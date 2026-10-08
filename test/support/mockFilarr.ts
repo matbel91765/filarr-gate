@@ -371,6 +371,13 @@ export class MockFilarr {
     access.grants.set(storeId, { rights: 'r', keys: [{ e: 0, g: 0, sealed }] });
   }
 
+  /** Le manifeste d'un AUTRE magasin recopié sous celui-ci : la boîte noire doit le refuser. */
+  plantForeignManifest(accessId: string, storeId: string, fromStoreId: string): void {
+    const access = this.accesses.get(accessId)!;
+    const foreign = access.manifests.get(fromStoreId)!;
+    access.manifests.set(storeId, { sealed: foreign.sealed, rev: foreign.rev });
+  }
+
   /** Le manifeste d'un magasin, scellé vers l'accès (§ 4), slugs gardés d'une publication à l'autre. */
   async publishManifest(accessId: string, storeId: string): Promise<void> {
     const access = this.accesses.get(accessId)!;

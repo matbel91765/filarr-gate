@@ -694,7 +694,8 @@ export class Replicator extends EventEmitter {
           this.selfDirty = true;
           return;
         default:
-          if (err.status === 426) {
+          // 426 client_upgrade_required : cette version ne parle plus le protocole ; websocket_required n'en est pas un
+          if (err.status === 426 && err.code !== 'websocket_required') {
             this.setLink('upgrade_required', 'Cette version de Filarr Gate est trop ancienne pour l’API Filarr');
             return;
           }

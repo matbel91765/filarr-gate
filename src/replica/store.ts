@@ -640,21 +640,21 @@ export class StoreMirror {
     const sealedSeq = this.seq + 1;
     const headBody = await sealHead(c, keys, sealedSeq, head);
 
-    let budget = INLINE_BUDGET;
-    const slots: Array<Record<string, unknown>> = [];
-    for (const slot of laid) {
-      const common = { p: slot.p, ver: slot.ver, e: keys.epoch, g: keys.generation };
-      if (slot.body.length <= INLINE_MAX && slot.body.length <= budget) {
-        budget -= slot.body.length;
-        slots.push({ ...common, body: toBase64Url(slot.body) });
-      } else {
-        const staged = await this.deps.client.putBytes<{ token: string }>(`dbstore/${this.storeId}/stage`, slot.body);
-        slots.push({ ...common, stage: staged.token });
-      }
-    }
-
     let seq: number;
     try {
+      // Les corps : en ligne tant que le budget tient, sinon par dépôt (un refus du dépôt est un refus de la validation)
+      let budget = INLINE_BUDGET;
+      const slots: Array<Record<string, unknown>> = [];
+      for (const slot of laid) {
+        const common = { p: slot.p, ver: slot.ver, e: keys.epoch, g: keys.generation };
+        if (slot.body.length <= INLINE_MAX && slot.body.length <= budget) {
+          budget -= slot.body.length;
+          slots.push({ ...common, body: toBase64Url(slot.body) });
+        } else {
+          const staged = await this.deps.client.putBytes<{ token: string }>(`dbstore/${this.storeId}/stage`, slot.body);
+          slots.push({ ...common, stage: staged.token });
+        }
+      }
       const res = await this.deps.client.json<{ seq: number }>('POST', `dbstore/${this.storeId}/commit`, {
         baseSeq: this.seq,
         slots,

@@ -21,6 +21,7 @@ let gate: Gate;
 let api: string;
 let admin: string;
 const stores: Record<string, string> = {};
+let accessIdOfGate = '';
 const ADMIN_PASSWORD = 'mot-de-passe-de-test';
 
 /** Un récepteur de webhooks : rend les statuts demandés, dans l'ordre, puis 200. */
@@ -34,6 +35,7 @@ beforeAll(async () => {
   await mock.listen();
   for (const spec of demoStores) stores[spec.dbId] = await mock.createStore(spec);
   const { token, accessId } = await mock.createAccess('ERP Atelier');
+  accessIdOfGate = accessId;
   await mock.grant(accessId, stores[CLIENTS_DB]!, 'rw');
   await mock.grant(accessId, stores[COMMANDES_DB]!, 'r');
   await mock.grant(accessId, stores[CATALOGUE_DB]!, 'r');
@@ -249,6 +251,21 @@ describe('webhooks signés', () => {
     await until(() => gate.model.base('clients')!.base.mirror.rowById('r_globex')?.cells.p_ville === 'Brest', 3000, 'changement reçu');
     await new Promise((r) => setTimeout(r, 150));
     expect(received).toEqual([]);
+    gate.webhooks.remove(hook.id);
+  });
+});
+
+describe('avis de quota', () => {
+  it('un message quota du flux part vers les webhooks gate.quota, et au journal', async () => {
+    const hook = gate.webhooks.create({ name: 'Alerte quota', url: hookUrl, target: null, events: ['gate.quota'], filter: null, transition: false, fields: null, expand: [] });
+    received.length = 0;
+    mock.quota(accessIdOfGate, 'sync', 80);
+    await until(() => received.some((r) => r.headers['filarr-gate-event'] === 'gate.quota'), 3000, 'livraison gate.quota');
+    const body = JSON.parse(received.find((r) => r.headers['filarr-gate-event'] === 'gate.quota')!.body);
+    expect(body).toMatchObject({ event: 'gate.quota', name: 'sync', pct: 80 });
+    expect(verifySignature(hook.secret, received.at(-1)!.body, String(received.at(-1)!.headers['filarr-gate-signature']))).toBe(true);
+    expect(gate.replicator.quotaAlerts[0]).toMatchObject({ name: 'sync', pct: 80 });
+    expect(gate.journal.list({ kind: 'filarr' }).some((e) => e.code === 'quota')).toBe(true);
     gate.webhooks.remove(hook.id);
   });
 });

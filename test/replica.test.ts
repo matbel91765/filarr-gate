@@ -3,6 +3,7 @@
  * lecture vérifiée, flux, relève, 429, révocation, clé manquante, écriture.
  */
 
+import { randomBytes } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -123,6 +124,20 @@ describe('la réplique', () => {
     expect(commandes.mirror.status).toBe('missing_key');
     expect(commandes.mirror.rows).toEqual([]);
     expect(r.bySlug('clients')!.mirror.status).toBe('ready');
+  });
+
+  it('refuse un manifeste recopié d’un autre magasin : la base reste sans points d’accès', async () => {
+    const { token, accessId } = await mock.createAccess('ERP');
+    await mock.grant(accessId, stores[CLIENTS_DB]!, 'r');
+    await mock.grant(accessId, stores[COMMANDES_DB]!, 'r');
+    mock.plantForeignManifest(accessId, stores[COMMANDES_DB]!, stores[CLIENTS_DB]!);
+    const r = make();
+    await r.start(token);
+    expect(r.refused).toEqual([expect.objectContaining({ storeId: stores[COMMANDES_DB], what: 'manifest', reason: 'manifeste hors de sa place' })]);
+    expect(r.bases.get(stores[COMMANDES_DB]!)!.manifest).toBeNull();
+    // Le magasin est lu (son droit est bon), mais aucun slug ne l'expose
+    expect(r.bases.get(stores[COMMANDES_DB]!)!.mirror.status).toBe('ready');
+    expect(r.bySlug('clients')!.storeId).toBe(stores[CLIENTS_DB]);
   });
 
   it('montée de génération sans rescellement : « clé manquante pour (0, 1) », l’ancienne copie reste servie', async () => {
@@ -364,6 +379,15 @@ describe('l’écriture (§ 7)', () => {
     await mock.bumpGeneration(storeId, { reseal: false });
     await expect(gate.commit([op('r_acme', 'p_ca', 1)])).rejects.toThrow(/clé manquante pour \(0, 1\)/);
     expect((await mock.appRows(storeId)).find((x) => x.id === 'r_acme')?.cells.p_ca).toBe(12500);
+  });
+
+  it('un bloc lourd part par un dépôt (stage) ; une ligne seule plus lourde que 32 Kio garde son bloc', async () => {
+    const long = randomBytes(90_000).toString('base64'); // incompressible : ~120 Kio de texte
+    const before = mock.requests.filter((q) => q.path.endsWith('/stage')).length;
+    await gate.commit([op('r_long', 'p_nom', long), op('r_long', '#o', 'zz')]);
+    expect(mock.requests.filter((q) => q.path.endsWith('/stage')).length).toBeGreaterThan(before);
+    expect((await mock.appRows(storeId)).find((x) => x.id === 'r_long')?.cells.p_nom).toBe(long);
+    expect(gate.rowById('r_long')?.cells.p_nom).toBe(long);
   });
 
   it('les corps envoyés restent chiffrés : aucune valeur en clair ne part vers Filarr', async () => {
