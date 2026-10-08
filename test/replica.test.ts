@@ -294,6 +294,26 @@ describe('la réplique', () => {
     expect(existsSync(join(dir, 'blocks'))).toBe(false);
   });
 
+  it('un autre jeton remplace le premier : ses bases, son client, rien de l’ancien', async () => {
+    const a = await mock.createAccess('A');
+    await mock.grant(a.accessId, stores[CLIENTS_DB]!, 'r');
+    const b = await mock.createAccess('B');
+    await mock.grant(b.accessId, stores[CLIENTS_DB]!, 'r');
+    await mock.grant(b.accessId, stores[COMMANDES_DB]!, 'r');
+    const r = make();
+    await r.start(a.token);
+    await r.start(b.token);
+    expect(r.access?.name).toBe('B');
+    expect(r.bases.size).toBe(2);
+    // Révoquer A monte la génération de Clients (rescellée pour B) : l'application écrit sous g = 1
+    await mock.revoke(a.accessId);
+    const app = await appWriter(mock, stores[CLIENTS_DB]!);
+    await app.commit([{ r: 'r_acme', f: 'p_ville', v: 'Givors', t: app.tick() }]);
+    await until(() => r.bySlug('clients')!.mirror.rowById('r_acme')?.cells.p_ville === 'Givors', 3000, 'changement via le nouveau jeton');
+    expect(r.link).not.toBe('revoked');
+    expect(mock.requests.filter((q) => q.access === a.accessId && q.status === 401)).toEqual([]);
+  });
+
   it('relation vers une base non ouverte : la base visée n’est pas résolue', async () => {
     const { token, accessId } = await mock.createAccess('ERP');
     await mock.grant(accessId, stores[CATALOGUE_DB]!, 'r');

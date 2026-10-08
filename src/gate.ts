@@ -206,6 +206,7 @@ export class Gate {
     }
     if (locked.length > 0) throw new Error(`Réglages fixés par l'environnement ou gate.toml : ${locked.join(', ')}`);
     const before = this.settings;
+    const previous = { ...this.state.data.settings };
     this.state.data.settings = next;
     this.state.saveNow();
     this.config = loadConfig(next, this.opts.env ?? process.env, this.state.dir);
@@ -214,7 +215,16 @@ export class Gate {
     const listenerChanged = ['host', 'port', 'tlsCert', 'tlsKey'].some((k) => JSON.stringify(before[k as SettingKey]) !== JSON.stringify(after[k as SettingKey]));
     if (listenerChanged && this.apiHttp) {
       await this.closeServer(this.apiHttp);
-      this.apiHttp = await this.listenApi();
+      try {
+        this.apiHttp = await this.listenApi();
+      } catch (err) {
+        // Le nouveau port est pris (ou le certificat illisible) : on revient aux réglages d'avant
+        this.state.data.settings = previous;
+        this.state.saveNow();
+        this.config = loadConfig(previous, this.opts.env ?? process.env, this.state.dir);
+        this.apiHttp = await this.listenApi();
+        throw new Error(`L'API locale ne peut pas écouter là : ${(err as Error).message}. Réglages d'avant rétablis.`);
+      }
     }
     this.journal.add({ kind: 'admin', who: 'administration', what: 'réglages enregistrés', code: 'ok', note: Object.keys(patch).join(', ') });
     return { restarted: listenerChanged };

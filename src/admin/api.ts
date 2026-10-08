@@ -146,7 +146,15 @@ export class AdminApi {
       res.end("L'interface n'est pas construite : npm run build:ui");
       return;
     }
-    const rel = normalize(decodeURIComponent(pathname.slice('/admin/'.length)) || 'index.html');
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(pathname.slice('/admin/'.length));
+    } catch {
+      res.writeHead(400, SECURITY_HEADERS);
+      res.end();
+      return;
+    }
+    const rel = normalize(decoded || 'index.html');
     let file = resolve(this.root, rel);
     if (!file.startsWith(resolve(this.root) + sep) && file !== resolve(this.root)) {
       res.writeHead(403, SECURITY_HEADERS);

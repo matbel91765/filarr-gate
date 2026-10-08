@@ -175,7 +175,12 @@ export class Replicator extends EventEmitter {
    */
   async start(token: string): Promise<void> {
     await this.stop();
-    this.identity = await openToken(token);
+    const identity = await openToken(token);
+    // Un autre jeton : les miroirs de l'ancien (et leur client) s'effacent ; le cache chiffré reste utilisable
+    for (const base of this.bases.values()) base.mirror.wipe();
+    this.bases.clear();
+    if (this.identity) wipeIdentity(this.identity);
+    this.identity = identity;
     this.client = new FilarrClient({
       baseUrl: this.opts.apiUrl,
       authorization: this.identity.authorization,

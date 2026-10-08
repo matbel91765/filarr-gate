@@ -58,6 +58,8 @@ FILARR_GATE_CACHE, FILARR_GATE_POLL_SECONDS, FILARR_GATE_CONFIG (gate.toml).
 `;
 
 async function serve(): Promise<void> {
+  // Une promesse oubliée ne fait pas tomber la boîte noire : elle est journalisée
+  process.on('unhandledRejection', (reason) => log.error(`promesse rejetée sans suite : ${(reason as Error)?.message ?? String(reason)}`));
   const gate = new Gate();
   let stopping = false;
   const stop = async (signal: string) => {

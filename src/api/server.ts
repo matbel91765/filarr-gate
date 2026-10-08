@@ -252,7 +252,12 @@ export class ApiServer {
 
     if (!path.startsWith('/v1/')) throw new ApiError(404, 'not_found', `Chemin inconnu : ${path}`);
     const key = (ctx.key = this.auth(req, ctx.ip));
-    const parts = path.slice(4).split('/').map(decodeURIComponent);
+    let parts: string[];
+    try {
+      parts = path.slice(4).split('/').map(decodeURIComponent);
+    } catch {
+      throw new ApiError(400, 'bad_path', 'Chemin illisible');
+    }
 
     if (parts[0] === 'sql' && parts.length === 1) {
       ctx.route = '/v1/sql';
