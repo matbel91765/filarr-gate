@@ -9,6 +9,8 @@
  *   filarr-gate version
  */
 
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { createInterface } from 'node:readline';
 import { coerce, defaultStateDir, loadConfig, type SettingKey } from './config';
 import { Gate } from './gate';
@@ -44,6 +46,7 @@ const HELP = `Filarr Gate ${GATE_VERSION} — une base Filarr servie comme une A
                                  crée une clé d'application en lecture sur toutes les vues
   filarr-gate mcp [--gate http://127.0.0.1:8443] [--key gk_…]
                                  serveur MCP sur stdio, relayé vers une boîte noire en marche
+  filarr-gate health             sonde /health de l'API locale (HEALTHCHECK de Docker)
   filarr-gate version
 
 Répertoire d'état : FILARR_GATE_STATE_DIR (d'office ${defaultStateDir()}).
@@ -110,6 +113,23 @@ function keysCreate(flags: Record<string, string | true>): void {
   process.stdout.write(`Clé « ${record.name} » (lecture de toutes les vues${record.sql ? ', SQL' : ''}${record.mcp ? ', MCP' : ''}) :\n\n  ${key}\n\nElle ne sera plus montrée. Redémarrez la boîte noire si elle tourne.\n`);
 }
 
+/** Sonde de santé (HEALTHCHECK de Docker) : `/health` de l'API locale, sur cette machine. */
+function health(): Promise<void> {
+  const { settings } = loadConfig({});
+  const tls = Boolean(settings.tlsCert && settings.tlsKey);
+  const req = (tls ? httpsRequest : httpRequest)(
+    { host: '127.0.0.1', port: settings.port, path: '/health', method: 'GET', timeout: 4000, ...(tls ? { rejectUnauthorized: false } : {}) },
+    (res) => {
+      res.resume();
+      process.exit(res.statusCode === 200 ? 0 : 1);
+    }
+  );
+  req.on('error', () => process.exit(1));
+  req.on('timeout', () => process.exit(1));
+  req.end();
+  return new Promise(() => undefined);
+}
+
 /** MCP sur stdio : chaque ligne JSON-RPC part vers `POST /mcp` d'une boîte noire en marche. */
 async function mcpStdio(flags: Record<string, string | true>): Promise<void> {
   const gateUrl = (typeof flags.gate === 'string' ? flags.gate : process.env.FILARR_GATE_URL) ?? `http://127.0.0.1:${loadConfig({}).settings.port}`;
@@ -163,6 +183,8 @@ async function main(): Promise<void> {
       throw new Error('keys create --name …');
     case 'mcp':
       return mcpStdio(flags);
+    case 'health':
+      return health();
     case 'version':
       return void process.stdout.write(`${GATE_VERSION}\n`);
     default:

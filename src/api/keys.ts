@@ -184,7 +184,8 @@ export class KeyRegistry {
     this.bumpHourly(record.id);
     record.lastUsedAt = new Date().toISOString();
     record.lastIp = ip;
-    this.state.save();
+    // Une trace d'usage : l'état s'écrit au plus toutes les 5 s, même sous une forte charge
+    this.state.save(5000);
     return { key: record };
   }
 }

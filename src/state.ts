@@ -148,10 +148,10 @@ export class StateStore {
     writeSecret(join(this.dir, 'state.json'), `${JSON.stringify(this.data, null, 2)}\n`);
   }
 
-  /** Enregistre bientôt (plusieurs changements groupés). */
-  save(): void {
+  /** Enregistre bientôt (plusieurs changements groupés ; `delayMs` long pour les simples traces d'usage). */
+  save(delayMs = 200): void {
     if (this.saving) return;
-    this.saving = setTimeout(() => this.saveNow(), 200);
+    this.saving = setTimeout(() => this.saveNow(), delayMs);
     this.saving.unref?.();
   }
 

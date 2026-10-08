@@ -185,7 +185,8 @@ export class AdminApi {
         version: g.version,
         authenticated: authed,
         setup: { done: this.setupDone, hasToken: g.hasToken, needsCode: !this.setupDone && !isLoopback(ip) },
-        ...(authed || !this.setupDone ? this.summary() : {}),
+        // Le résumé (liaison, accès, compteurs) : à une session, ou à CETTE machine pendant la mise en route
+        ...(authed || (!this.setupDone && isLoopback(ip)) ? this.summary() : {}),
       });
     }
     if (path === '/login' && method === 'POST') {
