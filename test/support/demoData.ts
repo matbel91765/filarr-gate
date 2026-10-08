@@ -93,7 +93,7 @@ export const commandesViews: DbView[] = [
     filters: [],
     sorts: [],
     query: {
-      sql: 'SELECT c.ville, count(*) AS commandes, sum(o.montant) AS chiffre FROM commandes AS o JOIN clients AS c ON o.client = c.id GROUP BY c.ville ORDER BY chiffre DESC',
+      sql: 'SELECT c.ville, count(*) AS commandes, sum(o.montant) AS chiffre FROM commandes AS o JOIN clients AS c ON o.client_id = c.id GROUP BY c.ville ORDER BY chiffre DESC',
     },
   },
 ];

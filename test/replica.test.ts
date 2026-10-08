@@ -144,19 +144,101 @@ describe('la réplique', () => {
     expect(clients.mirror.keys.has(keyId(0, 1))).toBe(true);
   });
 
-  it('palier Free : flux refusé, relève par changes, et 429 api_poll_interval honoré', async () => {
+  it('palier Free : sans flux (access.stream), relève par changes jamais plus vite que l’écart du palier', async () => {
     mock.freePollMs = 150;
     const { token, accessId } = await mock.createAccess('Free', 'free');
     await mock.grant(accessId, stores[CLIENTS_DB]!, 'r');
-    const r = make({ pollIntervalMs: 50 });
+    const r = make({ pollIntervalMs: 20 });
     await r.start(token);
-    await until(() => r.link === 'polling' || r.link === 'limited', 3000, 'relève');
+    await until(() => r.link === 'polling', 3000, 'relève');
     expect(r.streamRefused).toBe(true);
+    expect(r.pollIntervalMs).toBe(150);
+    // Le flux n'a même pas été tenté
+    expect(mock.requests.some((q) => q.path === '/api-access/self/stream')).toBe(false);
     await mock.appEdit(stores[CLIENTS_DB]!, [{ r: 'r_globex', f: 'p_ville', v: 'Rennes' }]);
     await until(() => r.bySlug('clients')!.mirror.rowById('r_globex')?.cells.p_ville === 'Rennes', 5000, 'relève du changement');
-    // La relève trop rapprochée a reçu un 429 ; la boîte noire a attendu le Retry-After
-    expect(mock.requests.some((q) => q.status === 429 && q.path.endsWith('/changes'))).toBe(true);
-    expect(journal.list({ kind: 'filarr' }).some((e) => e.code === '429')).toBe(true);
+    // L'écart du palier est tenu : aucun 429 api_poll_interval
+    expect(mock.requests.filter((q) => q.status === 429)).toEqual([]);
+  });
+
+  it('un 429 api_poll_interval ne retient que SON magasin, jusqu’au Retry-After', async () => {
+    const { token, accessId } = await mock.createAccess('ERP', 'free');
+    mock.freePollMs = 50;
+    await mock.grant(accessId, stores[CLIENTS_DB]!, 'r');
+    const r = make({ pollIntervalMs: 20 });
+    await r.start(token);
+    await until(() => r.link === 'polling', 3000, 'relève');
+    mock.failNext((m, p) => m === 'GET' && p.endsWith('/changes'), 429, 'api_poll_interval', { retryAfter: 1 });
+    await until(() => (r.bySlug('clients')?.waitUntil ?? 0) > Date.now(), 3000, 'magasin en attente');
+    expect(r.link).toBe('polling');
+    expect(r.notBefore).toBe(0);
+    await mock.appEdit(stores[CLIENTS_DB]!, [{ r: 'r_globex', f: 'p_ville', v: 'Brest' }]);
+    await until(() => r.bySlug('clients')!.mirror.rowById('r_globex')?.cells.p_ville === 'Brest', 5000, 'reprise après Retry-After');
+    expect(journal.list({ kind: 'filarr' }).some((e) => e.code === '429' && e.what.includes('api_poll_interval'))).toBe(true);
+  });
+
+  it('jeton remplacé dans Filarr : revoked puis fermeture 4301, tout est effacé', async () => {
+    const { token, accessId } = await mock.createAccess('ERP');
+    await mock.grant(accessId, stores[CLIENTS_DB]!, 'r');
+    const r = make();
+    await r.start(token);
+    await until(() => r.link === 'live', 3000, 'flux');
+    await mock.rotateToken(accessId);
+    await until(() => r.link === 'revoked', 3000, 'révocation');
+    expect(r.bases.size).toBe(0);
+    // L'ancien jeton est refusé à l'instant
+    const old = new FilarrClient({ baseUrl: mock.url, authorization: (await openToken(token)).authorization, version: 't' });
+    await expect(old.json('GET', 'api-access/self')).rejects.toMatchObject({ code: 'api_access_unknown' });
+  });
+
+  it('pause (fermeture 4302) : la copie reste servie, la liaison le dit, la reprise rattrape', async () => {
+    const { token, accessId } = await mock.createAccess('ERP');
+    await mock.grant(accessId, stores[CLIENTS_DB]!, 'r');
+    const r = make();
+    await r.start(token);
+    await until(() => r.link === 'live', 3000, 'flux');
+    mock.pause(accessId);
+    await until(() => r.link === 'paused', 3000, 'pause');
+    expect(r.bySlug('clients')!.mirror.rows.length).toBe(4);
+    mock.pause(accessId, false);
+    await mock.appEdit(stores[CLIENTS_DB]!, [{ r: 'r_acme', f: 'p_ville', v: 'Bron' }]);
+    await until(() => r.bySlug('clients')!.mirror.rowById('r_acme')?.cells.p_ville === 'Bron', 5000, 'reprise');
+  });
+
+  it('interrupteur API_BASE_SWITCH éteint : 403 api_base_not_switched, sans rien effacer', async () => {
+    const { token, accessId } = await mock.createAccess('ERP');
+    await mock.grant(accessId, stores[CLIENTS_DB]!, 'r');
+    mock.baseSwitch = false;
+    const r = make();
+    await r.start(token);
+    expect(r.link).toBe('not_switched');
+    mock.baseSwitch = true;
+    await until(() => r.bySlug('clients')?.mirror.status === 'ready', 5000, 'ouverture');
+  });
+
+  it('flux : ping applicatif accepté, tout autre envoi ferme en 4307 ; 8 flux au plus par accès', async () => {
+    const { token } = await mock.createAccess('ERP');
+    const id = await openToken(token);
+    const client = new FilarrClient({ baseUrl: mock.url, authorization: id.authorization, version: 't' });
+    const url = mock.url.replace('http', 'ws') + '/api-access/self/stream';
+    const { default: WebSocket } = await import('ws');
+    const open = () =>
+      new Promise<InstanceType<typeof WebSocket>>((resolve, reject) => {
+        const ws = new WebSocket(url, { headers: client.headers() });
+        ws.once('open', () => resolve(ws));
+        ws.once('error', reject);
+      });
+    const ws = await open();
+    const pong = new Promise<string>((resolve) => ws.once('message', (d) => resolve(d.toString())));
+    ws.send(JSON.stringify({ t: 'ping' }));
+    expect(JSON.parse(await pong)).toEqual({ t: 'pong' });
+    const closed = new Promise<number>((resolve) => ws.once('close', (code) => resolve(code)));
+    ws.send('bonjour');
+    expect(await closed).toBe(4307);
+    const many = await Promise.all(Array.from({ length: 8 }, open));
+    const ninth = await open();
+    expect(await new Promise<number>((resolve) => ninth.once('close', (code) => resolve(code)))).toBe(4306);
+    for (const s of many) s.terminate();
   });
 
   it('un 429 api_rate suspend tout échange jusqu’au Retry-After', async () => {

@@ -2,16 +2,19 @@
  * UN FILARR EN MÉMOIRE, pour les essais et le banc local (`npm run mock-filarr`).
  *
  * Deux moitiés :
- *  - le SERVEUR : les routes que le contrat `api-base-1` § 5 ouvre à un accès
- *    (`/api-access/self`, le flux, `/dbstore/*`), avec la génération du § 2, le
- *    compare-and-swap de `db-store-1` § 8, les quotas et les en-têtes du § 6, et
+ *  - le SERVEUR : ce que le worker de Filarr ouvre à une boîte noire (contrat
+ *    `api-base-1` § 5 et § 6, et le code du worker qui l'implémente :
+ *    `apiGate.ts`, `apiAccess.ts`, `apiMeter.ts`, `dbStore.ts`) — l'ordre des
+ *    refus, la génération du § 2, le compare-and-swap de `db-store-1` § 8, le
+ *    compteur (débit, relève par magasin et par nature, quotas), les en-têtes,
+ *    le flux (8 au plus par accès, `ping`/`pong`, fermetures 4301 à 4307) et
  *    `/public/api-limits` ;
  *  - l'APPLICATION du créateur : elle tient la racine (FEK), écrit les magasins
  *    avec la VRAIE réplique de Filarr (`test/helpers/appReplica.ts`), scelle les
- *    droits vers `A_pub`, publie les manifestes, monte une génération, révoque.
+ *    droits vers `A_pub`, publie les manifestes, monte une génération, révoque,
+ *    remplace le jeton.
  *
- * Ce n'est pas le worker de Filarr : c'est une lecture du contrat, écrite pour
- * éprouver la boîte noire. Le worker réel n'a pas encore les routes `api-access`.
+ * Ce n'est pas le worker : c'est sa lecture, pour éprouver la boîte noire sans réseau.
  */
 
 import { createHash, randomBytes } from 'node:crypto';
@@ -28,14 +31,7 @@ import {
   sealToKey,
 } from '../../src/core/engine/store/apiAccess';
 import { isCover } from '../../src/core/engine/store/codec';
-import {
-  fromBase64Url,
-  personalStoreId,
-  storeKeys,
-  toBase64Url,
-  utf8Encode,
-  type StoreKeys,
-} from '../../src/core/engine/store/crypto';
+import { fromBase64Url, personalStoreId, storeKeys, toBase64Url, utf8Encode, type StoreKeys } from '../../src/core/engine/store/crypto';
 import { HlcClock } from '../../src/core/engine/store/hlc';
 import type { StoreOp } from '../../src/core/engine/store/registers';
 import type { DbProperty, DbRow, DbView } from '../../src/core/types';
@@ -49,27 +45,37 @@ import {
   type StoreTransport,
 } from '../helpers/appReplica';
 
-// ==================== Barème (contrat § 6) ====================
+// ==================== Le barème (worker `apiLimits.ts`, contrat § 6) ====================
 
-export type Tier = 'free' | 'solo' | 'pro' | 'teams';
+export type Tier = 'free' | 'solo' | 'pro' | 'teams' | 'enterprise';
 
-export const TIER_LIMITS: Record<Tier, {
+export interface ApiLimits {
   accesses: number;
   storesPerAccess: number;
-  writesPerDay: number | null;
+  write: boolean;
+  writesPerDay: number;
   syncPerMonth: number;
   bytesPerMonth: number;
   ratePerMinute: number;
-  live: boolean;
-  pollSeconds: number | null;
-  eventsDays: number;
+  stream: boolean;
+  pollIntervalS: number;
+  eventsRetentionDays: number;
   ipAllowlist: boolean;
-}> = {
-  free: { accesses: 1, storesPerAccess: 1, writesPerDay: null, syncPerMonth: 10_000, bytesPerMonth: 1e9, ratePerMinute: 30, live: false, pollSeconds: 300, eventsDays: 7, ipAllowlist: false },
-  solo: { accesses: 3, storesPerAccess: 3, writesPerDay: 1_000, syncPerMonth: 100_000, bytesPerMonth: 10e9, ratePerMinute: 120, live: true, pollSeconds: null, eventsDays: 30, ipAllowlist: false },
-  pro: { accesses: 20, storesPerAccess: 20, writesPerDay: 20_000, syncPerMonth: 1_000_000, bytesPerMonth: 100e9, ratePerMinute: 600, live: true, pollSeconds: null, eventsDays: 90, ipAllowlist: true },
-  teams: { accesses: 100, storesPerAccess: 100, writesPerDay: 100_000, syncPerMonth: 5_000_000, bytesPerMonth: 500e9, ratePerMinute: 1_200, live: true, pollSeconds: null, eventsDays: 365, ipAllowlist: true },
+}
+
+const GIB = 1024 ** 3;
+
+export const API_LIMITS: Record<Tier, ApiLimits> = {
+  free: { accesses: 1, storesPerAccess: 1, write: false, writesPerDay: 0, syncPerMonth: 10_000, bytesPerMonth: GIB, ratePerMinute: 30, stream: false, pollIntervalS: 300, eventsRetentionDays: 7, ipAllowlist: false },
+  solo: { accesses: 3, storesPerAccess: 3, write: true, writesPerDay: 1_000, syncPerMonth: 100_000, bytesPerMonth: 10 * GIB, ratePerMinute: 120, stream: true, pollIntervalS: 0, eventsRetentionDays: 30, ipAllowlist: false },
+  pro: { accesses: 20, storesPerAccess: 20, write: true, writesPerDay: 20_000, syncPerMonth: 1_000_000, bytesPerMonth: 100 * GIB, ratePerMinute: 600, stream: true, pollIntervalS: 0, eventsRetentionDays: 90, ipAllowlist: true },
+  teams: { accesses: 100, storesPerAccess: 100, write: true, writesPerDay: 100_000, syncPerMonth: 5_000_000, bytesPerMonth: 500 * GIB, ratePerMinute: 1_200, stream: true, pollIntervalS: 0, eventsRetentionDays: 365, ipAllowlist: true },
+  enterprise: { accesses: 100, storesPerAccess: 100, write: true, writesPerDay: 100_000, syncPerMonth: 5_000_000, bytesPerMonth: 500 * GIB, ratePerMinute: 1_200, stream: true, pollIntervalS: 0, eventsRetentionDays: 365, ipAllowlist: true },
 };
+
+/** Flux simultanés d'un même accès (worker `API_STREAMS_PER_ACCESS`). */
+export const STREAMS_PER_ACCESS = 8;
+export const CLOSE = { revoked: 4301, paused: 4302, changed: 4303, expired: 4304, quota: 4305, tooMany: 4306, unexpected: 4307 } as const;
 
 // ==================== État ====================
 
@@ -77,7 +83,6 @@ interface MockSlot {
   ver: number;
   e: number;
   g: number;
-  token: string;
 }
 
 interface MockStore {
@@ -90,7 +95,7 @@ interface MockStore {
   headToken: string | null;
   hk: { e: number; g: number } | null;
   slots: Map<string, MockSlot>;
-  log: Array<{ seq: number; slots: Array<{ p: string; ver: number; e: number; g: number }>; removed: string[] }>;
+  log: Array<{ seq: number; slots: Array<{ p: string; ver: number; e: number; g?: number }>; removed: string[] }>;
   views: Array<DbView & { slug?: string }>;
   replica: StoreReplica | null;
 }
@@ -104,10 +109,14 @@ interface MockAccess {
   revoked: boolean;
   paused: boolean;
   expiresAt: string | null;
+  createdAt: string;
   grants: Map<string, { rights: 'r' | 'rw'; keys: Array<{ e: number; g: number; sealed: string }> }>;
   manifests: Map<string, { sealed: string; rev: number }>;
   usage: { sync: number; bytes: number; writes: number };
-  lastChanges: Map<string, number>;
+  minute: number;
+  minuteCount: number;
+  /** Dernière relève, par `<nature>:<magasin>` (worker : `polls`). */
+  polls: Map<string, number>;
   sockets: Set<WebSocket>;
   baseSlugs: Map<string, string>;
 }
@@ -121,9 +130,11 @@ interface Injection {
 }
 
 export interface MockOptions {
-  /** L'interrupteur `API_BASE_WRITE` (§ 0). */
+  /** `API_BASE_SWITCH` pour le compte du créateur. */
+  baseSwitch?: boolean;
+  /** `API_BASE_WRITE` pour le compte du créateur. */
   writeSwitch?: boolean;
-  /** Relève minimale en Free, en millisecondes (300 s au contrat). */
+  /** Écart minimal entre deux relèves d'un magasin en Free, en millisecondes (300 s au contrat). */
   freePollMs?: number;
 }
 
@@ -135,10 +146,11 @@ export interface NewStore {
   views?: DbView[];
 }
 
+type MeterKind = 'self' | 'stream' | 'head' | 'changes' | 'slots' | 'stage' | 'commit';
+
 const json = (res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void => {
-  const text = JSON.stringify(body);
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
-  res.end(text);
+  res.end(JSON.stringify(body));
 };
 
 const fail = (res: ServerResponse, status: number, code: string, extra: Record<string, unknown> = {}, headers: Record<string, string> = {}) =>
@@ -154,16 +166,23 @@ const readBody = (req: IncomingMessage): Promise<Buffer> =>
 
 const newToken = (): string => toBase64Url(randomBytes(16));
 
+/** L'entrée d'un bloc à la forme du contrat : `g` omis quand il vaut 0. */
+const slotRef = (p: string, ver: number, e: number, g = 0) => (g > 0 ? { p, ver, e, g } : { p, ver, e });
+
+/** Ce que la porte décide d'une requête : un refus, ou l'accès qui passe. */
+type GateOutcome = { refusal: { status: number; code: string; extra?: Record<string, unknown>; headers?: Record<string, string> } } | { access: MockAccess };
+
 export class MockFilarr {
   readonly fek = randomBytes(32);
   readonly site = randomBytes(4).toString('hex');
   readonly stores = new Map<string, MockStore>();
   readonly accesses = new Map<string, MockAccess>();
-  /** Corps chiffrés, par jeton (le R2 du worker). */
+  /** Corps chiffrés, par `storeId|p|ver` ou `storeId|head|seq` (le R2 du worker). */
   readonly bodies = new Map<string, Uint8Array>();
   readonly staged = new Map<string, Uint8Array>();
   /** Les requêtes reçues (méthode et chemin), pour les essais. */
-  readonly requests: Array<{ method: string; path: string; status: number; access?: string }> = [];
+  readonly requests: Array<{ method: string; path: string; status: number; access?: string; code?: string }> = [];
+  baseSwitch: boolean;
   writeSwitch: boolean;
   freePollMs: number;
   private injections: Injection[] = [];
@@ -172,8 +191,16 @@ export class MockFilarr {
   url = '';
 
   constructor(opts: MockOptions = {}) {
+    this.baseSwitch = opts.baseSwitch ?? true;
     this.writeSwitch = opts.writeSwitch ?? true;
     this.freePollMs = opts.freePollMs ?? 300_000;
+  }
+
+  /** Le barème d'un palier, tel que le mock l'applique (relève Free réglable pour les essais). */
+  limitsOf(tier: Tier): ApiLimits {
+    const l = { ...API_LIMITS[tier] };
+    if (l.pollIntervalS > 0) l.pollIntervalS = this.freePollMs / 1000;
+    return l;
   }
 
   // ==================== Le côté de l'application (créateur) ====================
@@ -183,13 +210,10 @@ export class MockFilarr {
     return storeKeys(c, this.fek, storeId, e, g);
   }
 
-  /** Le transport en mémoire de la réplique de l'application. */
+  /** Le transport en mémoire de la réplique de l'application (qui ignore la génération : g = 0, sans `hk`). */
   private appTransport(store: MockStore): StoreTransport {
     return {
-      head: async () => ({
-        seq: store.seq,
-        head: store.headToken ? this.bodies.get(store.headToken) ?? null : null,
-      }),
+      head: async () => ({ seq: store.seq, head: store.headToken ? (this.bodies.get(store.headToken) ?? null) : null }),
       slots: async (refs: SlotRef[]) => {
         const out = new Map<string, Uint8Array | null>();
         for (const r of refs) out.set(slotRefKey(r.p, r.ver), this.bodyOf(store, r.p, r.ver));
@@ -234,8 +258,7 @@ export class MockFilarr {
     };
     this.stores.set(storeId, store);
     const keys = await this.rootKeys(storeId, 0, 0);
-    const clock = new HlcClock(this.site);
-    store.replica = new StoreReplica(c, { current: keys, all: [keys] }, this.appTransport(store), clock, { dbId: spec.dbId });
+    store.replica = new StoreReplica(c, { current: keys, all: [keys] }, this.appTransport(store), new HlcClock(this.site), { dbId: spec.dbId });
     await store.replica.load();
     await store.replica.migrate(spec.rows, { properties: spec.properties, collation: 'fr' });
     return storeId;
@@ -265,30 +288,53 @@ export class MockFilarr {
     return s;
   }
 
-  /** Crée un accès et rend son jeton (montré une fois, jamais gardé par le serveur). */
-  async createAccess(name: string, tier: Tier = 'pro'): Promise<{ token: string; accessId: string }> {
+  private async newProof(): Promise<{ token: string; id: string; authHash: string; aPub: string; idBytes: Uint8Array }> {
     const idBytes = randomBytes(16);
     const secret = randomBytes(32);
-    const token = formatAccessToken(idBytes, secret);
     const keys = await deriveAccessKeys(c, curves, idBytes, secret);
-    const id = toBase64Url(idBytes);
-    this.accesses.set(id, {
-      id,
+    return { token: formatAccessToken(idBytes, secret), id: toBase64Url(idBytes), authHash: await accessAuthHash(c, keys.aAuth), aPub: keys.aPub, idBytes };
+  }
+
+  /** Crée un accès et rend son jeton (montré une fois, jamais gardé par le serveur). */
+  async createAccess(name: string, tier: Tier = 'pro'): Promise<{ token: string; accessId: string }> {
+    const proof = await this.newProof();
+    this.accesses.set(proof.id, {
+      id: proof.id,
       name,
-      authHash: await accessAuthHash(c, keys.aAuth),
-      aPub: keys.aPub,
+      authHash: proof.authHash,
+      aPub: proof.aPub,
       tier,
       revoked: false,
       paused: false,
       expiresAt: null,
+      createdAt: new Date().toISOString(),
       grants: new Map(),
       manifests: new Map(),
       usage: { sync: 0, bytes: 0, writes: 0 },
-      lastChanges: new Map(),
+      minute: 0,
+      minuteCount: 0,
+      polls: new Map(),
       sockets: new Set(),
       baseSlugs: new Map(),
     });
-    return { token, accessId: id };
+    return { token: proof.token, accessId: proof.id };
+  }
+
+  /**
+   * Remplace le jeton (`POST /api-access/:id/rotate-token`) : nouvelle paire, tout est rescellé
+   * vers elle ; les flux de l'ancien jeton reçoivent `revoked` et ferment en 4301.
+   */
+  async rotateToken(accessId: string): Promise<string> {
+    const access = this.accesses.get(accessId)!;
+    // L'identifiant de l'accès reste ; la preuve et la paire changent
+    const idBytes = fromBase64Url(accessId);
+    const secret = randomBytes(32);
+    const keys = await deriveAccessKeys(c, curves, idBytes, secret);
+    this.signal(access, { t: 'revoked' }, { code: CLOSE.revoked, reason: 'api_access_token_rotated' });
+    access.authHash = await accessAuthHash(c, keys.aAuth);
+    access.aPub = keys.aPub;
+    for (const [storeId, grant] of access.grants) await this.grant(accessId, storeId, grant.rights);
+    return formatAccessToken(idBytes, secret);
   }
 
   /** Les couples (e, g) en usage dans un magasin, plus le courant. */
@@ -313,7 +359,7 @@ export class MockFilarr {
     }
     access.grants.set(storeId, { rights, keys });
     await this.publishManifest(accessId, storeId);
-    this.push(access, { t: 'grant' });
+    this.signal(access, { t: 'grant' });
   }
 
   /** Un droit scellé glissé à la mauvaise place (un autre magasin) : la boîte noire doit le refuser. */
@@ -347,8 +393,9 @@ export class MockFilarr {
       updated: new Date().toISOString(),
     });
     const previous = access.manifests.get(storeId);
-    access.manifests.set(storeId, { sealed: await sealToKey(c, curves, access.aPub, utf8Encode(plain)), rev: (previous?.rev ?? 0) + 1 });
-    if (previous) this.push(access, { t: 'manifest', storeId, rev: (previous.rev ?? 0) + 1 });
+    const rev = (previous?.rev ?? 0) + 1;
+    access.manifests.set(storeId, { sealed: await sealToKey(c, curves, access.aPub, utf8Encode(plain)), rev });
+    if (previous) this.signal(access, { t: 'manifest', storeId, rev });
   }
 
   /** Monte la génération d'un magasin (§ 2) ; rescelle pour les accès restants, sauf demande contraire. */
@@ -364,17 +411,23 @@ export class MockFilarr {
     return store.g;
   }
 
-  /** Révoque un accès : refus immédiat, message au flux, montée de génération de ses magasins. */
+  /** Révoque : refus immédiat, `revoked` et fermeture 4301 des flux, montée de génération de ses magasins. */
   async revoke(accessId: string): Promise<void> {
     const access = this.accesses.get(accessId)!;
     access.revoked = true;
-    this.push(access, { t: 'revoked' });
-    for (const s of access.sockets) s.close();
+    this.signal(access, { t: 'revoked' }, { code: CLOSE.revoked, reason: 'api_access_revoked' });
     for (const storeId of access.grants.keys()) await this.bumpGeneration(storeId);
   }
 
-  quota(accessId: string, name: string, pct: number): void {
-    this.push(this.accesses.get(accessId)!, { t: 'quota', name, pct });
+  /** Met en pause (`PATCH { paused: true }`) : flux fermés en 4302. */
+  pause(accessId: string, paused = true): void {
+    const access = this.accesses.get(accessId)!;
+    access.paused = paused;
+    if (paused) this.signal(access, null, { code: CLOSE.paused, reason: 'api_access_paused' });
+  }
+
+  quota(accessId: string, name: 'sync' | 'bytes' | 'writes', pct: number): void {
+    this.signal(this.accesses.get(accessId)!, { t: 'quota', name, pct });
   }
 
   /** Les prochaines requêtes qui correspondent reçoivent ce refus. */
@@ -382,13 +435,15 @@ export class MockFilarr {
     this.injections.push({ match, status, code, ...(opts.retryAfter !== undefined ? { retryAfter: opts.retryAfter } : {}), times: opts.times ?? 1 });
   }
 
-  private push(access: MockAccess, msg: unknown): void {
-    for (const s of access.sockets) s.send(JSON.stringify(msg));
+  private signal(access: MockAccess, msg: unknown, close?: { code: number; reason: string }): void {
+    for (const s of access.sockets) {
+      if (msg !== null) s.send(JSON.stringify(msg));
+      if (close) s.close(close.code, close.reason);
+    }
   }
 
-  // ==================== L'automate du magasin ====================
+  // ==================== L'automate du magasin (`dbStoreObject.ts`) ====================
 
-  /** Un corps par (p, ver) ; une version remplacée reste servie (30 jours au contrat). */
   private bodyOf(store: MockStore, p: string, ver: number): Uint8Array | null {
     return this.bodies.get(`${store.storeId}|${p}|${ver}`) ?? null;
   }
@@ -400,46 +455,100 @@ export class MockFilarr {
       slots: Array<{ p: string; ver: number; e: number; g?: number; body?: Uint8Array | string; stage?: string | undefined }>;
       removed: string[];
       head: Uint8Array | string;
-      hk: { e: number; g?: number } | null;
+      hk: { e: number; g: number } | null;
     }
   ): { ok: true; seq: number } | { ok: false; code: string; status: number; extra?: Record<string, unknown> } {
     if (body.baseSeq !== store.seq) return { ok: false, code: 'seq_conflict', status: 409, extra: { seq: store.seq } };
-    const hkG = body.hk?.g ?? 0;
-    if (body.hk && hkG !== store.g) return { ok: false, code: 'stale_generation', status: 409, extra: { g: store.g } };
+    // La tête ET chaque bloc sous la génération COURANTE ; une tête sans `hk` vient d'un rédacteur d'avant 3.9 : g = 0
+    const g = store.g;
+    if ((body.hk ? body.hk.g : 0) !== g || body.slots.some((s) => (s.g ?? 0) !== g)) {
+      return { ok: false, code: 'stale_generation', status: 409, extra: { g } };
+    }
     for (const s of body.slots) {
-      if ((s.g ?? 0) !== store.g) return { ok: false, code: 'stale_generation', status: 409, extra: { g: store.g } };
       const old = store.slots.get(s.p);
       const expected = old ? old.ver + 1 : 1;
       if (s.ver !== expected) return { ok: false, code: 'slot_version', status: 409, extra: { p: s.p, expected } };
-      if (s.stage !== undefined && !this.staged.has(s.stage)) return { ok: false, code: 'stage_unknown', status: 409 };
     }
     const prefixes = new Set(store.slots.keys());
     for (const p of body.removed) prefixes.delete(p);
     for (const s of body.slots) prefixes.add(s.p);
     if (!isCover([...prefixes])) return { ok: false, code: 'bad_cover', status: 422 };
+    for (const s of body.slots) if (s.stage !== undefined && !this.staged.has(s.stage)) return { ok: false, code: 'stage_unknown', status: 409 };
 
     for (const p of body.removed) store.slots.delete(p);
     for (const s of body.slots) {
       const bytes = s.stage !== undefined ? this.staged.get(s.stage)! : typeof s.body === 'string' ? fromBase64Url(s.body) : s.body!;
       if (s.stage !== undefined) this.staged.delete(s.stage);
-      const token = `${store.storeId}|${s.p}|${s.ver}`;
-      this.bodies.set(token, bytes);
-      store.slots.set(s.p, { ver: s.ver, e: s.e, g: s.g ?? 0, token });
+      this.bodies.set(`${store.storeId}|${s.p}|${s.ver}`, bytes);
+      store.slots.set(s.p, { ver: s.ver, e: s.e, g });
     }
     const headToken = `${store.storeId}|head|${store.seq + 1}`;
     this.bodies.set(headToken, typeof body.head === 'string' ? fromBase64Url(body.head) : body.head);
     store.headToken = headToken;
-    store.hk = body.hk ? { e: body.hk.e, g: hkG } : null;
+    store.hk = body.hk ? { e: body.hk.e, g: body.hk.g } : null;
     store.seq += 1;
-    store.log.push({
-      seq: store.seq,
-      slots: body.slots.map((s) => ({ p: s.p, ver: s.ver, e: s.e, g: s.g ?? 0 })),
-      removed: body.removed,
-    });
+    store.log.push({ seq: store.seq, slots: body.slots.map((s) => slotRef(s.p, s.ver, s.e, g)), removed: body.removed });
     for (const access of this.accesses.values()) {
-      if (access.grants.has(store.storeId) && !access.revoked) this.push(access, { t: 'commit', storeId: store.storeId, seq: store.seq });
+      if (access.grants.has(store.storeId) && !access.revoked && !access.paused) this.signal(access, { t: 'commit', storeId: store.storeId, seq: store.seq });
     }
     return { ok: true, seq: store.seq };
+  }
+
+  // ==================== La porte (`apiGate.ts`) ====================
+
+  private quotaHeaders(access: MockAccess): Record<string, string> {
+    const lim = this.limitsOf(access.tier);
+    return {
+      'RateLimit-Limit': String(lim.ratePerMinute),
+      'RateLimit-Remaining': String(Math.max(0, lim.ratePerMinute - access.minuteCount)),
+      'RateLimit-Reset': String(60 - (Math.floor(Date.now() / 1000) % 60)),
+      'X-Filarr-Quota': `sync=${access.usage.sync}/${lim.syncPerMonth}; bytes=${access.usage.bytes}/${lim.bytesPerMonth}; writes=${access.usage.writes}/${lim.writesPerDay}`,
+    };
+  }
+
+  /** L'ordre des refus du worker : capacités, preuve, révocation, échéance, interrupteur, pause, palier, compteur. */
+  private gate(req: IncomingMessage, kind: MeterKind, storeId?: string): GateOutcome {
+    const caps = String(req.headers['x-filarr-sync-caps'] ?? '').split(',').map((s) => s.trim());
+    if (!caps.includes('db-store-1') || !caps.includes('api-base-1')) return { refusal: { status: 426, code: 'client_upgrade_required' } };
+    const m = /^Filarr-Access ([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization ?? '');
+    const access = m ? this.accesses.get(m[1]!) : undefined;
+    if (!m || !access || createHash('sha256').update(fromBase64Url(m[2]!)).digest('hex') !== access.authHash) {
+      return { refusal: { status: 401, code: 'api_access_unknown' } };
+    }
+    if (access.revoked) return { refusal: { status: 401, code: 'api_access_revoked' } };
+    if (access.expiresAt && Date.now() >= Date.parse(access.expiresAt)) return { refusal: { status: 401, code: 'api_access_expired' } };
+    if (!this.baseSwitch) return { refusal: { status: 403, code: 'api_base_not_switched' } };
+    if (access.paused) return { refusal: { status: 403, code: 'api_access_paused' } };
+    const lim = this.limitsOf(access.tier);
+    if (kind === 'stage' || kind === 'commit') {
+      if (!lim.write) return { refusal: { status: 403, code: 'api_tier_write' } };
+      if (!this.writeSwitch) return { refusal: { status: 403, code: 'api_write_unavailable' } };
+    }
+    if (kind === 'stream' && !lim.stream) return { refusal: { status: 403, code: 'api_tier_stream' } };
+    // Le compteur
+    const now = Date.now();
+    const minute = Math.floor(now / 60_000);
+    if (access.minute !== minute) {
+      access.minute = minute;
+      access.minuteCount = 0;
+    }
+    const headers = this.quotaHeaders(access);
+    if (access.minuteCount >= lim.ratePerMinute) {
+      const retry = Math.max(1, Math.ceil(((minute + 1) * 60_000 - now) / 1000));
+      return { refusal: { status: 429, code: 'api_rate', headers: { ...headers, 'Retry-After': String(retry) }, extra: { retryAfter: retry } } };
+    }
+    const pollKey = (kind === 'head' || kind === 'changes') && storeId ? `${kind}:${storeId}` : null;
+    if (pollKey && lim.pollIntervalS > 0) {
+      const last = access.polls.get(pollKey);
+      if (last !== undefined && now - last < lim.pollIntervalS * 1000) {
+        const retry = Math.max(1, Math.ceil((last + lim.pollIntervalS * 1000 - now) / 1000));
+        return { refusal: { status: 429, code: 'api_poll_interval', headers: { ...headers, 'Retry-After': String(retry) }, extra: { retryAfter: retry } } };
+      }
+    }
+    access.minuteCount += 1;
+    access.usage.sync += 1;
+    if (pollKey) access.polls.set(pollKey, now);
+    return { access };
   }
 
   // ==================== Le serveur ====================
@@ -455,23 +564,39 @@ export class MockFilarr {
       const reject = (status: number, code: string, headers: Record<string, string> = {}) => {
         const text = JSON.stringify({ success: false, code, error: code });
         socket.write(
-          `HTTP/1.1 ${status} ${status === 403 ? 'Forbidden' : status === 401 ? 'Unauthorized' : status === 429 ? 'Too Many Requests' : 'Error'}\r\n` +
-            `Content-Type: application/json\r\nContent-Length: ${Buffer.byteLength(text)}\r\n` +
+          `HTTP/1.1 ${status} Refused\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(text)}\r\n` +
             Object.entries(headers).map(([k, v]) => `${k}: ${v}\r\n`).join('') +
             `Connection: close\r\n\r\n${text}`
         );
         socket.destroy();
+        this.requests.push({ method: 'GET', path: '/api-access/self/stream', status, code });
       };
       const path = new URL(req.url ?? '/', 'http://x').pathname;
-      if (path !== '/api-access/self/stream') return reject(404, 'not_found');
-      const auth = this.authAccess(req);
-      if (typeof auth === 'string') return reject(auth === 'api_access_paused' ? 403 : 401, auth);
-      if (!TIER_LIMITS[auth.tier].live) return reject(403, 'api_tier_stream');
+      if (path !== '/api-access/self/stream') return reject(401, 'session_required');
       const injected = this.takeInjection('GET', path);
       if (injected) return reject(injected.status, injected.code, injected.retryAfter !== undefined ? { 'Retry-After': String(injected.retryAfter) } : {});
+      const outcome = this.gate(req, 'stream');
+      if ('refusal' in outcome) return reject(outcome.refusal.status, outcome.refusal.code, outcome.refusal.headers);
+      const access = outcome.access;
       this.wss!.handleUpgrade(req, socket, head, (ws) => {
-        auth.sockets.add(ws);
-        ws.on('close', () => auth.sockets.delete(ws));
+        this.requests.push({ method: 'GET', path, status: 101, access: access.id });
+        if (access.sockets.size >= STREAMS_PER_ACCESS) {
+          ws.close(CLOSE.tooMany, 'too_many_streams');
+          return;
+        }
+        access.sockets.add(ws);
+        ws.on('close', () => access.sockets.delete(ws));
+        ws.on('message', (data) => {
+          const text = data.toString();
+          let ping = false;
+          try {
+            ping = text.length <= 64 && (JSON.parse(text) as { t?: unknown }).t === 'ping';
+          } catch {
+            ping = false;
+          }
+          if (ping) ws.send(JSON.stringify({ t: 'pong' }));
+          else ws.close(CLOSE.unexpected, 'unexpected_frame');
+        });
       });
     });
     await new Promise<void>((resolve) => this.server!.listen(port, host, resolve));
@@ -483,8 +608,8 @@ export class MockFilarr {
   async close(): Promise<void> {
     for (const a of this.accesses.values()) for (const s of a.sockets) s.terminate();
     this.wss?.close();
-    await new Promise<void>((resolve) => (this.server ? this.server.close(() => resolve()) : resolve()));
     this.server?.closeAllConnections?.();
+    await new Promise<void>((resolve) => (this.server ? this.server.close(() => resolve()) : resolve()));
   }
 
   /** Coupe les flux ouverts (une coupure de réseau, vue de la boîte noire). */
@@ -501,130 +626,120 @@ export class MockFilarr {
     return inj;
   }
 
-  /** L'accès qui présente sa preuve, ou le code de refus (§ 5). */
-  private authAccess(req: IncomingMessage): MockAccess | string {
-    const header = req.headers.authorization ?? '';
-    const m = /^Filarr-Access ([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/.exec(header);
-    if (!m) return 'api_access_unknown';
-    const access = this.accesses.get(m[1]!);
-    if (!access) return 'api_access_unknown';
-    const hash = createHash('sha256').update(fromBase64Url(m[2]!)).digest('hex');
-    if (hash !== access.authHash) return 'api_access_unknown';
-    if (access.revoked) return 'api_access_revoked';
-    if (access.expiresAt && Date.parse(access.expiresAt) < Date.now()) return 'api_access_expired';
-    if (access.paused) return 'api_access_paused';
-    return access;
-  }
-
-  private quotaHeaders(access: MockAccess): Record<string, string> {
-    const lim = TIER_LIMITS[access.tier];
-    return {
-      'RateLimit-Limit': String(lim.ratePerMinute),
-      'RateLimit-Remaining': String(Math.max(0, lim.ratePerMinute - 1)),
-      'RateLimit-Reset': '60',
-      'X-Filarr-Quota': `sync=${access.usage.sync}/${lim.syncPerMonth}; bytes=${access.usage.bytes}/${lim.bytesPerMonth}; writes=${access.usage.writes}/${lim.writesPerDay ?? 0}`,
-    };
+  /** Ce qu'une boîte noire peut appeler sous `/dbstore` (worker `dbStoreGateRoute`), sinon `null`. */
+  private dbStoreRoute(method: string, path: string): { kind: MeterKind; storeId: string; action: string } | null {
+    const m = /^\/dbstore\/([A-Za-z0-9_-]{22})\/(head|changes|stage|commit|slots:batchGet|slots\/[^/]+\/[^/]+)$/.exec(path);
+    if (!m) return null;
+    const [, storeId, action] = m as unknown as [string, string, string];
+    if (method === 'GET' && action === 'head') return { kind: 'head', storeId, action };
+    if (method === 'GET' && action === 'changes') return { kind: 'changes', storeId, action };
+    if (method === 'GET' && action.startsWith('slots/')) return { kind: 'slots', storeId, action };
+    if (method === 'POST' && action === 'slots:batchGet') return { kind: 'slots', storeId, action };
+    if (method === 'PUT' && action === 'stage') return { kind: 'stage', storeId, action };
+    if (method === 'POST' && action === 'commit') return { kind: 'commit', storeId, action };
+    return null;
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? '/', 'http://x');
     const path = url.pathname;
     const method = req.method ?? 'GET';
-    const log = (status: number, access?: string) => this.requests.push({ method, path, status, ...(access ? { access } : {}) });
+    let accessId: string | undefined;
+    const log = (status: number, code?: string) => this.requests.push({ method, path, status, ...(accessId ? { access: accessId } : {}), ...(code ? { code } : {}) });
+    const refuse = (status: number, code: string, extra: Record<string, unknown> = {}, headers: Record<string, string> = {}) => {
+      log(status, code);
+      fail(res, status, code, extra, headers);
+    };
 
     if (path === '/public/api-limits' && method === 'GET') {
       log(200);
-      return json(res, 200, { success: true, data: { tiers: TIER_LIMITS, enterprise: 'teams' } }, { 'Cache-Control': 'public, max-age=3600' });
+      return json(res, 200, { success: true, data: { version: 1, tiers: API_LIMITS } }, { 'Cache-Control': 'public, max-age=3600' });
     }
 
     // L'application (créateur), pour écrire après une montée de génération
     const isApp = req.headers.authorization === 'Bearer mock-app';
+    const route =
+      path === '/api-access/self' && method === 'GET'
+        ? { kind: 'self' as MeterKind, storeId: undefined, action: 'self' }
+        : path === '/api-access/self/stream' && method === 'GET'
+          ? { kind: 'stream' as MeterKind, storeId: undefined, action: 'stream' }
+          : this.dbStoreRoute(method, path);
     let access: MockAccess | null = null;
+    let headers: Record<string, string> = {};
     if (!isApp) {
-      const auth = this.authAccess(req);
-      if (typeof auth === 'string') {
-        log(auth === 'api_access_paused' ? 403 : 401);
-        return fail(res, auth === 'api_access_paused' ? 403 : 401, auth);
-      }
-      access = auth;
-      access.usage.sync += 1;
-      const caps = String(req.headers['x-filarr-sync-caps'] ?? '');
-      if (!caps.includes('db-store-1') || !caps.includes('api-base-1')) {
-        log(426, access.id);
-        return fail(res, 426, 'client_upgrade_required');
-      }
-    }
-    const headers = access ? this.quotaHeaders(access) : {};
-    const injected = this.takeInjection(method, path);
-    if (injected) {
-      log(injected.status, access?.id);
-      return fail(res, injected.status, injected.code, {}, {
-        ...headers,
-        ...(injected.retryAfter !== undefined ? { 'Retry-After': String(injected.retryAfter) } : {}),
-      });
+      if (!route) return refuse(401, 'session_required');
+      const injected = this.takeInjection(method, path);
+      if (injected) return refuse(injected.status, injected.code, {}, injected.retryAfter !== undefined ? { 'Retry-After': String(injected.retryAfter) } : {});
+      const outcome = this.gate(req, route.kind, route.storeId);
+      if ('refusal' in outcome) return refuse(outcome.refusal.status, outcome.refusal.code, outcome.refusal.extra ?? {}, outcome.refusal.headers ?? {});
+      access = outcome.access;
+      accessId = access.id;
+      headers = this.quotaHeaders(access);
+    } else if (!route) {
+      return refuse(404, 'not_found');
     }
 
-    if (path === '/api-access/self' && method === 'GET' && access) {
-      const lim = TIER_LIMITS[access.tier];
-      log(200, access.id);
+    if (route!.kind === 'stream') return refuse(426, 'websocket_required', {}, headers);
+    if (route!.kind === 'self' && access) {
+      const lim = this.limitsOf(access.tier);
+      log(200);
       return json(res, 200, {
         success: true,
         data: {
-          access: { id: access.id, name: access.name, expiresAt: access.expiresAt, paused: access.paused, tier: access.tier },
-          grants: [...access.grants].map(([storeId, g]) => ({ storeId, rights: g.rights, keys: g.keys })),
+          access: {
+            id: access.id,
+            name: access.name,
+            encPublicKey: access.aPub,
+            expiresAt: access.expiresAt,
+            ipAllowlist: null,
+            createdAt: access.createdAt,
+            tier: access.tier,
+            write: lim.write && this.writeSwitch,
+            stream: lim.stream,
+          },
+          // Le droit EFFECTIF : `rw` se lit `r` sans écriture au palier ou sans l'interrupteur
+          grants: [...access.grants].map(([storeId, g]) => ({ storeId, rights: g.rights === 'rw' && lim.write && this.writeSwitch ? 'rw' : 'r', keys: g.keys })),
           manifests: [...access.manifests].map(([storeId, m]) => ({ storeId, sealed: m.sealed, rev: m.rev })),
-          limits: { tier: access.tier, ...lim },
-          usage: { ...access.usage },
+          limits: lim,
+          usage: {
+            period: new Date().toISOString().slice(0, 7),
+            day: new Date().toISOString().slice(0, 10),
+            sync: { n: access.usage.sync, max: lim.syncPerMonth },
+            bytes: { n: access.usage.bytes, max: lim.bytesPerMonth },
+            writes: { n: access.usage.writes, max: lim.writesPerDay },
+            writesMonth: access.usage.writes,
+            access: { ...access.usage },
+          },
         },
       }, headers);
     }
 
-    const m = /^\/dbstore\/([A-Za-z0-9_-]{22})\/(head|changes|commit|stage|slots:batchGet|slots\/([^/]+)\/(\d+))$/.exec(path);
-    if (!m) {
-      log(404, access?.id);
-      return fail(res, 404, 'not_found', {}, headers);
-    }
-    const store = this.stores.get(m[1]!);
-    const grant = access ? access.grants.get(m[1]!) : { rights: 'rw' as const };
-    if (!store || !grant) {
-      log(403, access?.id);
-      return fail(res, 403, 'store_not_granted', {}, headers);
-    }
-    const action = m[2]!;
+    const { storeId, action } = route as { storeId: string; action: string };
+    const store = this.stores.get(storeId);
+    const grant = access ? access.grants.get(storeId) : { rights: 'rw' as const };
+    if (!store || !grant) return refuse(403, 'store_not_granted', {}, headers);
     const countBytes = (n: number) => {
       if (access) access.usage.bytes += n;
     };
 
-    if (action === 'head' && method === 'GET') {
+    if (action === 'head') {
       const head = store.headToken ? this.bodies.get(store.headToken)! : null;
       if (head) countBytes(head.length);
-      log(200, access?.id);
-      return json(res, 200, {
-        success: true,
-        data: { seq: store.seq, head: head ? toBase64Url(head) : null, ...(store.hk ? { hk: store.hk } : {}), g: store.g },
-      }, headers);
+      log(200);
+      return json(res, 200, { success: true, data: { seq: store.seq, head: head ? toBase64Url(head) : null, hk: head ? store.hk : null, g: store.g } }, headers);
     }
-    if (action === 'changes' && method === 'GET') {
-      if (access && access.tier === 'free') {
-        const last = access.lastChanges.get(store.storeId) ?? 0;
-        if (Date.now() - last < this.freePollMs) {
-          log(429, access.id);
-          return fail(res, 429, 'api_poll_interval', {}, { ...headers, 'Retry-After': String(Math.ceil((this.freePollMs - (Date.now() - last)) / 1000)) });
-        }
-        access.lastChanges.set(store.storeId, Date.now());
-      }
+    if (action === 'changes') {
       const since = Number(url.searchParams.get('since') ?? '0');
-      const entries = store.log.filter((e) => e.seq > since);
-      const slots = new Map<string, { p: string; ver: number; e: number; g: number }>();
+      const slots = new Map<string, { p: string; ver: number; e: number; g?: number }>();
       const removed = new Set<string>();
-      for (const e of entries) {
+      for (const e of store.log.filter((x) => x.seq > since)) {
         for (const s of e.slots) slots.set(s.p, s);
         for (const p of e.removed) removed.add(p);
       }
-      log(200, access?.id);
+      log(200);
       return json(res, 200, { success: true, data: { seq: store.seq, slots: [...slots.values()], removed: [...removed] } }, headers);
     }
-    if (action === 'slots:batchGet' && method === 'POST') {
+    if (action === 'slots:batchGet') {
       const body = JSON.parse((await readBody(req)).toString('utf8')) as { slots: Array<{ p: string; ver: number }>; maxBytes?: number };
       const maxBytes = body.maxBytes ?? 2 * 1024 * 1024;
       const out: Array<Record<string, unknown>> = [];
@@ -638,58 +753,35 @@ export class MockFilarr {
           break;
         }
         total += size;
-        countBytes(size);
         out.push(bytes ? { p: r.p, ver: r.ver, body: toBase64Url(bytes) } : { p: r.p, ver: r.ver, missing: true });
       }
-      log(200, access?.id);
+      countBytes(total);
+      log(200);
       return json(res, 200, { success: true, data: { slots: out, more } }, headers);
     }
-    if (m[3] !== undefined && method === 'GET') {
-      const p = m[3] === '-' ? '' : m[3];
-      const bytes = this.bodyOf(store, p, Number(m[4]));
-      if (!bytes) {
-        log(404, access?.id);
-        return fail(res, 404, 'slot_not_found', {}, headers);
-      }
+    if (action.startsWith('slots/')) {
+      const [, rawP, rawVer] = action.split('/');
+      const bytes = this.bodyOf(store, rawP === '-' ? '' : rawP!, Number(rawVer));
+      if (!bytes) return refuse(404, 'slot_not_found', {}, headers);
       countBytes(bytes.length);
-      log(200, access?.id);
+      log(200);
       res.writeHead(200, { 'content-type': 'application/octet-stream', ...headers });
       return void res.end(Buffer.from(bytes));
     }
-    // Écritures : droit "rw", interrupteur API_BASE_WRITE, palier payant (§ 6, § 7)
-    if ((action === 'stage' && method === 'PUT') || (action === 'commit' && method === 'POST')) {
-      if (access) {
-        if (grant.rights !== 'rw') {
-          log(403, access.id);
-          return fail(res, 403, 'store_read_only', {}, headers);
-        }
-        if (!this.writeSwitch) {
-          log(403, access.id);
-          return fail(res, 403, 'api_write_disabled', {}, headers);
-        }
-        if (TIER_LIMITS[access.tier].writesPerDay === null) {
-          log(403, access.id);
-          return fail(res, 403, 'api_tier_write', {}, headers);
-        }
-      }
-      const raw = await readBody(req);
-      if (action === 'stage') {
-        const token = newToken();
-        this.staged.set(token, new Uint8Array(raw));
-        log(200, access?.id);
-        return json(res, 200, { success: true, data: { token } }, headers);
-      }
-      const body = JSON.parse(raw.toString('utf8'));
-      const outcome = this.applyCommit(store, body);
-      if (!outcome.ok) {
-        log(outcome.status, access?.id);
-        return fail(res, outcome.status, outcome.code, outcome.extra ?? {}, headers);
-      }
-      if (access) access.usage.writes += 1;
-      log(200, access?.id);
-      return json(res, 200, { success: true, data: { seq: outcome.seq } }, headers);
+    // Écritures : le droit `rw` (sinon `store_not_granted` avec `rights: "r"`)
+    if (access && grant.rights !== 'rw') return refuse(403, 'store_not_granted', { rights: 'r' }, headers);
+    const raw = await readBody(req);
+    if (action === 'stage') {
+      const token = newToken();
+      this.staged.set(token, new Uint8Array(raw));
+      log(200);
+      return json(res, 200, { success: true, data: { token } }, headers);
     }
-    log(404, access?.id);
-    return fail(res, 404, 'not_found', {}, headers);
+    const body = JSON.parse(raw.toString('utf8')) as Parameters<MockFilarr['applyCommit']>[1] & { hk?: { e: number; g: number } | null };
+    const outcome = this.applyCommit(store, { ...body, hk: body.hk ?? null });
+    if (!outcome.ok) return refuse(outcome.status, outcome.code, outcome.extra ?? {}, headers);
+    if (access) access.usage.writes += 1;
+    log(200);
+    return json(res, 200, { success: true, data: { seq: outcome.seq } }, headers);
   }
 }

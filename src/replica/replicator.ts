@@ -31,6 +31,7 @@ export type LinkState =
   | 'offline'
   | 'limited'
   | 'paused'
+  | 'not_switched'
   | 'ip_forbidden'
   | 'revoked'
   | 'expired'
@@ -45,7 +46,22 @@ export interface GateBase {
   rights: Rights;
   mirror: StoreMirror;
   manifest: ManifestInfo | null;
+  /** Une relève de CE magasin attend cette heure (`api_poll_interval`, `api_quota_sync`, `api_quota_bytes`). */
+  waitUntil: number;
 }
+
+/** Les refus du compteur qui ne visent qu'un magasin (ou que ses blocs) : les autres continuent. */
+const PER_STORE_429: ReadonlySet<string> = new Set(['api_poll_interval', 'api_quota_sync', 'api_quota_bytes']);
+/** Requêtes du mois épuisées : une relève par magasin et par 900 s (contrat § 6). */
+const SLOW_POLL_MS = 900_000;
+
+// Codes de fermeture du flux (worker, `apiMeter.ts`)
+const CLOSE_REVOKED = 4301;
+const CLOSE_PAUSED = 4302;
+const CLOSE_CHANGED = 4303;
+const CLOSE_EXPIRED = 4304;
+const CLOSE_QUOTA = 4305;
+const CLOSE_TOO_MANY = 4306;
 
 export interface QuotaAlert {
   name: string;
@@ -97,8 +113,8 @@ export class Replicator extends EventEmitter {
   /** Plus rien ne part vers Filarr avant cette heure (un `429`). */
   notBefore = 0;
   limitedCode: string | null = null;
-  /** Le flux a été refusé pour le palier : on relève. */
-  streamRefused = false;
+  /** Le flux a été refusé (palier, ou requêtes du mois épuisées) : on relève jusqu'à cette heure. */
+  streamRefusedUntil = 0;
   lastSelfAt: string | null = null;
   lastChangeAt: string | null = null;
   startedAt: string | null = null;
@@ -115,8 +131,16 @@ export class Replicator extends EventEmitter {
     this.backoff = opts.backoffMinMs ?? 1000;
   }
 
+  /** Le flux est-il refusé en ce moment (on relève) ? */
+  get streamRefused(): boolean {
+    return Date.now() < this.streamRefusedUntil;
+  }
+
+  /** Intervalle de relève : le réglage, jamais sous l'écart que Filarr impose au palier, ni sous 900 s une fois le mois épuisé. */
   get pollIntervalMs(): number {
-    return this.opts.pollIntervalMs ?? 300_000;
+    const tier = typeof this.limits?.pollIntervalS === 'number' ? this.limits.pollIntervalS * 1000 : 0;
+    const slow = this.streamRefusedUntil !== Infinity && this.streamRefused ? SLOW_POLL_MS : 0;
+    return Math.max(this.opts.pollIntervalMs ?? 300_000, tier, slow);
   }
 
   /** Une base par son slug (manifeste). */
@@ -162,7 +186,7 @@ export class Replicator extends EventEmitter {
     this.abort = new AbortController();
     this.startedAt = new Date().toISOString();
     this.selfDirty = true;
-    this.streamRefused = false;
+    this.streamRefusedUntil = 0;
     this.notBefore = 0;
     this.setLink('connecting');
     const signal = this.abort.signal;
@@ -270,10 +294,13 @@ export class Replicator extends EventEmitter {
           cache: this.opts.cache,
           site: this.opts.site,
         });
-        this.bases.set(storeId, { storeId, rights: grant.rights, mirror, manifest: manifests.get(storeId) ?? null });
+        this.bases.set(storeId, { storeId, rights: grant.rights, mirror, manifest: manifests.get(storeId) ?? null, waitUntil: 0 });
         this.emit('bases');
       }
     }
+    // Le palier dit si le flux est offert (`access.stream`) : sans lui, on relève sans même essayer
+    if (this.access?.stream === false) this.streamRefusedUntil = Infinity;
+    else if (this.streamRefusedUntil === Infinity) this.streamRefusedUntil = 0;
     if (this.access?.paused === true) this.setLink('paused', 'Accès mis en pause dans Filarr');
   }
 
@@ -284,6 +311,7 @@ export class Replicator extends EventEmitter {
 
   private async syncBase(base: GateBase, force = false): Promise<void> {
     this.checkLimited();
+    if (Date.now() < base.waitUntil) return;
     const started = Date.now();
     const before = base.mirror.status;
     try {
@@ -293,6 +321,11 @@ export class Replicator extends EventEmitter {
       if (err instanceof FilarrError && err.status === 403 && err.code === 'store_not_granted') {
         base.mirror.markUnavailable('refused', { code: err.code, message: 'Filarr refuse cette base à l’accès' });
         this.selfDirty = true;
+        return;
+      }
+      if (err instanceof RateLimitError && PER_STORE_429.has(err.code)) {
+        // Ce magasin attend ; les autres, et les lectures locales, continuent
+        this.storeLimited(base, err);
         return;
       }
       if (err instanceof RateLimitError) base.mirror.markUnavailable('waiting', { code: err.code, message: err.message });
@@ -305,6 +338,13 @@ export class Replicator extends EventEmitter {
       if (after === 'missing_key') this.selfDirty = true;
     }
     if (after !== before) this.emit('bases');
+  }
+
+  private storeLimited(base: GateBase, err: RateLimitError): void {
+    base.waitUntil = Date.now() + err.retryAfterMs;
+    if (base.mirror.loaded) base.mirror.markUnavailable('waiting', { code: err.code, message: err.message });
+    this.journal(`limite de Filarr · ${err.code} · ${base.manifest?.title ?? base.storeId}`, '429', `nouvel essai dans ${Math.ceil(err.retryAfterMs / 1000)} s`);
+    this.emit('bases');
   }
 
   private onDiff(base: GateBase, diff: RowDiff, ms: number): void {
@@ -338,7 +378,7 @@ export class Replicator extends EventEmitter {
           await sleep(wait, signal);
           continue;
         }
-        if (this.link === 'paused' || this.link === 'ip_forbidden' || this.link === 'upgrade_required') {
+        if (this.link === 'paused' || this.link === 'ip_forbidden' || this.link === 'upgrade_required' || this.link === 'not_switched') {
           await sleep(this.opts.pausedRetryMs ?? 300_000, signal);
           if (signal.aborted) break;
           await this.refreshSelf();
@@ -353,11 +393,13 @@ export class Replicator extends EventEmitter {
         if (!this.streamRefused) {
           const outcome = await this.runStream(signal);
           if (outcome === 'tier') {
-            this.streamRefused = true;
+            this.streamRefusedUntil = Infinity;
             this.journal('flux des changements refusé pour le palier', 'relève', `relève toutes les ${Math.round(this.pollIntervalMs / 1000)} s`);
             continue;
           }
+          if (outcome === 'quota') continue;
           if (signal.aborted || TERMINAL.has(this.link)) break;
+          if (['paused', 'not_switched', 'ip_forbidden', 'upgrade_required'].includes(this.link)) continue;
           // Fermé ou injoignable : délai croissant, puis reconnexion
           if (this.link !== 'limited') this.setLink('offline', 'Flux des changements interrompu : reconnexion…');
           await sleep(this.nextBackoff(), signal);
@@ -411,6 +453,7 @@ export class Replicator extends EventEmitter {
     }
     for (const base of this.bases.values()) {
       this.checkLimited();
+      if (Date.now() < base.waitUntil) continue;
       if (base.mirror.status !== 'ready' || base.mirror.seq === 0) {
         await this.syncBase(base, true);
         continue;
@@ -423,13 +466,17 @@ export class Replicator extends EventEmitter {
           await this.syncBase(base, true);
           continue;
         }
+        if (err instanceof RateLimitError && PER_STORE_429.has(err.code)) {
+          this.storeLimited(base, err);
+          continue;
+        }
         throw err;
       }
     }
   }
 
   /** Le flux des changements ; rend quand il se ferme. */
-  private runStream(signal: AbortSignal): Promise<'closed' | 'tier' | 'refused'> {
+  private runStream(signal: AbortSignal): Promise<'closed' | 'tier' | 'quota' | 'refused'> {
     const client = this.client!;
     return new Promise((resolve) => {
       // Un signal déjà levé ne prévient plus personne : on ne rouvre pas le flux
@@ -441,7 +488,7 @@ export class Replicator extends EventEmitter {
       let settled = false;
       let alive = true;
       let heartbeat: ReturnType<typeof setInterval> | null = null;
-      const finish = (outcome: 'closed' | 'tier' | 'refused') => {
+      const finish = (outcome: 'closed' | 'tier' | 'quota' | 'refused') => {
         if (settled) return;
         settled = true;
         if (heartbeat) clearInterval(heartbeat);
@@ -469,6 +516,12 @@ export class Replicator extends EventEmitter {
           ws.terminate();
           const status = res.statusCode ?? 0;
           if (status === 403 && code === 'api_tier_stream') return finish('tier');
+          if (status === 429 && code === 'api_quota_sync') {
+            // Requêtes du mois épuisées : pas de flux avant le mois suivant, relève lente (900 s)
+            this.streamRefusedUntil = Date.now() + parseRetryAfter((res.headers['retry-after'] as string | undefined) ?? null, SLOW_POLL_MS);
+            this.journal('flux des changements refusé : requêtes du mois épuisées', '429', 'relève toutes les 900 s');
+            return finish('quota');
+          }
           if (status === 429) {
             this.limit(code, parseRetryAfter((res.headers['retry-after'] as string | undefined) ?? null));
             return finish('refused');
@@ -486,12 +539,16 @@ export class Replicator extends EventEmitter {
             return;
           }
           alive = false;
-          ws.ping();
+          // Le relais n'accepte qu'un ping applicatif (il rend un pong) : tout autre envoi ferme le flux
+          try {
+            ws.send(JSON.stringify({ t: 'ping' }));
+          } catch {
+            ws.terminate();
+          }
         }, 30_000);
         // Ce qui a pu se passer pendant la coupure
         void this.catchUp();
       });
-      ws.on('pong', () => (alive = true));
       ws.on('message', (data) => {
         alive = true;
         let msg: Record<string, unknown>;
@@ -502,7 +559,36 @@ export class Replicator extends EventEmitter {
         }
         void this.onMessage(msg);
       });
-      ws.on('close', () => finish('closed'));
+      ws.on('close', (code: number, reason: Buffer) => {
+        const why = reason.toString('utf8');
+        switch (code) {
+          case CLOSE_REVOKED:
+            void this.revoked(
+              why === 'api_access_token_rotated' ? 'Jeton remplacé dans Filarr : collez le nouveau jeton' : 'Accès révoqué dans Filarr'
+            ).then(() => finish('refused'));
+            return;
+          case CLOSE_EXPIRED:
+            void this.revoked('Accès expiré', 'expired').then(() => finish('refused'));
+            return;
+          case CLOSE_PAUSED:
+            this.setLink('paused', 'Accès mis en pause dans Filarr');
+            return finish('refused');
+          case CLOSE_CHANGED:
+            // Échéance ou adresses changées : on relit self avant de rouvrir
+            this.selfDirty = true;
+            return finish('closed');
+          case CLOSE_QUOTA:
+            this.streamRefusedUntil = Date.now() + SLOW_POLL_MS;
+            this.journal('flux fermé : requêtes du mois épuisées', 'quota', 'relève toutes les 900 s');
+            return finish('quota');
+          case CLOSE_TOO_MANY:
+            this.journal('flux refusé : trop de flux ouverts pour cet accès (8 au plus)', 'flux');
+            this.backoff = Math.max(this.backoff, 30_000);
+            return finish('closed');
+          default:
+            return finish('closed');
+        }
+      });
       ws.on('error', () => {
         /* la fermeture suit */
       });
@@ -550,6 +636,8 @@ export class Replicator extends EventEmitter {
         case 'revoked':
           await this.revoked('Accès révoqué dans Filarr');
           break;
+        case 'pong':
+          break;
         default:
           break;
       }
@@ -566,6 +654,7 @@ export class Replicator extends EventEmitter {
   }
 
   private async revoked(detail: string, state: LinkState = 'revoked'): Promise<void> {
+    if (TERMINAL.has(this.link)) return;
     this.journal(detail, state === 'revoked' ? 'révoqué' : state);
     this.abort?.abort();
     this.ws?.terminate();
@@ -594,6 +683,9 @@ export class Replicator extends EventEmitter {
           return this.revoked('Filarr ne connaît pas ce jeton', 'unknown_access');
         case 'api_access_paused':
           this.setLink('paused', 'Accès mis en pause dans Filarr');
+          return;
+        case 'api_base_not_switched':
+          this.setLink('not_switched', 'Les accès API ne sont pas encore ouverts pour ce compte Filarr');
           return;
         case 'api_ip_forbidden':
           this.setLink('ip_forbidden', 'Filarr refuse l’adresse IP de cette machine pour cet accès');
