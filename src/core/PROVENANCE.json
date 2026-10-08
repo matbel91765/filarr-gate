@@ -1,0 +1,248 @@
+[
+  {
+    "file": "src/core/types.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/types.ts",
+    "commit": "e3502763",
+    "rewritten": 3
+  },
+  {
+    "file": "src/core/cellFormats.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/cellFormats.ts",
+    "commit": "5b357da1",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/relations.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/relations.ts",
+    "commit": "d5a3544b",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/cellValues.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/cellValues.ts",
+    "commit": "136cf58c",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/dbCore.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/dbCore.ts",
+    "commit": "e3502763",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/dbCreationModel.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/dbCreationModel.ts",
+    "commit": "e3502763",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/dbTemplatesModel.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/dbTemplatesModel.ts",
+    "commit": "e3502763",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/columnCalculations.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/columnCalculations.ts",
+    "commit": "5b357da1",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/importRequests.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/importRequests.ts",
+    "commit": "8d960938",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/boardLayout.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/boardLayout.ts",
+    "commit": "ba9d8c90",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/viewEngine.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/viewEngine.ts",
+    "commit": "7864b9e2",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/people.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/people.ts",
+    "commit": "3e9d65cd",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/dbIndex.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/dbIndex.ts",
+    "commit": "61a9f71e",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/formulaEngine.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/formulaEngine.ts",
+    "commit": "e731d49f",
+    "rewritten": 1
+  },
+  {
+    "file": "src/core/merise/mcd.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/merise/mcd.ts",
+    "commit": "912fd390",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/merise/mld.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/merise/mld.ts",
+    "commit": "912fd390",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/index.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/index.ts",
+    "commit": "e42515a6",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/view.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/view.ts",
+    "commit": "9b0ca853",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/table.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/table.ts",
+    "commit": "50743c75",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/collation.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/collation.ts",
+    "commit": "73bae6d7",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/sortKernels.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/sortKernels.ts",
+    "commit": "50743c75",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/liveView.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/liveView.ts",
+    "commit": "f4ce9d22",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/canonical.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/canonical.ts",
+    "commit": "68abe8ff",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/codec.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/codec.ts",
+    "commit": "cf89543a",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/crypto.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/crypto.ts",
+    "commit": "189ef234",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/apiAccess.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/apiAccess.ts",
+    "commit": "01e4cb5e",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/hlc.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/hlc.ts",
+    "commit": "9b0ca853",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/registers.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/registers.ts",
+    "commit": "68abe8ff",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/materialize.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/materialize.ts",
+    "commit": "52570752",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/zones.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/zones.ts",
+    "commit": "dc68193f",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/store/fracIndex.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/fracIndex.ts",
+    "commit": "9b0ca853",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/sql/run.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/sql/run.ts",
+    "commit": "3e9d65cd",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/sql/parser.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/sql/parser.ts",
+    "commit": "3e9d65cd",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/sql/values.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/sql/values.ts",
+    "commit": "3e9d65cd",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/sql/messages.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/sql/messages.ts",
+    "commit": "e6d45c20",
+    "rewritten": 0
+  },
+  {
+    "file": "src/core/engine/sql/catalog.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/sql/catalog.ts",
+    "commit": "3e9d65cd",
+    "rewritten": 0
+  },
+  {
+    "file": "test/helpers/storeVectors.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/__tests__/helpers/storeVectors.ts",
+    "commit": "189ef234",
+    "rewritten": 8
+  },
+  {
+    "file": "test/helpers/apiAccessVectors.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/__tests__/helpers/apiAccessVectors.ts",
+    "commit": "01e4cb5e",
+    "rewritten": 2
+  },
+  {
+    "file": "test/helpers/nodeCryptoStore.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/__tests__/helpers/nodeCryptoStore.ts",
+    "commit": "189ef234",
+    "rewritten": 1
+  },
+  {
+    "file": "test/vectors/api-base-1.vectors.json",
+    "from": ".filarr-parity/contracts/api-base-1.vectors.json",
+    "commit": null,
+    "rewritten": 0
+  },
+  {
+    "file": "test/vectors/db-store-1.vectors.json",
+    "from": ".filarr-parity/contracts/db-store-1.vectors.json",
+    "commit": null,
+    "rewritten": 0
+  }
+]

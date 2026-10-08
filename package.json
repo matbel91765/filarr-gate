@@ -1,0 +1,49 @@
+{
+  "name": "filarr-gate",
+  "version": "0.1.0",
+  "description": "Serve a Filarr database as an API, without Filarr ever seeing your data: a customer-hosted replica of end-to-end encrypted Filarr database stores.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "filarr-gate": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "README.fr.md",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build:server && npm run build:ui",
+    "build:server": "node scripts/build-server.mjs",
+    "build:ui": "vite build --config ui/vite.config.ts",
+    "dev:ui": "vite --config ui/vite.config.ts",
+    "start": "node dist/cli.js",
+    "mock-filarr": "tsx scripts/mock-filarr.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p ui/tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "fflate": "^0.8.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.7",
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^22.20.5",
+    "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
+    "preact": "^10.29.8",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.3",
+    "vitest": "^4.1.11"
+  }
+}

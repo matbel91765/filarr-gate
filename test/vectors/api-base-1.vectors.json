@@ -1,0 +1,178 @@
+{
+  "contract": "api-base-1",
+  "revision": "2",
+  "produitPar": "filarg (bureau), cœur pur engine/store/apiAccess.ts",
+  "notes": [
+    "Octets en hexadécimal (hex), en base64url sans remplissage (accessId, storeId, jeton, clé dans un droit) ou en base64 STANDARD avec remplissage (clés publiques, signature, scellés), comme userKeypair.",
+    "Les scellés sont ceux de userKeypair.sealToPublicKey, avec l'éphémère et l'IV IMPOSÉS ici pour que le fichier soit déterministe ; en production ils sont tirés au hasard. Le rejoueur doit RETROUVER chaque scellé sous l'éphémère et l'IV donnés, ET l'ouvrir.",
+    "Ed25519 est déterministe (RFC 8032) : la signature `bind.sig` doit être retrouvée à l’identique, et vérifiée.",
+    "Les clairs sont du TEXTE JSON : le droit a ses clés dans l’ordre a, s, e, g, k ; le manifeste et la fiche du créateur se relisent par JSON.parse, seul le scellé de ces textes exacts est figé.",
+    "Slugs : départagés DANS l’ordre de la liste, à partir de rien (`assignSlugs`) ; les mots de `reserved` comptent comme pris.",
+    "`tokensRefused` : parseAccessToken doit rendre null pour chacun (préfixe, longueurs, bits de bourrage non nuls, séparateur)."
+  ],
+  "token": {
+    "accessIdHex": "101112131415161718191a1b1c1d1e1f",
+    "secretHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+    "accessId": "EBESExQVFhcYGRobHB0eHw",
+    "token": "flr_live_EBESExQVFhcYGRobHB0eHw_QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+    "aAuth": "eaeea9e6bc421b7e30b1371ff56c46094a90ecb86cc8eb6d05bf98fa8ab0a469",
+    "aEnc": "24ca503f9c16a38974cc292f38748ad700ec4091103e5c431ba867acf15faf4f",
+    "aPub": "cRvZrNq5kTLCp9s93DMUS1bNIo9LEWCixJXoyR47bmE=",
+    "authHash": "b724b2c6552b63cd952cedb8a03a0c96d91dbf5b5ece8c0145dda0bd3763f9fc",
+    "authorization": "Filarr-Access EBESExQVFhcYGRobHB0eHw.6u6p5rxCG34wsTcf9WxGCUqQ7LhsyOttBb-Y-oqwpGk"
+  },
+  "tokensRefused": [
+    "",
+    "flr_live_",
+    "flr_test_EBESExQVFhcYGRobHB0eHw_QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+    "flr_live_EBESExQVFhcYGRobHB0eHw_QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl",
+    "flr_live_EBESExQVFhcYGRobHB0eHw_QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8x",
+    "flr_live_EBESExQVFhcYGRobHB0eHx_QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+    "flr_live_EBESExQVFhcYGRobHB0eHw_QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9",
+    "flr_live_EBESExQVFhcYGRobHB0eHw.QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8"
+  ],
+  "bind": {
+    "signPrivHex": "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+    "signPub": "zRSzf5VulTGU/3+3Oz2B3MVh1hp1OAlLfD4aZD7l86o=",
+    "message": "filarr/api/v1|bind|EBESExQVFhcYGRobHB0eHw|cRvZrNq5kTLCp9s93DMUS1bNIo9LEWCixJXoyR47bmE=",
+    "sig": "Np+qRL1vnVxU3tZFDZqSHQpiaLtydm8ULgQAUZZe+MQA52R8CQsb9Gu8IOMwzS921NF+N4cF3whkFjUCdEcOCA=="
+  },
+  "grant": {
+    "fekHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+    "storeId": "MDEyMzQ1Njc4OTo7PD0-Pw",
+    "e": 0,
+    "g": 1,
+    "info": "filarr/dbstore/v1|db|0|g1",
+    "kDb": "d3f0184571825070b7dfbfed2ae0efeb652b2c4956ee21d87b0af71575c69133",
+    "plaintext": "{\"a\":\"EBESExQVFhcYGRobHB0eHw\",\"s\":\"MDEyMzQ1Njc4OTo7PD0-Pw\",\"e\":0,\"g\":1,\"k\":\"0_AYRXGCUHC337_tKuDv62UrLElW7iHYewr3FXXGkTM\"}",
+    "ephemeralPrivHex": "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+    "ivHex": "505152535455565758595a5b",
+    "sealed": "3CzKMejkO72R3/fkdcyjNH60eBB9W9dlq6SuSjDDXURQUVJTVFVWV1hZWltSHUIlkKMopxH3c8oGV7cV/naooUXn78PcCpDHb/2IXtlhtX52vHD2G25UYgo3gATITQnYL2HCZ+wcfN8eNSmdkDP98g1AwYp3SQ7J9EFZflhP4rJStUxToPpfqVhUPhJicOWqT40wBYhwF/1SmmXnJXOX5nbcZxoBBb8FcONEtfn1KyPYS0akXA=="
+  },
+  "creator": {
+    "encPrivHex": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+    "encPub": "YFpyXSpK3+6xop4X7dYhwbdZPujNvESsbEq24vgF0jw=",
+    "plaintext": "{\"v\":1,\"a\":\"EBESExQVFhcYGRobHB0eHw\",\"s\":\"MDEyMzQ1Njc4OTo7PD0-Pw\",\"slug\":\"clients\",\"views\":{\"v1\":\"tableau\",\"v2\":\"actifs\"}}",
+    "ephemeralPrivHex": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeef",
+    "ivHex": "606162636465666768696a6b",
+    "sealed": "az7mdGNYPL49wI/p0HZcJmb/UhDdUnydhwXkSSfIDVVgYWJjZGVmZ2hpamsp0ftH2GGVw+SZ6ibNjrLWqLxOt1z1ib5ffD3syZB5mns6T1uMBQvSSmXd11nkhnCtI02oi/+orxxIG7oI5EtJR9NZThAGggCmrcCiHF0L3GfkyvnYu39r4b0XdjX6vo5HHfO5uimd0Q5RlQr2UcretJj2VZ/h/BxSNZsRA69OK6oEy7H+p35kkw=="
+  },
+  "manifest": {
+    "plaintext": "{\"v\":1,\"a\":\"EBESExQVFhcYGRobHB0eHw\",\"s\":\"MDEyMzQ1Njc4OTo7PD0-Pw\",\"slug\":\"clients\",\"title\":\"Clients\",\"rights\":\"rw\",\"views\":[{\"id\":\"v1\",\"name\":\"Tableau\",\"type\":\"table\",\"slug\":\"tableau\"},{\"id\":\"v2\",\"name\":\"Actifs\",\"type\":\"table\",\"filters\":[{\"propertyId\":\"p_statut\",\"operator\":\"equals\",\"value\":\"Actif\"}],\"slug\":\"actifs\"}],\"updated\":\"2026-10-07T12:00:00.000Z\"}",
+    "ephemeralPrivHex": "e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+    "ivHex": "707172737475767778797a7b",
+    "sealed": "c2hF1U6H3gnWuxFKpwQsUKSgFb2ZAdGgAm9ZVlM6FRlwcXJzdHV2d3h5entPHw8le+DwB9YxW5G8nQJ3B6RxPn1vb5nPD0kjqcwVWlOl5Rxkk3uM1/LAF9Vgdf9ZZpKVFAc5PN7cTihdsCmYEE4hvXChT/WprMw6HDqfp85D7k9Hr3bhdtPtIn+wIafmExb1pxkqk5U7VcIJKn+DiruVX9ZDTjmlEPtRVkipmrlHJ6nPbs63ik/+AmmfIeskU7k3QDvqtXsa4lTjihfVBDGc0ZmG+MzvmVyVE8+PiNYxP3kSPyECamG4Pi58Lvn/KgmI4yo9xogB6pajn26BMoCmjf2MZD197Yxzni/r8U614IA+FohCgMJtuzgpTPJSD2VIm8OIfMBHCzGny7XKL0Gw1aXmbZPwF9MUCHHg0c4zeSBZucDyma5YrgP6HYXcQhkRligWsS1Dv/yFyZ4Cxum7y8X1ewJWRRWRt66wX8LuPNo/z6MtgQ470k3C35CcSiZKF0WGD/zodm1PHS/+uyStNqL0KSQTl8Z14zeB8a3Rpw=="
+  },
+  "slugs": {
+    "reserved": ["q", "sql", "openapi", "docs", "health", "metrics", "self"],
+    "maxLength": 48,
+    "bases": [
+      {
+        "title": "Clients",
+        "slug": "clients"
+      },
+      {
+        "title": "Commandes",
+        "slug": "commandes"
+      },
+      {
+        "title": "Clients",
+        "slug": "clients-2"
+      },
+      {
+        "title": "Café & Thé",
+        "slug": "cafe-the"
+      },
+      {
+        "title": "İstanbul",
+        "slug": "istanbul"
+      },
+      {
+        "title": "Straße",
+        "slug": "stra-e"
+      },
+      {
+        "title": "ÉLÈVES",
+        "slug": "eleves"
+      },
+      {
+        "title": "élèves",
+        "slug": "eleves-2"
+      },
+      {
+        "title": "C++ / C#",
+        "slug": "c-c"
+      },
+      {
+        "title": "日本語",
+        "slug": "base"
+      },
+      {
+        "title": "",
+        "slug": "base-2"
+      },
+      {
+        "title": "😀",
+        "slug": "base-3"
+      },
+      {
+        "title": "q",
+        "slug": "q-2"
+      },
+      {
+        "title": "Docs",
+        "slug": "docs-2"
+      },
+      {
+        "title": "  --Été 2026--  ",
+        "slug": "ete-2026"
+      },
+      {
+        "title": "Une base dont le titre dépasse largement quarante-huit caractères de long",
+        "slug": "une-base-dont-le-titre-depasse-largement-quarant"
+      }
+    ],
+    "vues": [
+      {
+        "title": "Tableau",
+        "slug": "tableau"
+      },
+      {
+        "title": "Tableau",
+        "slug": "tableau-2"
+      },
+      {
+        "title": "Tableau",
+        "slug": "tableau-3"
+      },
+      {
+        "title": "Actifs ✅",
+        "slug": "actifs"
+      },
+      {
+        "title": "Par ville (2026)",
+        "slug": "par-ville-2026"
+      },
+      {
+        "title": "",
+        "slug": "vue"
+      },
+      {
+        "title": "self",
+        "slug": "self-2"
+      },
+      {
+        "title": "metrics",
+        "slug": "metrics-2"
+      },
+      {
+        "title": "A—B",
+        "slug": "a-b"
+      },
+      {
+        "title": "Œuvres",
+        "slug": "uvres"
+      }
+    ]
+  }
+}
