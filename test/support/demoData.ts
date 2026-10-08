@@ -22,7 +22,8 @@ const statut = [
 export const clientsProps: DbProperty[] = [
   { id: 'p_nom', name: 'Nom', type: 'text' },
   { id: 'p_ville', name: 'Ville', type: 'text' },
-  { id: 'p_statut', name: 'Statut', type: 'select', options: statut },
+  // L'option par défaut d'une ligne neuve, comme « Nouvelle ligne » dans Filarr.
+  { id: 'p_statut', name: 'Statut', type: 'select', options: statut, defaultOptionId: 'o_prospect' },
   { id: 'p_ca', name: 'CA', type: 'number', numberFormat: 'euro' },
   { id: 'p_contact', name: 'Dernier contact', type: 'date' },
   { id: 'p_cmds', name: 'Commandes', type: 'relation', targetDbId: COMMANDES_DB, direction: 'in', sourcePropertyId: 'c_client' },

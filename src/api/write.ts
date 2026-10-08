@@ -9,6 +9,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { defaultCells } from '../core/dbCore';
 import { positionBetween } from '../core/engine/store/fracIndex';
 import { FIELD_CREATED, FIELD_DELETED, FIELD_ORDER, type StoreOp } from '../core/engine/store/registers';
 import { FilarrError, RateLimitError, UnreachableError } from '../replica/http';
@@ -58,6 +59,29 @@ export class Writer {
     if (info.rights !== 'rw') throw new ApiError(403, 'base_read_only', 'Cet accès ne peut que lire cette base.');
   }
 
+  /**
+   * Les valeurs par défaut d'une ligne NEUVE, comme « Nouvelle ligne » dans
+   * Filarr (`defaultCells` du cœur, celle de `makeRow`) : l'option par défaut
+   * de chaque colonne select ou multiSelect qui en a une — un « Statut » à
+   * « À faire » plutôt que vide. Un champ présent dans l'objet reçu, même à
+   * `null`, a le dernier mot (`null` = laisser vide, comme `undefined` dans
+   * `makeRow`).
+   */
+  private defaultOps(info: BaseInfo, rowId: string, input: unknown, tick: () => string): StoreOp[] {
+    const given = new Set<string>();
+    if (input && typeof input === 'object' && !Array.isArray(input)) {
+      for (const name of Object.keys(input as Record<string, unknown>)) {
+        const field = info.fields.find((f) => f.name === name);
+        if (field) given.add(field.prop.id);
+      }
+    }
+    const ops: StoreOp[] = [];
+    for (const [propId, value] of Object.entries(defaultCells(info.properties))) {
+      if (!given.has(propId)) ops.push({ r: rowId, f: propId, v: value, t: tick() });
+    }
+    return ops;
+  }
+
   /** Les écritures d'un objet reçu, pour une ligne. */
   private cellOps(info: BaseInfo, rowId: string, input: unknown, tick: () => string): StoreOp[] {
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ApiError(400, 'bad_body', 'Un objet JSON est attendu');
@@ -104,7 +128,9 @@ export class Writer {
       for (const item of items) {
         const id = newRowId();
         ids.push(id);
-        ops.push(...this.cellOps(info, id, item, tick));
+        // Les champs reçus d'abord : un objet refusé ne laisse rien partir.
+        const given = this.cellOps(info, id, item, tick);
+        ops.push(...this.defaultOps(info, id, item, tick), ...given);
         order = positionBetween(order, null);
         ops.push({ r: id, f: FIELD_CREATED, v: now, t: tick() }, { r: id, f: FIELD_ORDER, v: order, t: tick() });
       }

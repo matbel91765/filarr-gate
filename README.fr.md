@@ -136,7 +136,7 @@ Chaque appel `/v1` porte une clé d'application : `Authorization: Bearer gk_…`
 | `GET /v1/<base>` | les lignes : `limit` (≤ 1000), `cursor`, `fields=a,b`, `sort=a,-b`, `q=texte`, `since=<version>`, filtres `champ=valeur` ou `champ[op]=valeur` (`eq ne lt lte gt gte contains in empty`) |
 | `GET /v1/<base>/<vue>` | la vue rejouée par le moteur de Filarr (une vue Requête rend son résultat SQL) |
 | `GET /v1/<base>/rows/<id>` | une ligne |
-| `POST /v1/<base>` | ajouter une ligne (objet) ou plusieurs (tableau, ≤ 500) ; `Idempotency-Key` respecté |
+| `POST /v1/<base>` | ajouter une ligne (objet) ou plusieurs (tableau, ≤ 500) ; `Idempotency-Key` respecté ; un champ absent prend la valeur par défaut de sa colonne, comme **Nouvelle ligne** dans Filarr (`null` le laisse vide) |
 | `PATCH /v1/<base>/rows/<id>` | modifier des champs (`null` vide) |
 | `DELETE /v1/<base>/rows/<id>` | supprimer (la suppression l'emporte sur une modification concurrente, comme dans Filarr) |
 | `POST /v1/sql` | `{ "sql": "SELECT …" }`, en lecture seule (`400 sql_read_only` sinon) |

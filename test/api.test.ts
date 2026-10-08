@@ -295,6 +295,24 @@ describe('écriture (§ 7)', () => {
     expect(app.some((r) => r.id === id)).toBe(false);
   });
 
+  it('une ligne ajoutée reçoit les valeurs par défaut de ses colonnes, comme « Nouvelle ligne » dans Filarr', async () => {
+    // Sans « statut » : l'option par défaut de la colonne (Prospect), pas null.
+    const created = await send('POST', '/v1/clients', writer, { nom: 'Hooli' });
+    expect(created.status).toBe(201);
+    expect(created.body.row).toMatchObject({ nom: 'Hooli', statut: 'Prospect' });
+    const app = await mock.appRows(stores[CLIENTS_DB]!);
+    expect(app.find((r) => r.id === created.body.id)?.cells).toMatchObject({ p_nom: 'Hooli', p_statut: 'o_prospect' });
+    // Un champ donné a le dernier mot, même vide (null = laisser vide).
+    const empty = await send('POST', '/v1/clients', writer, { nom: 'Sans statut', statut: null });
+    expect(empty.body.row.statut).toBeNull();
+    const batch = await send('POST', '/v1/clients', writer, [{ nom: 'A', statut: 'Client' }, { nom: 'B' }]);
+    expect(batch.body.rows.map((r: Record<string, unknown>) => r.statut)).toEqual(['Client', 'Prospect']);
+    // Rien ne reste derrière pour les essais suivants.
+    for (const id of [created.body.id, empty.body.id, ...batch.body.rows.map((r: Record<string, unknown>) => r.id)]) {
+      expect((await send('DELETE', `/v1/clients/rows/${id as string}`, writer)).body).toMatchObject({ deleted: true });
+    }
+  });
+
   it('refuse un champ inconnu, calculé, une option inconnue, et une clé sans droit d’écriture', async () => {
     expect((await send('POST', '/v1/clients', writer, { inconnu: 1 })).body.code).toBe('unknown_field');
     expect((await send('POST', '/v1/clients', writer, { total_commande: 3 })).body.code).toBe('field_read_only');

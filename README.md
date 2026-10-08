@@ -140,7 +140,7 @@ Every `/v1` call carries an app key: `Authorization: Bearer gk_…`.
 | `GET /v1/<database>` | rows: `limit` (≤ 1000), `cursor`, `fields=a,b`, `sort=a,-b`, `q=text`, `since=<version>`, filters `field=value` or `field[op]=value` (`eq ne lt lte gt gte contains in empty`) |
 | `GET /v1/<database>/<view>` | the view replayed by Filarr's engine (a Query view returns its SQL result) |
 | `GET /v1/<database>/rows/<id>` | one row |
-| `POST /v1/<database>` | create one row (object) or several (array, ≤ 500); `Idempotency-Key` honoured |
+| `POST /v1/<database>` | create one row (object) or several (array, ≤ 500); `Idempotency-Key` honoured; a field left out takes its column's default, as **New row** does in Filarr (`null` leaves it empty) |
 | `PATCH /v1/<database>/rows/<id>` | update fields (`null` clears) |
 | `DELETE /v1/<database>/rows/<id>` | delete (deletion wins over concurrent edits, as in Filarr) |
 | `POST /v1/sql` | `{ "sql": "SELECT …" }`, read-only (`400 sql_read_only` otherwise) |
