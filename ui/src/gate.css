@@ -25,7 +25,7 @@
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: Manrope, system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
 a { color: var(--accent); }
 a:hover { color: #1d4f8a; }
-.shell { display: flex; flex-wrap: wrap; align-items: stretch; }
+.shell { display: flex; flex-wrap: wrap; align-items: stretch; min-height: 100vh; }
 .side { flex: 1 1 232px; max-width: 256px; background: var(--box); color: var(--box-ink); padding: 18px 12px 24px; display: flex; flex-direction: column; gap: 2px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; }
 .brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #000; border: 1px solid var(--box-line); display: grid; place-items: center; }

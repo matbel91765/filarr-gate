@@ -380,6 +380,7 @@ export const EN: Record<string, string> = {
   "mois remis à zéro le {date}": "month resets on {date}",
   "nombre": "number",
   "non": "no",
+  "non (base en lecture)": "no (read-only database)",
   "non résolu": "unresolved",
   "non vérifiée": "not verified",
   "note": "rating",

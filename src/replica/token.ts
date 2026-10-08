@@ -24,7 +24,7 @@ export interface AccessIdentity {
   aPub: string;
   /** La valeur de l'en-tête `Authorization`. */
   authorization: string;
-  /** Pour l'affichage seulement : `flr_live_EBES…Xl8`. */
+  /** Pour l'affichage seulement, tiré de `accessId` (jamais un caractère du secret) : `flr_live_EBES…Hw`. */
   hint: string;
   /** Empreinte courte du jeton (SHA-256), pour le reconnaître sans le montrer. */
   fingerprint: string;
@@ -50,7 +50,7 @@ export async function openToken(token: string): Promise<AccessIdentity> {
     aEnc: keys.aEnc,
     aPub: keys.aPub,
     authorization: accessAuthorization(parsed.accessId, keys.aAuth),
-    hint: `${trimmed.slice(0, 13)}…${trimmed.slice(-4)}`,
+    hint: `flr_live_${parsed.accessId.slice(0, 4)}…${parsed.accessId.slice(-4)}`,
     fingerprint: `${digest.slice(0, 4)}…${digest.slice(-2)}`,
   };
 }

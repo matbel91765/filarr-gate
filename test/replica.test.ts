@@ -29,8 +29,9 @@ describe('le jeton', () => {
     expect(id.accessId).toBe(vectors.token.accessId);
     expect(id.authorization).toBe(vectors.token.authorization);
     expect(id.aPub).toBe(vectors.token.aPub);
-    expect(id.hint).toBe(`flr_live_EBES…${vectors.token.token.slice(-4)}`);
-    expect(id.hint).not.toContain(vectors.token.token.slice(32, 60));
+    expect(id.hint).toBe(`flr_live_${vectors.token.accessId.slice(0, 4)}…${vectors.token.accessId.slice(-4)}`);
+    // Aucun caractère du secret à l'écran
+    expect(id.hint).not.toContain(vectors.token.token.slice(-4));
   });
 
   it.each(vectors.tokensRefused)('refuse %j', async (t) => {

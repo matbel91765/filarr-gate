@@ -153,7 +153,7 @@ export function Bases() {
                   ))}
                 </div>
                 {tab === 0 ? <Endpoints base={cur} publicUrl={data!.publicUrl} write={data!.write} /> : null}
-                {tab === 1 ? <Schema base={cur} /> : null}
+                {tab === 1 ? <Schema base={cur} writable={cur.methods?.includes('POST') ?? false} /> : null}
                 {tab === 2 ? <Preview base={cur} /> : null}
                 {tab === 3 ? (
                   <section class="card" aria-labelledby="oa">
@@ -293,7 +293,7 @@ function Endpoints(props: { base: BaseRow; publicUrl: string; write: boolean }) 
   );
 }
 
-function Schema(props: { base: BaseRow }) {
+function Schema(props: { base: BaseRow; writable: boolean }) {
   return (
     <>
       <div class="table-box">
@@ -329,7 +329,7 @@ function Schema(props: { base: BaseRow }) {
                     </>
                   ) : null}
                 </td>
-                <td>{f.writable ? t('oui') : t('non')}</td>
+                <td>{f.writable && props.writable ? t('oui') : f.writable ? <span class="muted">{t('non (base en lecture)')}</span> : t('non')}</td>
               </tr>
             ))}
           </tbody>
