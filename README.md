@@ -5,9 +5,10 @@
 [Lire en français](README.fr.md)
 
 > **Status: v0.1, ahead of the server.** The gate implements the frozen contract `api-base-1` (revision 2) and the
-> store protocol `db-store-1` (revision 3.9). The Filarr side is merged but switched off (`API_BASE_SWITCH`,
-> `API_BASE_WRITE`); it opens account by account. Until then, try the gate against the in-memory Filarr shipped in
-> this repository (see [Try it locally](#try-it-locally)).
+> store protocol `db-store-1` (revision 3.9). The Filarr side is built and was tested end to end with this gate against
+> a local Filarr server (read, live changes, write, revocation), but it is not in service yet (`API_BASE_SWITCH`,
+> `API_BASE_WRITE` off); it will open account by account. Until then, try the gate against the in-memory Filarr
+> shipped in this repository (see [Try it locally](#try-it-locally)).
 
 Filarr encrypts your notes and databases end to end: the Filarr servers store blocks they cannot read. That rules out
 the usual "API key on the vendor's server". Filarr Gate is the other way round: a small **black box you run yourself**

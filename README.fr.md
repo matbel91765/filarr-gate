@@ -5,9 +5,10 @@
 [Read in English](README.md)
 
 > **État : v0.1, en avance sur le serveur.** La boîte noire suit le contrat gelé `api-base-1` (révision 2) et le
-> protocole des magasins `db-store-1` (révision 3.9). Le côté Filarr est fusionné mais éteint (`API_BASE_SWITCH`,
-> `API_BASE_WRITE`) ; il s'ouvre compte par compte. D'ici là, essayez la boîte noire contre le Filarr en mémoire fourni
-> dans ce dépôt (voir [Essayer sur sa machine](#essayer-sur-sa-machine)).
+> protocole des magasins `db-store-1` (révision 3.9). Le côté Filarr est construit et a été éprouvé de bout en bout avec
+> cette boîte noire contre un serveur Filarr local (lecture, changements en direct, écriture, révocation), mais il
+> n'est pas encore en service (`API_BASE_SWITCH`, `API_BASE_WRITE` éteints) ; il s'ouvrira compte par compte. D'ici là,
+> essayez la boîte noire contre le Filarr en mémoire fourni dans ce dépôt (voir [Essayer sur sa machine](#essayer-sur-sa-machine)).
 
 Filarr chiffre vos notes et vos bases de bout en bout : ses serveurs gardent des blocs qu'ils ne savent pas lire.
 Pas de « clé d'API chez l'éditeur », donc. Filarr Gate prend le chemin inverse : une petite **boîte noire que vous
