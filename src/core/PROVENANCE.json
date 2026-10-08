@@ -234,6 +234,12 @@
     "rewritten": 1
   },
   {
+    "file": "test/helpers/appReplica.ts",
+    "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/replica.ts",
+    "commit": "3e9d65cd",
+    "rewritten": 7
+  },
+  {
     "file": "test/vectors/api-base-1.vectors.json",
     "from": ".filarr-parity/contracts/api-base-1.vectors.json",
     "commit": null,

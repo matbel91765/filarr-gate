@@ -64,6 +64,22 @@ for (const rel of TEST_FILES) {
   writeFileSync(join(process.cwd(), 'test', 'helpers', rel), header + text, 'utf8');
   manifest.push({ file: `test/helpers/${rel}`, from: src, commit, rewritten });
 }
+// La réplique de l'APPLICATION (le client db-store-1 du bureau, du web et du mobile) : les essais
+// lui font écrire les magasins que la boîte noire relit. Elle ignore la génération (g = 0).
+{
+  const src = `${BASE}/engine/store/replica.ts`;
+  const commit = execFileSync('git', ['-C', filarg, 'log', '-1', '--format=%h', '--', src], { encoding: 'utf8' }).trim();
+  let text = readFileSync(join(filarg, src), 'utf8');
+  let rewritten = 0;
+  text = text.replace(/from '(\.\/[^']+|\.\.\/\.\.\/types)'/g, (_m, path) => {
+    rewritten += 1;
+    return path === '../../types' ? `from '../../src/core/types'` : `from '../../src/core/engine/store/${path.slice(2)}'`;
+  });
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const header = `// Recopié de filarg ${src} @ ${commit} — relicencié Apache-2.0 par le titulaire des droits.${eol}`;
+  writeFileSync(join(process.cwd(), 'test', 'helpers', 'appReplica.ts'), header + text, 'utf8');
+  manifest.push({ file: 'test/helpers/appReplica.ts', from: src, commit, rewritten });
+}
 // Les vecteurs dorés eux-mêmes, depuis les contrats de parité (copie identique).
 const CONTRACTS = join(filarg, '..', '.filarr-parity', 'contracts');
 mkdirSync(join(process.cwd(), 'test', 'vectors'), { recursive: true });
