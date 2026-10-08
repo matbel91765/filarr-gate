@@ -293,7 +293,9 @@ export class StoreMirror {
       if (!k) return this.keyMissing([named]);
       candidates = [k];
     } else {
-      candidates = [...this.keys.values()].sort((a, b) => b.epoch - a.epoch || b.generation - a.generation);
+      // `hk: null` : une tête d'un rédacteur d'avant la précision 3.9, donc de génération 0 ; l'époque s'essaie
+      // comme avant, la plus récente d'abord (contrat api-base-1 § 5, précisions du worker)
+      candidates = [...this.keys.values()].filter((k) => k.generation === 0).sort((a, b) => b.epoch - a.epoch);
     }
     let head: StoreHead | null = null;
     let headKeys: StoreKeys | null = null;

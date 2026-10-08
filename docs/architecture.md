@@ -60,7 +60,7 @@ ui/            management UI (Preact, built by Vite into dist/ui)
 
 ### Reading
 
-For each store: `GET /dbstore/:id/head` → open the head under `hk` (or try the keys held when `hk` is null) → for every
+For each store: `GET /dbstore/:id/head` → open the head under `hk` (when `hk` is null, a pre-generation head: the generation-0 keys, newest epoch first) → for every
 block entry, check that its `K_db(e, g)` is held (otherwise the base shows "missing key for (e, g)" and keeps serving
 its last complete state) → take changed blocks from the local cache or `POST /dbstore/:id/slots:batchGet` (repeated
 while `more`) → verify each body against the head's MAC → decrypt → merge the last-writer-wins registers → materialise
