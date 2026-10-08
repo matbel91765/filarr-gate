@@ -307,7 +307,8 @@ export class AdminApi {
       const body = (await readJson(req)) as Record<string, unknown> | undefined;
       const hook = g.webhooks.create(this.webhookInput(body ?? {}));
       g.journal.add({ kind: 'admin', who: 'administration', what: `webhook créé · ${hook.name}`, code: 'ok' });
-      return send(res, 201, { webhook: this.webhookView(hook.id) });
+      // Le secret de signature n'est montré qu'ici, à la création
+      return send(res, 201, { webhook: this.webhookView(hook.id), secret: hook.secret });
     }
     const w = /^\/webhooks\/([0-9a-f-]{36})(?:\/(test|rotate))?$/.exec(path);
     if (w && method === 'POST' && w[2] === 'test') {
@@ -507,17 +508,17 @@ export class AdminApi {
     return this.gate.keys.list().filter(test).map((k) => k.name);
   }
 
-  private viewSummary(info: BaseInfo, view: BaseInfo['views'][number]): string {
+  /** Ce que la vue décide, en morceaux que l'interface met en mots dans sa langue. */
+  private viewSummary(info: BaseInfo, view: BaseInfo['views'][number]) {
     const v = view.view;
-    if (v.type === 'query') return v.query?.sql ?? '';
-    const parts: string[] = [];
+    if (v.type === 'query') return { query: v.query?.sql ?? '' };
     const nameOf = (id: string) => info.properties.find((p) => p.id === id)?.name ?? id;
-    const filters = v.filters.length + (v.filterGroups?.length ?? 0);
-    if (filters) parts.push(`${filters} filtre${filters > 1 ? 's' : ''}`);
-    if (v.sorts.length) parts.push(`tri : ${v.sorts.map((s) => `${nameOf(s.propertyId)} ${s.direction === 'desc' ? '↓' : '↑'}`).join(', ')}`);
     const shown = orderedVisibleProperties(info.properties, v).length;
-    if (shown !== info.properties.length) parts.push(`${shown} colonne${shown > 1 ? 's' : ''}`);
-    return parts.join(' · ') || 'toutes les lignes';
+    return {
+      filters: v.filters.length + (v.filterGroups?.length ?? 0),
+      sorts: v.sorts.map((s) => ({ column: nameOf(s.propertyId), desc: s.direction === 'desc' })),
+      columns: shown === info.properties.length ? null : shown,
+    };
   }
 
   private bases() {
