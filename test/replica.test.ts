@@ -10,9 +10,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { StoreOp } from '../packages/core/src/engine/store/registers';
 import { Journal } from '../packages/server/src/journal';
 import { keyId } from '../packages/gate/src/replica/access';
-import { DiskBlockCache, MemoryBlockCache } from '../packages/gate/src/replica/blockCache';
+import { MemoryBlockCache } from '../packages/gate/src/replica/blockCache';
+import { DiskBlockCache } from '../packages/gate/src/node/diskCache';
 import { FilarrClient } from '../packages/gate/src/replica/http';
 import { Replicator } from '../packages/gate/src/replica/replicator';
+import { wsPackageOpener, type WsCtor } from '../packages/gate/src/replica/stream';
+import WebSocket from 'ws';
 import { StoreMirror } from '../packages/gate/src/replica/store';
 import { InvalidTokenError, openToken } from '../packages/gate/src/replica/token';
 import { CATALOGUE_DB, CLIENTS_DB, COMMANDES_DB, demoStores } from './support/demoData';
@@ -69,6 +72,8 @@ describe('la réplique', () => {
       backoffMaxMs: 200,
       pollIntervalMs: 100,
       pausedRetryMs: 100,
+      // Le paquet `ws` rend les refus de montée entiers, comme sous Node dans filarr-gate
+      streamOpener: wsPackageOpener(WebSocket as unknown as WsCtor),
       ...opts,
     });
     return replicator;

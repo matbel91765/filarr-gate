@@ -1,14 +1,25 @@
 /**
  * Le journal LOCAL de la boîte noire : chaque requête servie, chaque échange
- * avec Filarr, chaque geste d'administration. Gardé sur cette machine (fichiers
- * JSON Lines par jour, retenue réglable), jamais envoyé ailleurs. Il ne contient
- * ni jeton, ni clé, ni contenu de ligne : des chemins, des codes, des comptes.
+ * avec Filarr, chaque geste d'administration, chaque dépôt de fichier et chaque
+ * passage de synchro. Gardé là où tourne la boîte (sous Node, des fichiers JSON
+ * Lines par jour, retenue réglable), jamais envoyé ailleurs. Il ne contient ni
+ * jeton, ni clé, ni contenu de ligne : des chemins, des codes, des comptes.
+ *
+ * Indépendant du moteur : l'hôte fournit où l'écrire (`JournalSink`) ; sans lui,
+ * le journal vit en mémoire seulement.
  */
 
-import { appendFile, mkdir, readdir, readFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+export type JournalKind = 'read' | 'write' | 'error' | 'filarr' | 'admin' | 'files' | 'sync';
 
-export type JournalKind = 'read' | 'write' | 'error' | 'filarr' | 'admin';
+/** Où le journal s'écrit (fichiers par jour sous Node). */
+export interface JournalSink {
+  append(day: string, line: string): Promise<void>;
+  /** Tout le journal gardé, en JSON Lines. */
+  exportAll(): Promise<string>;
+  /** Efface les jours antérieurs à `beforeDay` (AAAA-MM-JJ). */
+  prune(beforeDay: string): Promise<void>;
+  clear(): Promise<void>;
+}
 
 export interface JournalEntry {
   at: string;
@@ -24,7 +35,7 @@ export interface JournalEntry {
 }
 
 const MEMORY_MAX = 5000;
-const DAY_FILE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/;
+const NL = '\n';
 
 export class Journal {
   private entries: JournalEntry[] = [];
@@ -32,7 +43,7 @@ export class Journal {
   private writing: Promise<void> = Promise.resolve();
 
   constructor(
-    private readonly dir: string | null,
+    private readonly sink: JournalSink | null,
     public retentionDays = 30
   ) {}
 
@@ -41,15 +52,10 @@ export class Journal {
     this.entries.push(full);
     if (this.entries.length > MEMORY_MAX) this.entries.splice(0, this.entries.length - MEMORY_MAX);
     for (const fn of this.listeners) fn(full);
-    if (this.dir) {
-      const dir = this.dir;
-      const line = `${JSON.stringify(full)}\n`;
-      this.writing = this.writing
-        .then(async () => {
-          await mkdir(dir, { recursive: true });
-          await appendFile(join(dir, `${full.at.slice(0, 10)}.jsonl`), line, { mode: 0o600 });
-        })
-        .catch(() => undefined);
+    if (this.sink) {
+      const sink = this.sink;
+      const line = JSON.stringify(full) + NL;
+      this.writing = this.writing.then(() => sink.append(full.at.slice(0, 10), line)).catch(() => undefined);
     }
     return full;
   }
@@ -75,7 +81,7 @@ export class Journal {
 
   /** Le compte des entrées récentes par sorte. */
   counts(since?: string): Record<JournalKind | 'all', number> {
-    const out = { all: 0, read: 0, write: 0, error: 0, filarr: 0, admin: 0 };
+    const out = { all: 0, read: 0, write: 0, error: 0, filarr: 0, admin: 0, files: 0, sync: 0 };
     for (const e of this.entries) {
       if (since && e.at < since) continue;
       out.all += 1;
@@ -84,30 +90,24 @@ export class Journal {
     return out;
   }
 
-  /** Tout le journal gardé, en JSON Lines (les fichiers, sinon la mémoire). */
+  /** Tout le journal gardé, en JSON Lines (le support de l'hôte, sinon la mémoire). */
   async export(): Promise<string> {
     await this.writing;
-    if (!this.dir) return this.entries.map((e) => JSON.stringify(e)).join('\n') + '\n';
-    const files = (await readdir(this.dir).catch(() => [] as string[])).filter((f) => DAY_FILE.test(f)).sort();
-    let out = '';
-    for (const f of files) out += await readFile(join(this.dir, f), 'utf8').catch(() => '');
-    return out;
+    if (!this.sink) return this.entries.map((e) => JSON.stringify(e)).join(NL) + NL;
+    return this.sink.exportAll();
   }
 
-  /** Efface les jours au-delà de la retenue. */
+  /** Efface les jours au-delà de la retenue (et les entrées en mémoire trop vieilles). */
   async prune(now = Date.now()): Promise<void> {
-    if (!this.dir) return;
-    const limit = new Date(now - this.retentionDays * 86_400_000).toISOString().slice(0, 10);
-    for (const f of await readdir(this.dir).catch(() => [] as string[])) {
-      const m = DAY_FILE.exec(f);
-      if (m && m[1]! < limit) await rm(join(this.dir, f), { force: true });
-    }
+    const limit = new Date(now - this.retentionDays * 86_400_000).toISOString();
+    this.entries = this.entries.filter((e) => e.at >= limit);
+    await this.sink?.prune(limit.slice(0, 10)).catch(() => undefined);
   }
 
   async clear(): Promise<void> {
     this.entries = [];
     await this.writing;
-    if (this.dir) await rm(this.dir, { recursive: true, force: true });
+    await this.sink?.clear().catch(() => undefined);
   }
 
   flushed(): Promise<void> {

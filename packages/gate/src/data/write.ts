@@ -8,7 +8,6 @@
  * par la boîte noire : le chiffrement, lui, ouvre tout le magasin (§ 7).
  */
 
-import { randomBytes } from 'node:crypto';
 import { defaultCells } from '../../../core/src/dbCore';
 import { positionBetween } from '../../../core/src/engine/store/fracIndex';
 import { FIELD_CREATED, FIELD_DELETED, FIELD_ORDER, type StoreOp } from '../../../core/src/engine/store/registers';
@@ -18,9 +17,10 @@ import { KeyMissingError, WriteRefusedError } from '../replica/store';
 import { cellFromJson, FieldError, rowJson } from './fields';
 import type { BaseInfo, GateModel } from './model';
 import { ApiError } from './query';
+import { randomBytes, toHex } from '../util/bytes';
 
 /** Un identifiant de ligne neuf, de la forme de ceux de l'application. */
-export const newRowId = (): string => `db-${Date.now()}-${BigInt(`0x${randomBytes(6).toString('hex')}`).toString(36)}`;
+export const newRowId = (): string => `db-${Date.now()}-${BigInt(`0x${toHex(randomBytes(6))}`).toString(36)}`;
 
 export interface WriteResult {
   version: number;

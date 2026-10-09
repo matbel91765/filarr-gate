@@ -9,7 +9,7 @@
  * Outils : `list_bases`, `query_view`, `get_row`, `run_sql`.
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomUUID } from '../../../gate/src/util/bytes';
 import type { AppKeyRecord } from '../state';
 import { canReadBase, canReadView } from './keys';
 import type { GateModel } from '../../../gate/src/data/model';

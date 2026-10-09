@@ -12,59 +12,23 @@
  * machine qui détient les données.
  */
 
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { extname, join, normalize, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { randomToken, randomUUID, timingSafeEqualStr } from '../../../gate/src/util/bytes';
 import { assignSlugs } from '../../../core/src/engine/store/apiAccess';
 import { orderedVisibleProperties } from '../../../core/src/viewEngine';
 import { canReadBase, canReadQuery, canReadView, canWrite, validRange } from '../api/keys';
 import { buildOpenApi } from '../api/openapi';
 import { ApiError, runSql, viewPage, listRows } from '../../../gate/src/data/query';
-import { readJson } from '../api/server';
+import { errorResponse, isLoopback, json, readJson, type ConnInfo } from '../http';
 import { compileFilter } from '../api/webhooks';
 import type { BaseInfo } from '../../../gate/src/data/model';
-import { ENV_NAMES, type SettingKey } from '../../../cli/src/config';
-import type { Gate } from '../../../cli/src/gate';
+import type { SettingKey } from '../settings';
+import type { GateCore } from '../core';
 import type { JournalKind } from '../journal';
 import { StateStore, type KeyScope, type SavedQuery, type WebhookEvent } from '../state';
-import { log } from '../../../cli/src/log';
+import { log } from '../log';
 
 const SESSION_COOKIE = 'gate_admin';
 const SESSION_MS = 12 * 3_600_000;
-
-const MIME: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.ico': 'image/x-icon',
-  '.json': 'application/json',
-  '.woff2': 'font/woff2',
-};
-
-/** Où sont les fichiers de l'interface : `dist/ui` à côté du paquet. */
-function uiRoot(): string | null {
-  const here = fileURLToPath(new URL('.', import.meta.url));
-  for (const candidate of [join(here, 'ui'), join(here, '..', '..', 'dist', 'ui'), join(here, '..', 'dist', 'ui')]) {
-    if (existsSync(join(candidate, 'index.html'))) return candidate;
-  }
-  return null;
-}
-
-const isLoopback = (ip: string): boolean => ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip.startsWith('127.');
-
-function send(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
-  res.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
-    ...headers,
-  });
-  res.end(JSON.stringify(body));
-}
 
 const SECURITY_HEADERS = {
   'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
@@ -77,9 +41,7 @@ export class AdminApi {
   private sessions = new Map<string, number>();
   private loginFailures: number[] = [];
   private publicLimits: { at: number; data: unknown } | null = null;
-  private readonly root = uiRoot();
-
-  constructor(private readonly gate: Gate) {}
+  constructor(private readonly gate: GateCore) {}
 
   /** La mise en route est faite quand un mot de passe d'administration existe. */
   get setupDone(): boolean {
@@ -89,15 +51,13 @@ export class AdminApi {
   private async passwordOk(password: string): Promise<boolean> {
     const fromEnv = this.gate.config.adminPasswordFromEnv;
     if (fromEnv !== null) {
-      const a = Buffer.from(password);
-      const b = Buffer.from(fromEnv);
-      return a.length === b.length && timingSafeEqual(a, b);
+      return timingSafeEqualStr(password, fromEnv);
     }
     return StateStore.verifyPassword(password, this.gate.state.data.admin.passwordHash);
   }
 
-  private session(req: IncomingMessage): string | null {
-    const cookie = String(req.headers.cookie ?? '');
+  private session(request: Request): string | null {
+    const cookie = String(request.headers.get('cookie') ?? '');
     const m = new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([A-Za-z0-9_-]+)`).exec(cookie);
     if (!m) return null;
     const exp = this.sessions.get(m[1]!);
@@ -109,87 +69,66 @@ export class AdminApi {
     return m[1]!;
   }
 
-  private openSession(res: ServerResponse): void {
-    const id = randomBytes(24).toString('base64url');
+  private openSession(out: Record<string, string>): void {
+    const id = randomToken(24);
     this.sessions.set(id, Date.now() + SESSION_MS);
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}`);
+    out['Set-Cookie'] = `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}`;
   }
 
-  handle = (req: IncomingMessage, res: ServerResponse): void => {
-    const url = new URL(req.url ?? '/', 'http://admin.local');
-    const method = (req.method ?? 'GET').toUpperCase();
-    if (!url.pathname.startsWith('/admin/api/')) {
-      this.serveStatic(url.pathname, res);
-      return;
-    }
-    void this.api(req, res, url, method).catch((err) => {
-      const status = err instanceof ApiError ? err.status : 400;
-      const code = err instanceof ApiError ? err.code : 'bad_request';
+  /** Le point d'entrée HTTP de l'interface de gestion (fichiers et API). */
+  async handle(request: Request, conn: ConnInfo): Promise<Response> {
+    const url = new URL(request.url);
+    const method = request.method.toUpperCase();
+    if (!url.pathname.startsWith('/admin/api/')) return this.serveStatic(url.pathname);
+    try {
+      return await this.api(request, conn, url, method);
+    } catch (err) {
       if (!(err instanceof ApiError)) log.debug(`administration : ${(err as Error).message}`);
-      if (!res.headersSent) send(res, status, { error: (err as Error).message, code, ...(err instanceof ApiError ? err.extra : {}) });
-    });
-  };
+      const e = err instanceof ApiError ? err : new ApiError(400, 'bad_request', (err as Error).message);
+      return errorResponse(e).response;
+    }
+  }
 
-  private serveStatic(pathname: string, res: ServerResponse): void {
-    if (pathname === '/' || pathname === '/admin') {
-      res.writeHead(302, { Location: '/admin/' });
-      res.end();
-      return;
-    }
-    if (!pathname.startsWith('/admin/')) {
-      res.writeHead(404, SECURITY_HEADERS);
-      res.end('Not found');
-      return;
-    }
-    if (!this.root) {
-      res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS });
-      res.end("L'interface n'est pas construite : npm run build:ui");
-      return;
-    }
+  private async serveStatic(pathname: string): Promise<Response> {
+    if (pathname === '/' || pathname === '/admin') return new Response(null, { status: 302, headers: { Location: '/admin/' } });
+    if (!pathname.startsWith('/admin/')) return new Response('Not found', { status: 404, headers: SECURITY_HEADERS });
     let decoded: string;
     try {
       decoded = decodeURIComponent(pathname.slice('/admin/'.length));
     } catch {
-      res.writeHead(400, SECURITY_HEADERS);
-      res.end();
-      return;
+      return new Response(null, { status: 400, headers: SECURITY_HEADERS });
     }
-    const rel = normalize(decoded || 'index.html');
-    let file = resolve(this.root, rel);
-    if (!file.startsWith(resolve(this.root) + sep) && file !== resolve(this.root)) {
-      res.writeHead(403, SECURITY_HEADERS);
-      res.end();
-      return;
+    // Aucun chemin qui remonte : l'hôte ne sert que les fichiers de l'interface
+    if (decoded.split(/[\/]/).some((seg) => seg === '..')) return new Response(null, { status: 403, headers: SECURITY_HEADERS });
+    const asset = (await this.gate.host.serveAsset(decoded || 'index.html')) ?? (await this.gate.host.serveAsset('index.html'));
+    if (!asset) {
+      return new Response("L'interface n'est pas construite : npm run build:ui", { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS } });
     }
-    // Application d'une page : tout chemin inconnu rend index.html
-    if (!existsSync(file) || statSync(file).isDirectory()) file = join(this.root, 'index.html');
-    const ext = extname(file);
-    res.writeHead(200, {
-      'Content-Type': MIME[ext] ?? 'application/octet-stream',
-      'Cache-Control': ext === '.html' ? 'no-store' : 'public, max-age=31536000, immutable',
-      ...SECURITY_HEADERS,
-    });
-    res.end(readFileSync(file));
+    const headers = new Headers(asset.headers);
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) headers.set(k, v);
+    return new Response(asset.body, { status: asset.status, headers });
   }
 
-  private requireSetupAllowed(req: IncomingMessage, code: unknown): void {
+  private requireSetupAllowed(conn: ConnInfo, code: unknown): void {
     if (this.setupDone) throw new ApiError(409, 'setup_done', 'La mise en route est déjà faite : connectez-vous.');
-    const ip = req.socket.remoteAddress ?? '';
+    const ip = conn.remoteAddress ?? '';
     if (!isLoopback(ip) && String(code ?? '') !== this.gate.setupCode) {
       throw new ApiError(403, 'setup_code_required', 'Depuis une autre machine, saisissez le code de mise en route affiché dans la console de la boîte noire.');
     }
   }
 
-  private async api(req: IncomingMessage, res: ServerResponse, url: URL, method: string): Promise<void> {
+  private async api(request: Request, conn: ConnInfo, url: URL, method: string): Promise<Response> {
+    const extra: Record<string, string> = {};
+    const send = (status: number, body: unknown, headers: Record<string, string> = {}): Response => json(status, body, { ...extra, ...headers });
     const path = url.pathname.slice('/admin/api'.length).replace(/\/+$/, '') || '/';
     const g = this.gate;
-    const authed = this.session(req) !== null;
+    const authed = this.session(request) !== null;
     // Écriture : en-tête maison (contre une page d'un autre site)
-    if (method !== 'GET' && req.headers['x-gate-admin'] !== '1') throw new ApiError(403, 'csrf', 'En-tête X-Gate-Admin manquant');
+    if (method !== 'GET' && request.headers.get('x-gate-admin') !== '1') throw new ApiError(403, 'csrf', 'En-tête X-Gate-Admin manquant');
 
     if (path === '/state' && method === 'GET') {
-      const ip = req.socket.remoteAddress ?? '';
-      return send(res, 200, {
+      const ip = conn.remoteAddress ?? '';
+      return send(200, {
         version: g.version,
         authenticated: authed,
         setup: { done: this.setupDone, hasToken: g.hasToken, needsCode: !this.setupDone && !isLoopback(ip) },
@@ -198,39 +137,39 @@ export class AdminApi {
       });
     }
     if (path === '/login' && method === 'POST') {
-      const body = (await readJson(req)) as { password?: string } | undefined;
+      const body = (await readJson(request)) as { password?: string } | undefined;
       const now = Date.now();
       this.loginFailures = this.loginFailures.filter((t) => now - t < 60_000);
       if (this.loginFailures.length >= 5) throw new ApiError(429, 'too_many_attempts', 'Trop d’essais : attendez une minute.');
       if (!this.setupDone || !(await this.passwordOk(String(body?.password ?? '')))) {
         this.loginFailures.push(now);
-        g.journal.add({ kind: 'error', who: `administration · ${req.socket.remoteAddress ?? ''}`, what: 'connexion', code: '401', note: 'mot de passe refusé' });
+        g.journal.add({ kind: 'error', who: `administration · ${conn.remoteAddress ?? ''}`, what: 'connexion', code: '401', note: 'mot de passe refusé' });
         throw new ApiError(401, 'bad_password', 'Mot de passe refusé');
       }
-      this.openSession(res);
-      return send(res, 200, { ok: true });
+      this.openSession(extra);
+      return send(200, { ok: true });
     }
     if (path === '/logout' && method === 'POST') {
-      const id = this.session(req);
+      const id = this.session(request);
       if (id) this.sessions.delete(id);
-      res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0`);
-      return send(res, 200, { ok: true });
+      extra['Set-Cookie'] = `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0`;
+      return send(200, { ok: true });
     }
 
     // ---------- Mise en route ----------
     if (path === '/setup/token' && method === 'POST') {
-      const body = (await readJson(req)) as { token?: string; code?: string } | undefined;
-      this.requireSetupAllowed(req, body?.code);
-      return send(res, 200, await this.applyToken(String(body?.token ?? '')));
+      const body = (await readJson(request)) as { token?: string; code?: string } | undefined;
+      this.requireSetupAllowed(conn, body?.code);
+      return send(200, await this.applyToken(String(body?.token ?? '')));
     }
     if (path === '/setup/network' && method === 'POST') {
-      const body = (await readJson(req)) as Record<string, unknown> | undefined;
-      this.requireSetupAllowed(req, body?.code);
-      return send(res, 200, await this.applyNetwork(body ?? {}));
+      const body = (await readJson(request)) as Record<string, unknown> | undefined;
+      this.requireSetupAllowed(conn, body?.code);
+      return send(200, await this.applyNetwork(body ?? {}));
     }
     if (path === '/setup/finish' && method === 'POST') {
-      const body = (await readJson(req)) as { password?: string; metrics?: boolean; mcp?: boolean; code?: string } | undefined;
-      this.requireSetupAllowed(req, body?.code);
+      const body = (await readJson(request)) as { password?: string; metrics?: boolean; mcp?: boolean; code?: string } | undefined;
+      this.requireSetupAllowed(conn, body?.code);
       const password = String(body?.password ?? '');
       if (password.length < 10) throw new ApiError(400, 'weak_password', 'Dix caractères au moins.');
       g.state.data.admin.passwordHash = await StateStore.hashPassword(password);
@@ -240,15 +179,15 @@ export class AdminApi {
       if (typeof body?.mcp === 'boolean' && g.config.sources.mcp !== 'env' && g.config.sources.mcp !== 'file') patch.mcp = body.mcp;
       if (Object.keys(patch).length) await g.updateSettings(patch);
       g.journal.add({ kind: 'admin', who: 'administration', what: 'mise en route terminée', code: 'ok' });
-      this.openSession(res);
-      return send(res, 200, { ok: true });
+      this.openSession(extra);
+      return send(200, { ok: true });
     }
 
     if (!authed) throw new ApiError(401, 'login_required', 'Connexion requise');
 
     // ---------- Écrans ----------
-    if (path === '/dashboard' && method === 'GET') return send(res, 200, this.dashboard());
-    if (path === '/bases' && method === 'GET') return send(res, 200, { bases: this.bases(), refused: g.replicator.refused, publicUrl: g.publicUrl(), write: g.settings.write });
+    if (path === '/dashboard' && method === 'GET') return send(200, this.dashboard());
+    if (path === '/bases' && method === 'GET') return send(200, { bases: this.bases(), refused: g.replicator.refused, publicUrl: g.publicUrl(), write: g.settings.write });
     const preview = /^\/bases\/([A-Za-z0-9_-]{22})\/rows$/.exec(path);
     if (preview && method === 'GET') {
       const info = g.model.baseById(preview[1]!);
@@ -257,146 +196,147 @@ export class AdminApi {
       const viewSlug = url.searchParams.get('view');
       const view = viewSlug ? info.views.find((v) => v.slug === viewSlug) : undefined;
       const page = view ? viewPage(g.model, info, view, params) : listRows(g.model, info, params);
-      return send(res, 200, page);
+      return send(200, page);
     }
     if (path === '/openapi.json' && method === 'GET') {
-      return send(res, 200, buildOpenApi({ bases: g.model.bases(), queries: g.state.data.queries, serverUrl: g.publicUrl(), version: g.version, write: g.settings.write }), {
+      return send(200, buildOpenApi({ bases: g.model.bases(), queries: g.state.data.queries, serverUrl: g.publicUrl(), version: g.version, write: g.settings.write }), {
         'Content-Disposition': 'attachment; filename="openapi.json"',
       });
     }
     if (path === '/sql' && method === 'POST') {
-      const body = (await readJson(req)) as { sql?: string } | undefined;
+      const body = (await readJson(request)) as { sql?: string } | undefined;
       const out = runSql(g.model.sql().catalog, String(body?.sql ?? ''));
       g.journal.add({ kind: 'read', who: 'administration', what: 'explorateur SQL', code: '200', ms: out.ms, note: `${out.rows.length} ligne(s)` });
-      return send(res, 200, out);
+      return send(200, out);
     }
-    if (path === '/sql/tables' && method === 'GET') return send(res, 200, this.tables());
+    if (path === '/sql/tables' && method === 'GET') return send(200, this.tables());
     if (path === '/queries' && method === 'GET') {
-      return send(res, 200, {
+      return send(200, {
         queries: g.state.data.queries.map((q) => ({ ...q, endpoint: `/v1/q/${q.slug}`, keys: this.allowedKeys((k) => canReadQuery(k, q.id)) })),
       });
     }
     if (path === '/queries' && method === 'POST') {
-      const body = (await readJson(req)) as { name?: string; sql?: string } | undefined;
-      return send(res, 201, this.saveQuery(String(body?.name ?? ''), String(body?.sql ?? '')));
+      const body = (await readJson(request)) as { name?: string; sql?: string } | undefined;
+      return send(201, this.saveQuery(String(body?.name ?? ''), String(body?.sql ?? '')));
     }
     const q = /^\/queries\/([0-9a-f-]{36})$/.exec(path);
     if (q && method === 'DELETE') {
       g.state.data.queries = g.state.data.queries.filter((x) => x.id !== q[1]);
       g.state.saveNow();
-      return send(res, 200, { ok: true });
+      return send(200, { ok: true });
     }
 
-    if (path === '/keys' && method === 'GET') return send(res, 200, this.keyList());
+    if (path === '/keys' && method === 'GET') return send(200, this.keyList());
     if (path === '/keys' && method === 'POST') {
-      const body = (await readJson(req)) as Record<string, unknown> | undefined;
+      const body = (await readJson(request)) as Record<string, unknown> | undefined;
       const { record, key } = g.keys.create(this.keyInput(body ?? {}));
       g.journal.add({ kind: 'admin', who: 'administration', what: `clé créée · ${record.name}`, code: 'ok', note: record.prefix });
-      return send(res, 201, { key, record: this.keyView(record) });
+      return send(201, { key, record: this.keyView(record) });
     }
     const k = /^\/keys\/([0-9a-f-]{36})$/.exec(path);
     if (k && method === 'PATCH') {
-      const body = (await readJson(req)) as Record<string, unknown> | undefined;
+      const body = (await readJson(request)) as Record<string, unknown> | undefined;
       const patch: Record<string, unknown> = {};
       if (typeof body?.paused === 'boolean') patch.paused = body.paused;
       if (typeof body?.name === 'string' && body.name.trim()) patch.name = body.name.trim();
       const record = g.keys.update(k[1]!, patch);
       g.journal.add({ kind: 'admin', who: 'administration', what: `clé ${record.paused ? 'mise en pause' : 'reprise'} · ${record.name}`, code: 'ok' });
-      return send(res, 200, { record: this.keyView(record) });
+      return send(200, { record: this.keyView(record) });
     }
     if (k && method === 'DELETE') {
       const record = g.keys.get(k[1]!);
       if (!g.keys.revoke(k[1]!)) throw new ApiError(404, 'key_not_found', 'Clé inconnue');
       g.journal.add({ kind: 'admin', who: 'administration', what: `clé révoquée · ${record?.name ?? k[1]}`, code: 'ok' });
-      return send(res, 200, { ok: true });
+      return send(200, { ok: true });
     }
 
-    if (path === '/webhooks' && method === 'GET') return send(res, 200, this.webhookList());
+    if (path === '/webhooks' && method === 'GET') return send(200, this.webhookList());
     if (path === '/webhooks' && method === 'POST') {
-      const body = (await readJson(req)) as Record<string, unknown> | undefined;
+      const body = (await readJson(request)) as Record<string, unknown> | undefined;
       const hook = g.webhooks.create(this.webhookInput(body ?? {}));
       g.journal.add({ kind: 'admin', who: 'administration', what: `webhook créé · ${hook.name}`, code: 'ok' });
       // Le secret de signature n'est montré qu'ici, à la création
-      return send(res, 201, { webhook: this.webhookView(hook.id), secret: hook.secret });
+      return send(201, { webhook: this.webhookView(hook.id), secret: hook.secret });
     }
     const w = /^\/webhooks\/([0-9a-f-]{36})(?:\/(test|rotate))?$/.exec(path);
     if (w && method === 'POST' && w[2] === 'test') {
       g.webhooks.test(w[1]!);
-      return send(res, 200, { webhook: this.webhookView(w[1]!) });
+      return send(200, { webhook: this.webhookView(w[1]!) });
     }
     if (w && method === 'POST' && w[2] === 'rotate') {
       const hook = g.webhooks.rotate(w[1]!);
       g.journal.add({ kind: 'admin', who: 'administration', what: `secret renouvelé · ${hook.name}`, code: 'ok' });
-      return send(res, 200, { webhook: this.webhookView(w[1]!), secret: hook.secret });
+      return send(200, { webhook: this.webhookView(w[1]!), secret: hook.secret });
     }
     if (w && !w[2] && method === 'PATCH') {
-      const body = (await readJson(req)) as Record<string, unknown> | undefined;
+      const body = (await readJson(request)) as Record<string, unknown> | undefined;
       const patch = typeof body?.paused === 'boolean' && Object.keys(body).length === 1 ? { paused: body.paused } : this.webhookInput(body ?? {});
       g.webhooks.update(w[1]!, patch);
-      return send(res, 200, { webhook: this.webhookView(w[1]!) });
+      return send(200, { webhook: this.webhookView(w[1]!) });
     }
     if (w && !w[2] && method === 'DELETE') {
       if (!g.webhooks.remove(w[1]!)) throw new ApiError(404, 'webhook_not_found', 'Webhook inconnu');
-      return send(res, 200, { ok: true });
+      return send(200, { ok: true });
     }
 
     if (path === '/journal' && method === 'GET') {
       const kind = (url.searchParams.get('kind') ?? 'all') as JournalKind | 'all';
-      return send(res, 200, {
+      return send(200, {
         entries: g.journal.list({ kind, q: url.searchParams.get('q') ?? '', limit: Math.min(1000, Number(url.searchParams.get('limit') ?? '200') || 200) }),
         counts: g.journal.counts(),
         retentionDays: g.journal.retentionDays,
       });
     }
     if (path === '/journal/export' && method === 'GET') {
-      res.writeHead(200, {
-        'Content-Type': 'application/x-ndjson; charset=utf-8',
-        'Content-Disposition': `attachment; filename="filarr-gate-journal-${new Date().toISOString().slice(0, 10)}.jsonl"`,
-        'Cache-Control': 'no-store',
+      return new Response(await g.journal.export(), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/x-ndjson; charset=utf-8',
+          'Content-Disposition': `attachment; filename="filarr-gate-journal-${new Date().toISOString().slice(0, 10)}.jsonl"`,
+          'Cache-Control': 'no-store',
+        },
       });
-      res.end(await g.journal.export());
-      return;
     }
-    if (path === '/limits' && method === 'GET') return send(res, 200, await this.limits());
+    if (path === '/limits' && method === 'GET') return send(200, await this.limits());
 
-    if (path === '/settings' && method === 'GET') return send(res, 200, await this.settingsView());
+    if (path === '/settings' && method === 'GET') return send(200, await this.settingsView());
     if (path === '/settings' && method === 'PUT') {
-      const body = (await readJson(req)) as Record<string, unknown> | undefined;
+      const body = (await readJson(request)) as Record<string, unknown> | undefined;
       try {
         const out = await g.updateSettings(body ?? {});
-        return send(res, 200, { ...(await this.settingsView()), restarted: out.restarted });
+        return send(200, { ...(await this.settingsView()), restarted: out.restarted });
       } catch (err) {
         throw new ApiError(400, 'settings_refused', (err as Error).message);
       }
     }
     if (path === '/token' && method === 'POST') {
-      const body = (await readJson(req)) as { token?: string } | undefined;
+      const body = (await readJson(request)) as { token?: string } | undefined;
       if (g.tokenSource === 'env') throw new ApiError(409, 'token_from_env', 'Le jeton vient de FILARR_GATE_TOKEN : changez la variable.');
-      return send(res, 200, await this.applyToken(String(body?.token ?? '')));
+      return send(200, await this.applyToken(String(body?.token ?? '')));
     }
     if (path === '/resync' && method === 'POST') {
       await g.replicator.resync();
       g.journal.add({ kind: 'admin', who: 'administration', what: 'resynchronisation complète', code: g.replicator.link });
-      return send(res, 200, this.summary());
+      return send(200, this.summary());
     }
     if (path === '/password' && method === 'POST') {
-      const body = (await readJson(req)) as { current?: string; next?: string } | undefined;
+      const body = (await readJson(request)) as { current?: string; next?: string } | undefined;
       if (g.config.adminPasswordFromEnv !== null) throw new ApiError(409, 'password_from_env', 'Le mot de passe vient de FILARR_GATE_ADMIN_PASSWORD.');
       if (!(await this.passwordOk(String(body?.current ?? '')))) throw new ApiError(401, 'bad_password', 'Mot de passe actuel refusé');
       if (String(body?.next ?? '').length < 10) throw new ApiError(400, 'weak_password', 'Dix caractères au moins.');
       g.state.data.admin.passwordHash = await StateStore.hashPassword(String(body?.next));
       g.state.saveNow();
       this.sessions.clear();
-      this.openSession(res);
-      return send(res, 200, { ok: true });
+      this.openSession(extra);
+      return send(200, { ok: true });
     }
     if (path === '/forget' && method === 'POST') {
-      const body = (await readJson(req)) as { confirm?: string } | undefined;
+      const body = (await readJson(request)) as { confirm?: string } | undefined;
       if (body?.confirm !== 'oublier') throw new ApiError(400, 'confirm_required', 'Confirmation attendue : « oublier »');
       await g.forget();
       this.sessions.clear();
-      res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0`);
-      return send(res, 200, { ok: true });
+      extra['Set-Cookie'] = `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0`;
+      return send(200, { ok: true });
     }
     throw new ApiError(404, 'not_found', `Route inconnue : ${method} ${path}`);
   }
@@ -455,7 +395,7 @@ export class AdminApi {
       patch.tlsCert = null;
       patch.tlsKey = null;
     } else if (typeof body.tlsCert === 'string' && typeof body.tlsKey === 'string') {
-      if (!existsSync(body.tlsCert) || !existsSync(body.tlsKey)) throw new ApiError(400, 'tls_missing', 'Certificat ou clé introuvable sur cette machine');
+      if (!this.gate.host.fileExists(body.tlsCert) || !this.gate.host.fileExists(body.tlsKey)) throw new ApiError(400, 'tls_missing', 'Certificat ou clé introuvable sur cette machine');
       patch.tlsCert = body.tlsCert;
       patch.tlsKey = body.tlsKey;
     }
@@ -513,7 +453,7 @@ export class AdminApi {
     };
   }
 
-  private allowedKeys(test: (k: ReturnType<Gate['keys']['list']>[number]) => boolean): string[] {
+  private allowedKeys(test: (k: ReturnType<GateCore['keys']['list']>[number]) => boolean): string[] {
     return this.gate.keys.list().filter(test).map((k) => k.name);
   }
 
@@ -627,11 +567,12 @@ export class AdminApi {
     return out;
   }
 
-  private keyView(k: ReturnType<Gate['keys']['list']>[number]) {
+  private keyView(k: ReturnType<GateCore['keys']['list']>[number]) {
     const g = this.gate;
     const describe = (s: KeyScope): string => {
       if (s.target === 'all') return 'toutes les vues';
       if (s.target === 'query') return g.state.data.queries.find((q) => q.id === s.queryId)?.slug ?? 'requête supprimée';
+      if (s.target === 'files') return 'dépôt de fichiers';
       const base = g.model.baseById(s.storeId);
       if (s.target === 'view') return `${base?.slug ?? '?'}/${base?.views.find((v) => v.view.id === s.viewId)?.slug ?? '?'}`;
       return base?.slug ?? '?';
@@ -764,8 +705,8 @@ export class AdminApi {
     if (!this.publicLimits || Date.now() - this.publicLimits.at > 3_600_000) {
       try {
         const res = await fetch(new URL('public/api-limits', g.settings.apiUrl.endsWith('/') ? g.settings.apiUrl : `${g.settings.apiUrl}/`), { signal: AbortSignal.timeout(10_000) });
-        const json = (await res.json()) as { data?: unknown };
-        this.publicLimits = { at: Date.now(), data: res.ok ? (json.data ?? json) : null };
+        const body = (await res.json()) as { data?: unknown };
+        this.publicLimits = { at: Date.now(), data: res.ok ? (body.data ?? body) : null };
       } catch {
         this.publicLimits = { at: Date.now(), data: null };
       }
@@ -790,7 +731,7 @@ export class AdminApi {
     return {
       settings: g.settings,
       sources: g.config.sources,
-      envNames: ENV_NAMES,
+      envNames: g.config.envNames,
       stateDir: g.state.dir,
       configFile: g.config.configFile,
       token: r.identity ? { hint: r.identity.hint, fingerprint: r.identity.fingerprint, source: g.tokenSource } : null,

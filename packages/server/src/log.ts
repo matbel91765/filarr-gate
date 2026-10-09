@@ -3,8 +3,15 @@
 type Level = 'debug' | 'info' | 'warn' | 'error';
 const ORDER: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 };
 
-let threshold: Level = (process.env.FILARR_GATE_LOG_LEVEL as Level) in ORDER ? (process.env.FILARR_GATE_LOG_LEVEL as Level) : 'info';
+const envLevel = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.FILARR_GATE_LOG_LEVEL;
+let threshold: Level = envLevel !== undefined && envLevel in ORDER ? (envLevel as Level) : 'info';
 let silent = false;
+
+/** Où écrire une ligne (la console d'office ; `filarr-gate` écrit sur stdout et stderr). */
+let writer: (level: Level, line: string) => void = (level, line) => {
+  if (level === 'error' || level === 'warn') console.error(line);
+  else console.log(line);
+};
 
 export function setLogLevel(level: Level | 'silent'): void {
   if (level === 'silent') silent = true;
@@ -14,11 +21,13 @@ export function setLogLevel(level: Level | 'silent'): void {
   }
 }
 
+export function setLogWriter(fn: (level: Level, line: string) => void): void {
+  writer = fn;
+}
+
 function write(level: Level, message: string): void {
   if (silent || ORDER[level] < ORDER[threshold]) return;
-  const line = `${new Date().toISOString()} ${level.toUpperCase().padEnd(5)} ${message}`;
-  if (level === 'error' || level === 'warn') process.stderr.write(`${line}\n`);
-  else process.stdout.write(`${line}\n`);
+  writer(level, `${new Date().toISOString()} ${level.toUpperCase().padEnd(5)} ${message}`);
 }
 
 export const log = {

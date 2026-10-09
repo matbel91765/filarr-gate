@@ -13,7 +13,10 @@
  *   les abandonne (et le journal le dit).
  */
 
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { hmac } from '@noble/hashes/hmac.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { utf8Encode } from '../../../core/src/engine/store/crypto';
+import { randomBytes, randomToken, randomUUID, timingSafeEqualStr, toHex } from '../../../gate/src/util/bytes';
 import { compileViewFilter } from '../../../core/src/viewEngine';
 import { parseStatement } from '../../../core/src/engine/sql/parser';
 import { catalogOf, runSelect, type SqlCatalog } from '../../../core/src/engine/sql/run';
@@ -23,7 +26,7 @@ import type { Journal } from '../journal';
 import type { Metrics } from '../metrics';
 import type { GateBase, QuotaAlert } from '../../../gate/src/replica/replicator';
 import type { RowDiff } from '../../../gate/src/replica/store';
-import type { StateStore, WebhookEvent, WebhookRecord } from '../state';
+import type { DepositRecord, StateStore, WebhookEvent, WebhookRecord } from '../state';
 import { rowJson } from '../../../gate/src/data/fields';
 import type { BaseInfo, GateModel } from '../../../gate/src/data/model';
 
@@ -32,7 +35,7 @@ export const MAX_ATTEMPTS = 8;
 
 /** Signe un corps : l'en-tête `Filarr-Gate-Signature`. */
 export function signPayload(secret: string, body: string, t = Math.floor(Date.now() / 1000)): string {
-  const v1 = createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
+  const v1 = toHex(hmac(sha256, utf8Encode(secret), utf8Encode(`${t}.${body}`)));
   return `t=${t},v1=${v1}`;
 }
 
@@ -41,11 +44,11 @@ export function verifySignature(secret: string, body: string, header: string, no
   const parts = Object.fromEntries(header.split(',').map((p) => p.split('=') as [string, string]));
   const t = Number(parts.t);
   if (!Number.isFinite(t) || Math.abs(now - t) > SIGNATURE_TOLERANCE_S || !parts.v1) return false;
-  const expected = createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
-  return expected.length === parts.v1.length && timingSafeEqual(Buffer.from(expected), Buffer.from(parts.v1));
+  const expected = toHex(hmac(sha256, utf8Encode(secret), utf8Encode(`${t}.${body}`)));
+  return timingSafeEqualStr(expected, parts.v1);
 }
 
-export const newWebhookSecret = (): string => `whsec_${randomBytes(24).toString('base64url')}`;
+export const newWebhookSecret = (): string => `whsec_${randomToken(24)}`;
 
 export interface Delivery {
   id: string;
@@ -202,7 +205,7 @@ export class WebhookService {
     }
     if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Adresse http(s) attendue');
     if (!Array.isArray(h.events) || h.events.length === 0) throw new Error('Au moins un événement');
-    const rowEvents = h.events.filter((e) => e !== 'gate.quota');
+    const rowEvents = h.events.filter((e) => e.startsWith('row.'));
     if (rowEvents.length > 0 && !h.target) throw new Error('Une base est attendue pour les événements de lignes');
     try {
       compileFilter(h.filter);
@@ -279,6 +282,26 @@ export class WebhookService {
     }
   }
 
+  /** Révision 3 : un fichier déposé par cette boîte a été rangé par l'appli (`file.filed`, jamais où ni sous quel nom). */
+  onFile(record: DepositRecord): void {
+    if (record.status !== 'filed') return;
+    for (const hook of this.list()) {
+      if (hook.paused || !hook.events.includes('file.filed')) continue;
+      this.enqueue(hook, 'file.filed', record.id, {
+        event: 'file.filed',
+        file: { id: record.id, depositId: record.depositId, status: record.status, depositedAt: record.depositedAt, filedAt: record.filedAt, sizeBytes: record.sizeBytes, source: record.source },
+      });
+    }
+  }
+
+  /** Une synchro externe a fini un passage (`sync.done`) ou échoué (`sync.failed`). */
+  onSync(event: 'sync.done' | 'sync.failed', payload: Record<string, unknown>): void {
+    for (const hook of this.list()) {
+      if (hook.paused || !hook.events.includes(event)) continue;
+      this.enqueue(hook, event, String(payload.name ?? payload.defId ?? ''), { event, ...payload });
+    }
+  }
+
   /** « Envoyer un essai ». */
   test(id: string): Delivery {
     const hook = this.get(id);
@@ -312,7 +335,7 @@ export class WebhookService {
   }
 
   private enqueue(hook: WebhookRecord, event: string, label: string, payload: Record<string, unknown>, immediate = false): Delivery {
-    const deliveryId = `dlv_${Date.now().toString(36)}${randomBytes(5).toString('hex')}`;
+    const deliveryId = `dlv_${Date.now().toString(36)}${toHex(randomBytes(5))}`;
     const body = JSON.stringify({ id: deliveryId, ...payload });
     const pending: Pending = { hook, deliveryId, event, label, body, attempt: 1, dueAt: Date.now() };
     const record: Delivery = { id: deliveryId, hookId: hook.id, event, label, at: new Date().toISOString(), attempt: 1, status: null, ms: null, final: false, body };
@@ -337,7 +360,7 @@ export class WebhookService {
     const wait = delay ?? Math.max(0, next - Date.now());
     if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.drain(), wait);
-    this.timer.unref?.();
+    (this.timer as { unref?: () => void }).unref?.();
   }
 
   private async drain(): Promise<void> {

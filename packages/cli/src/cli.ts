@@ -14,10 +14,11 @@ import { request as httpsRequest } from 'node:https';
 import { createInterface } from 'node:readline';
 import { coerce, defaultStateDir, loadConfig, type SettingKey } from './config';
 import { Gate } from './gate';
-import { log } from './log';
+import { log } from '../../server/src/log';
 import { parseAccessToken } from '../../core/src/engine/store/apiAccess';
 import { KeyRegistry } from '../../server/src/api/keys';
 import { StateStore } from '../../server/src/state';
+import { StateDir } from './node';
 import { GATE_VERSION } from './version';
 
 function parseArgs(argv: string[]): { command: string[]; flags: Record<string, string | true> } {
@@ -77,7 +78,8 @@ async function serve(): Promise<void> {
 async function init(flags: Record<string, string | true>): Promise<void> {
   const token = typeof flags.token === 'string' ? flags.token : process.env.FILARR_GATE_TOKEN;
   if (!token || !parseAccessToken(token)) throw new Error('--token flr_live_… attendu (un jeton Filarr valide)');
-  const state = new StateStore(defaultStateDir());
+  const files = new StateDir(defaultStateDir());
+  const state = new StateStore(files.backend(), files.readState());
   const map: Record<string, SettingKey> = {
     host: 'host',
     port: 'port',
@@ -93,7 +95,7 @@ async function init(flags: Record<string, string | true>): Promise<void> {
     if (flags['admin-password'].length < 10) throw new Error('--admin-password : dix caractères au moins');
     state.data.admin.passwordHash = await StateStore.hashPassword(flags['admin-password']);
   }
-  state.writeToken(token);
+  files.writeToken(token);
   state.saveNow();
   const cfg = loadConfig(state.data.settings);
   process.stdout.write(`Jeton rangé dans ${state.dir} (droits 0600).\nAPI locale : ${cfg.settings.host}:${cfg.settings.port} · interface : http://${cfg.settings.adminHost}:${cfg.settings.adminPort}/admin/\nDémarrez : filarr-gate\n`);
@@ -102,7 +104,8 @@ async function init(flags: Record<string, string | true>): Promise<void> {
 function keysCreate(flags: Record<string, string | true>): void {
   const name = typeof flags.name === 'string' ? flags.name : '';
   if (!name) throw new Error('--name attendu');
-  const state = new StateStore(defaultStateDir());
+  const files = new StateDir(defaultStateDir());
+  const state = new StateStore(files.backend(), files.readState());
   const days = typeof flags.days === 'string' ? Number(flags.days) : 0;
   const { record, key } = new KeyRegistry(state).create({
     name,

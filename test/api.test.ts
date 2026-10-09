@@ -9,7 +9,7 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { verifySignature } from '../packages/server/src/api/webhooks';
 import { Gate } from '../packages/cli/src/gate';
-import { setLogLevel } from '../packages/cli/src/log';
+import { setLogLevel } from '../packages/server/src/log';
 import { CATALOGUE_DB, CLIENTS_DB, COMMANDES_DB, demoStores } from './support/demoData';
 import { MockFilarr } from './support/mockFilarr';
 import { tempDir, until } from './support/util';

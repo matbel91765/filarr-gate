@@ -15,7 +15,6 @@ import { evaluateFormula } from '../../../core/src/formulaEngine';
 import { peopleOf } from '../../../core/src/people';
 import { computeRollup, resolveRelation, type DbEnv } from '../../../core/src/relations';
 import { vaultFileRef, type DbProperty, type DbRow, type PropertyType } from '../../../core/src/types';
-import type { StateStore } from '../../../server/src/state';
 
 export type JsonType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'string[]' | 'object';
 
@@ -67,9 +66,26 @@ const TYPE_OF: Record<PropertyType, JsonType> = {
 
 const READ_ONLY: ReadonlySet<PropertyType> = new Set(['createdTime', 'updatedTime', 'rollup', 'formula']);
 
+/**
+ * Où la boîte garde les noms de champs déjà donnés (`storeId → propertyId → nom`),
+ * pour qu'un renommage de colonne dans Filarr ne casse pas les logiciels.
+ */
+export interface FieldNameStore {
+  /** Les noms d'une base (objet modifiable en place). */
+  names(storeId: string): Record<string, string>;
+  /** Un nom a été ajouté : à enregistrer bientôt. */
+  changed(): void;
+}
+
+/** Les noms en mémoire seulement (la bibliothèque sans répertoire). */
+export function memoryFieldNames(): FieldNameStore {
+  const all: Record<string, Record<string, string>> = {};
+  return { names: (storeId) => (all[storeId] ??= {}), changed: () => undefined };
+}
+
 /** Les champs d'une base, noms gardés d'une lecture à l'autre. */
-export function fieldsOf(state: StateStore, storeId: string, properties: readonly DbProperty[]): FieldDef[] {
-  const saved = (state.data.fieldNames[storeId] ??= {});
+export function fieldsOf(store: FieldNameStore, storeId: string, properties: readonly DbProperty[]): FieldDef[] {
+  const saved = store.names(storeId);
   const taken = new Set<string>(RESERVED_FIELDS);
   for (const p of properties) if (saved[p.id]) taken.add(saved[p.id]!);
   let changed = false;
@@ -94,7 +110,7 @@ export function fieldsOf(state: StateStore, storeId: string, properties: readonl
       ...(prop.type === 'relation' && prop.targetDbId ? { target: prop.targetDbId } : {}),
     });
   }
-  if (changed) state.save();
+  if (changed) store.changed();
   return out;
 }
 

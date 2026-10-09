@@ -5,21 +5,32 @@
  * montrée qu'une fois ; la boîte noire n'en garde que l'empreinte (SHA-256).
  */
 
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { isIP } from 'node:net';
+import { fromHex, randomToken, randomUUID, sha256Hex, timingSafeEqualBytes } from '../../../gate/src/util/bytes';
 import type { AppKeyRecord, KeyScope, StateStore } from '../state';
 
 export type WriteOp = 'create' | 'update' | 'delete';
 
-export const hashKey = (key: string): string => createHash('sha256').update(key).digest('hex');
+export const hashKey = (key: string): string => sha256Hex(key);
 
 /** `gk_<trois lettres du nom>_<32 caractères>` */
 export function newAppKey(name: string): string {
   const tag = (name.toLowerCase().normalize('NFD').replace(/[^a-z]/g, '') || 'app').slice(0, 3).padEnd(3, 'x');
-  return `gk_${tag}_${randomBytes(24).toString('base64url')}`;
+  return `gk_${tag}_${randomToken(24)}`;
 }
 
 // ==================== Adresses ====================
+
+/** 4 pour une adresse IPv4 écrite en décimal pointé, 6 pour une IPv6, 0 sinon (comme `node:net`). */
+export function isIP(ip: string): 0 | 4 | 6 {
+  if (/^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip)) return 4;
+  if (!/^[0-9a-fA-F:]+$/.test(ip) || !ip.includes(':')) return 0;
+  const halves = ip.split('::');
+  if (halves.length > 2) return 0;
+  const groups = halves.flatMap((h) => (h === '' ? [] : h.split(':')));
+  if (groups.some((g) => g.length === 0 || g.length > 4)) return 0;
+  if (halves.length === 1 ? groups.length !== 8 : groups.length > 7) return 0;
+  return 6;
+}
 
 function ipToBigInt(ip: string): { v: bigint; bits: number } | null {
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
@@ -162,10 +173,9 @@ export class KeyRegistry {
   check(header: string | undefined, alt: string | undefined, ip: string): KeyCheck {
     const raw = (header?.startsWith('Bearer ') ? header.slice(7) : alt ?? '').trim();
     if (!raw) return { key: null, refusal: { status: 401, code: 'key_missing', message: 'Clé absente : Authorization: Bearer gk_…' } };
-    const hash = Buffer.from(hashKey(raw), 'hex');
+    const hash = fromHex(hashKey(raw));
     const record = this.state.data.keys.find((k) => {
-      const other = Buffer.from(k.hash, 'hex');
-      return other.length === hash.length && timingSafeEqual(other, hash);
+      return timingSafeEqualBytes(fromHex(k.hash), hash);
     });
     if (!record) return { key: null, refusal: { status: 401, code: 'key_unknown', message: 'Clé inconnue ou révoquée' } };
     if (record.paused) return { key: record, refusal: { status: 403, code: 'key_paused', message: 'Clé en pause' } };
@@ -206,4 +216,9 @@ export function canReadQuery(key: AppKeyRecord, queryId: string): boolean {
 
 export function canWrite(key: AppKeyRecord, storeId: string, op: WriteOp): boolean {
   return key.scopes.some((s) => s.target === 'base' && s.storeId === storeId && s[op] === true);
+}
+
+/** Révision 3 : déposer des fichiers (`POST /v1/files`, portée `files`). */
+export function canDeposit(key: AppKeyRecord): boolean {
+  return key.scopes.some((s) => s.target === 'files');
 }

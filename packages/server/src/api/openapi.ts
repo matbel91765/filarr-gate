@@ -76,6 +76,8 @@ export function buildOpenApi(opts: {
   serverUrl: string;
   version: string;
   write: boolean;
+  /** Révision 3 : une boîte de dépôt est liée à l'accès (`POST /v1/files`). */
+  files?: boolean;
 }): Record<string, unknown> {
   const paths: Record<string, unknown> = {};
   const schemas: Record<string, Schema> = {
@@ -218,6 +220,57 @@ export function buildOpenApi(opts: {
       },
     },
   };
+  if (opts.files) {
+    const fileStatus = {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        status: { type: 'string', enum: ['sending', 'deposited', 'filed', 'rejected', 'expired', 'failed'] },
+        depositedAt: { type: ['string', 'null'], format: 'date-time' },
+        filedAt: { type: ['string', 'null'], format: 'date-time' },
+      },
+    };
+    paths['/v1/files'] = {
+      post: {
+        tags: ['Fichiers'],
+        summary: 'Déposer un fichier dans la boîte de dépôt liée (rangé par l’appli Filarr)',
+        operationId: 'deposit_file',
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                required: ['file'],
+                properties: {
+                  file: { type: 'string', format: 'binary' },
+                  path: { type: 'string', description: 'Chemin demandé, relatif au dossier cible (appliqué si la boîte l’accepte).' },
+                  tags: { type: 'string', description: 'Étiquettes, séparées par des virgules ou répétées (10 au plus).' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          202: { description: 'Déposé (en attente de rangement)', content: { 'application/json': { schema: fileStatus } } },
+          415: errorResponse,
+          413: errorResponse,
+          409: errorResponse,
+          429: errorResponse,
+          default: errorResponse,
+        },
+      },
+    };
+    paths['/v1/files/{id}'] = {
+      get: {
+        tags: ['Fichiers'],
+        summary: 'Le statut d’un dépôt (jamais où ni sous quel nom il a été rangé)',
+        operationId: 'file_status',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Le statut', content: { 'application/json': { schema: fileStatus } } }, default: errorResponse },
+      },
+    };
+  }
   return {
     openapi: '3.1.0',
     info: {

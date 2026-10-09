@@ -15,8 +15,7 @@ import { makeLinkContext, type DbEnv, type DbLinkContext } from '../../../core/s
 import { parseDbData, type DbProperty, type DbRow, type DbView, type InlineDbData } from '../../../core/src/types';
 import type { GateBase, Replicator } from '../replica/replicator';
 import type { MirrorStatus } from '../replica/store';
-import type { StateStore } from '../../../server/src/state';
-import { fieldsOf, type FieldDef } from './fields';
+import { fieldsOf, type FieldDef, type FieldNameStore } from './fields';
 
 export interface ViewInfo {
   view: DbView;
@@ -48,7 +47,7 @@ export class GateModel {
 
   constructor(
     readonly replicator: Replicator,
-    readonly state: StateStore
+    readonly fieldNames: FieldNameStore
   ) {}
 
   /** Les propriétés du schéma de la tête, relues comme l'application les relit. */
@@ -78,7 +77,7 @@ export class GateModel {
       views: m.views.map((view) => ({ view, slug: m.viewSlugs.get(view.id) ?? view.id })),
       version: base.mirror.seq,
       status: base.mirror.status,
-      fields: fieldsOf(this.state, base.storeId, properties),
+      fields: fieldsOf(this.fieldNames, base.storeId, properties),
       dbId: base.mirror.head?.dbId ?? null,
     };
   }
