@@ -1,4 +1,4 @@
-// Recopié de filarg src/renderer/components/notes/extensions/inlineDatabase/engine/store/codec.ts @ cf89543a — relicencié Apache-2.0 par le titulaire des droits.
+// Recopié de filarg src/renderer/components/notes/extensions/inlineDatabase/engine/store/codec.ts @ e4a34700 — relicencié Apache-2.0 par le titulaire des droits.
 /**
  * Codec du magasin des bases — contrat `db-store-1`, § 5 et § 6.
  *
@@ -304,9 +304,18 @@ export async function layoutSlot(
 export interface SlotEntry {
   /** Époque de la clé sous laquelle le bloc est chiffré. */
   e: number;
+  /**
+   * Génération du magasin sous laquelle le bloc est chiffré (précision 3.9) :
+   * ABSENTE vaut 0, et un rédacteur ne l'écrit qu'au-delà de 0 — une tête de
+   * génération 0 reste octet pour octet celle d'avant.
+   */
+  g?: number;
   mac: string;
   ver: number;
 }
+
+/** La génération d'une entrée de bloc (absente : 0). */
+export const entryGeneration = (entry: Pick<SlotEntry, 'g'>): number => entry.g ?? 0;
 
 export interface StoreSchema {
   properties: DbProperty[];
@@ -387,6 +396,7 @@ const isSlotEntry = (entry: unknown): entry is SlotEntry => {
     e.ver >= 1 &&
     Number.isInteger(e.e) &&
     e.e >= 0 &&
+    (e.g === undefined || (Number.isSafeInteger(e.g) && e.g >= 0)) &&
     typeof e.mac === 'string'
   );
 };

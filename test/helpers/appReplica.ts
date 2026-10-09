@@ -1,4 +1,4 @@
-// Recopié de filarg src/renderer/components/notes/extensions/inlineDatabase/engine/store/replica.ts @ 3e9d65cd — relicencié Apache-2.0 par le titulaire des droits.
+// Recopié de filarg src/renderer/components/notes/extensions/inlineDatabase/engine/store/replica.ts @ e4a34700 — relicencié Apache-2.0 par le titulaire des droits.
 /**
  * LA RÉPLIQUE D'UN MAGASIN — le client de `db-store-1`, en cœur pur.
  *
@@ -23,17 +23,25 @@
  *  · Trois échecs distincts : INJOIGNABLE (`StoreUnreachableError`, levée par le
  *    transport : l'état en cache tient, `offline` le dit), REFUSÉ (toute autre
  *    erreur du transport) et NON VÉRIFIÉ (`StoreIntegrityError`).
+ *  · LA GÉNÉRATION (précision 3.9, contrat `api-base-1` § 2) : chaque bloc se lit
+ *    sous la clé que dit SON entrée (`e`, `g` absent = 0) ; la tête sous celle que
+ *    dit le serveur (`hk`), à défaut sous chaque époque détenue. On écrit sous la
+ *    génération COURANTE ; un `409 stale_generation` fait relire, resceller et
+ *    rejouer. Un membre dérive toute génération de sa racine (`keyring.derive`).
+ *    Rien ne change à `g = 0` : un serveur qui ne dit pas `g` est lu comme avant.
  *
  * Le source passe sous `strict` ET `noUncheckedIndexedAccess`.
  */
 
 import type { DbRow } from '../../packages/core/src/types';
 import {
+  entryGeneration,
   headKeyBytes,
   isCover,
   layoutSlot,
   mergeSchema,
   merkleRoot,
+  openHead,
   openHeadAnyEpoch,
   openSlot,
   placeHash,
@@ -73,10 +81,21 @@ export interface SlotRef {
   ver: number;
 }
 
+/**
+ * La clé d'une tête, ou d'un bloc : l'époque et la génération (précision 3.9).
+ * `GET /dbstore/:id/head` rend `hk`, et `commit` le porte, sous cette forme.
+ */
+export interface HeadKeyRef {
+  e: number;
+  g: number;
+}
+
 export interface CommitSlot {
   p: string;
   ver: number;
   e: number;
+  /** Génération du bloc (précision 3.9) : toujours la COURANTE, celle de `hk`. */
+  g: number;
   body?: Uint8Array;
   stage?: string;
 }
@@ -86,22 +105,45 @@ export interface CommitRequest {
   slots: CommitSlot[];
   removed: string[];
   head: Uint8Array;
+  /** Sous quelle clé la tête neuve est scellée. */
+  hk: HeadKeyRef;
 }
 
 export type CommitResponse =
   | { ok: true; seq: number }
   | { ok: false; code: 'seq_conflict'; seq: number }
+  /** Un bloc ou la tête d'une autre génération : relire, resceller sous `g`, rejouer. */
+  | { ok: false; code: 'stale_generation'; g: number }
   | { ok: false; code: string; detail?: string };
+
+/** La tête telle que le serveur la rend : `hk` et `g` manquent chez un serveur d'avant 3.9. */
+export interface RemoteHead {
+  seq: number;
+  head: Uint8Array | null;
+  /** Sous quelle clé la tête est scellée. */
+  hk?: HeadKeyRef;
+  /** La génération COURANTE du magasin. */
+  g?: number;
+}
+
+export type GenerationResponse =
+  | { ok: true; g: number }
+  | { ok: false; code: 'generation_conflict'; g: number };
 
 /** Le serveur, vu du client (routes `/dbstore`, § 8). */
 export interface StoreTransport {
   /** La tête courante ; `head` vaut `null` au seq 0. */
-  head(): Promise<{ seq: number; head: Uint8Array | null }>;
+  head(): Promise<RemoteHead>;
   /** Des corps de blocs, par `p|ver` ; `null` pour une version introuvable. */
   slots(refs: SlotRef[]): Promise<Map<string, Uint8Array | null>>;
   /** Dépose un corps avant la validation ; rend son jeton. */
   stage(body: Uint8Array): Promise<string>;
   commit(request: CommitRequest): Promise<CommitResponse>;
+  /**
+   * Monte la génération du magasin de `from` à `from + 1`, en compare-and-swap
+   * (précision 3.9). Réservé à une SESSION de membre, jamais à un accès API.
+   */
+  bumpGeneration?(from: number): Promise<GenerationResponse>;
 }
 
 /**
@@ -109,23 +151,125 @@ export interface StoreTransport {
  * CHIFFRÉS, tels que le serveur les garde. Jamais un clair, jamais une clé.
  */
 export interface StoreCache {
-  /** La dernière tête rangée et le `seq` sous lequel elle est scellée. */
-  head(): Promise<{ seq: number; head: Uint8Array } | null>;
+  /**
+   * La dernière tête rangée, le `seq` sous lequel elle est scellée, et sa clé
+   * (`hk`, absente dans un cache d'avant 3.9).
+   */
+  head(): Promise<{ seq: number; head: Uint8Array; hk?: HeadKeyRef } | null>;
   /** Les corps rangés parmi `refs`, par `p|ver` (un corps absent manque à la table). */
   slots(refs: readonly SlotRef[]): Promise<Map<string, Uint8Array>>;
   /** Range une tête et les corps neufs ENSEMBLE, et oublie tout corps que `keep` ne désigne plus. */
   save(entry: {
     seq: number;
     head: Uint8Array;
+    hk?: HeadKeyRef;
     bodies: ReadonlyArray<{ p: string; ver: number; body: Uint8Array }>;
     keep: readonly SlotRef[];
   }): Promise<void>;
 }
 
-/** Les clés détenues : `current` écrit (l'époque la plus récente), `all` lit. */
+/**
+ * Les clés détenues : `current` écrit (l'époque la plus récente), `all` lit. Les
+ * deux sont à la génération 0, sauf un trousseau qui ne tient que des `K_db`
+ * confiées (un accès API). `derive` rend `K_db(e, g)` depuis la RACINE (FEK, ou
+ * K_vault de l'époque `e`) : un membre lit et écrit ainsi toute génération ;
+ * absente, ou `null` (racine pas là), la génération n'est pas lisible.
+ */
 export interface ReplicaKeyring {
   current: StoreKeys;
   all: StoreKeys[];
+  derive?: (epoch: number, generation: number) => Promise<StoreKeys | null>;
+}
+
+const keyRefOf = (keys: StoreKeys): HeadKeyRef => ({ e: keys.epoch, g: keys.generation ?? 0 });
+
+const isGeneration = (g: unknown): g is number =>
+  typeof g === 'number' && Number.isSafeInteger(g) && g >= 0;
+
+/**
+ * Les clés d'un couple `(e, g)` : celles du trousseau d'abord, sinon dérivées de
+ * la racine (et retenues dans `memo`). `null` : la clé n'est pas là.
+ */
+export async function keysAt(
+  keyring: ReplicaKeyring,
+  epoch: number,
+  generation: number,
+  memo?: Map<string, StoreKeys>
+): Promise<StoreKeys | null> {
+  const held = keyring.all.find((k) => k.epoch === epoch && (k.generation ?? 0) === generation);
+  if (held) return held;
+  const key = `${epoch}|${generation}`;
+  const kept = memo?.get(key);
+  if (kept) return kept;
+  if (!keyring.derive) return null;
+  const derived = await keyring.derive(epoch, generation);
+  if (derived) memo?.set(key, derived);
+  return derived;
+}
+
+/**
+ * Ouvre une tête (précision 3.9) : sous la clé que dit le serveur (`hk`) ; à
+ * défaut, ou si elle n'ouvre pas, sous chaque époque détenue, à la génération de
+ * `hk` puis à 0 — un serveur d'avant 3.9 ne dit rien, et une tête écrite par un
+ * client d'avant 3.9 n'a pas déclaré sa clé. Rend la tête et sa clé ; lève si
+ * rien ne l'ouvre.
+ */
+export async function openStoreHead(
+  c: StoreCrypto,
+  keyring: ReplicaKeyring,
+  seq: number,
+  body: Uint8Array,
+  hk?: HeadKeyRef,
+  memo?: Map<string, StoreKeys>
+): Promise<{ head: StoreHead; keys: StoreKeys; hk: HeadKeyRef }> {
+  let first: unknown = null;
+  if (hk && Number.isSafeInteger(hk.e) && hk.e >= 0 && isGeneration(hk.g)) {
+    const keys = await keysAt(keyring, hk.e, hk.g, memo);
+    if (keys) {
+      try {
+        return { head: await openHead(c, keys, seq, body), keys, hk: keyRefOf(keys) };
+      } catch (err) {
+        first = err;
+      }
+    } else {
+      first = new Error(`clé (e ${hk.e}, g ${hk.g}) absente`);
+    }
+  }
+  const generations = [...new Set([hk && isGeneration(hk.g) ? hk.g : 0, 0])];
+  const candidates: StoreKeys[] = [];
+  for (const g of generations) {
+    for (const held of keyring.all) {
+      const keys = (held.generation ?? 0) === g ? held : await keysAt(keyring, held.epoch, g, memo);
+      if (keys && !candidates.includes(keys)) candidates.push(keys);
+    }
+  }
+  try {
+    const opened = await openHeadAnyEpoch(c, candidates, seq, body);
+    return { ...opened, hk: keyRefOf(opened.keys) };
+  } catch (err) {
+    throw first ?? err;
+  }
+}
+
+/**
+ * Les couples `(e, g)` EN USAGE dans un magasin (contrat `api-base-1` § 3) :
+ * ceux des blocs de la tête, celui de la tête, et celui sous lequel le prochain
+ * rédacteur écrira (`writing` : l'époque courante, la génération courante) — un
+ * droit scellé sans lui deviendrait muet à la première écriture. Triés par
+ * époque puis génération, sans doublon.
+ */
+export function keyPairsInUse(
+  head: Pick<StoreHead, 'slots'> | null,
+  hk: HeadKeyRef | null,
+  writing: HeadKeyRef | null
+): HeadKeyRef[] {
+  const seen = new Map<string, HeadKeyRef>();
+  const add = (ref: HeadKeyRef) => seen.set(`${ref.e}|${ref.g}`, { e: ref.e, g: ref.g });
+  for (const entry of Object.values(head?.slots ?? {}))
+    add({ e: entry.e, g: entryGeneration(entry) });
+  if (hk) add(hk);
+  if (writing) add(writing);
+  return [...seen.values()].sort((a, b) => a.e - b.e || a.g - b.g);
 }
 
 /** Le journal local des écritures pas encore validées (hors ligne compris). */
@@ -188,6 +332,7 @@ export class StoreIntegrityError extends Error {
 interface CachedSlot {
   ver: number;
   e: number;
+  g: number;
   mac: string;
   rows: StoreRows;
 }
@@ -195,6 +340,8 @@ interface CachedSlot {
 /** Une tête ouverte et tous ses blocs, prête à être installée. */
 interface OpenedState {
   head: StoreHead;
+  /** Sous quelle clé la tête est scellée. */
+  hk: HeadKeyRef;
   keys: { mac: Uint8Array; place: Uint8Array };
   slots: Map<string, CachedSlot>;
   /** Les corps venus du serveur, à ranger dans le cache local. */
@@ -258,6 +405,22 @@ function cutBatches<T>(items: T[]): T[][] {
 export class StoreReplica {
   seq = 0;
   head: StoreHead | null = null;
+  /**
+   * La génération COURANTE du magasin (précision 3.9), telle que le serveur l'a
+   * dite (tête lue, refus `stale_generation`). Elle ne redescend jamais : un
+   * serveur qui la baisserait ferait écrire sous une clé qu'un accès révoqué tient.
+   */
+  generation = 0;
+  /** Sous quelle clé la tête installée est scellée (`null` : aucune tête). */
+  headKeyRef: HeadKeyRef | null = null;
+  /**
+   * La plus haute génération de tête déjà ouverte : une tête scellée sous une
+   * génération plus basse est un retour en arrière (un accès révoqué, allié au
+   * serveur, pourrait la forger sous une clé qu'il tient encore).
+   */
+  private headGenerationFloor = 0;
+  /** Les clés dérivées d'une génération au-delà de 0, par `e|g`. */
+  private derivedKeys = new Map<string, StoreKeys>();
   private headKeyCache: { mac: Uint8Array; place: Uint8Array } | null = null;
   private slotCache = new Map<string, CachedSlot>();
   /** L'état validé (fusion de tous les blocs de la tête lue). */
@@ -362,10 +525,25 @@ export class StoreReplica {
     try {
       const saved = await cache.head();
       if (!saved || saved.seq <= 0) return false;
-      return this.install(saved.seq, await this.openState(saved.seq, saved.head, false));
+      return this.install(saved.seq, await this.openState(saved.seq, saved.head, false, saved.hk));
     } catch {
       return false;
     }
+  }
+
+  /** Les clés d'un couple `(e, g)`, ou `null` sans la racine qui les dérive. */
+  private keysFor(epoch: number, generation: number): Promise<StoreKeys | null> {
+    return keysAt(this.keyring, epoch, generation, this.derivedKeys);
+  }
+
+  /** La génération sous laquelle on écrit : la courante, jamais sous la tête déjà lue. */
+  private writeGeneration(): number {
+    return Math.max(this.generation, this.headGenerationFloor);
+  }
+
+  /** Retient la génération que dit le serveur, sans jamais la baisser. */
+  private noteGeneration(g: unknown): void {
+    if (isGeneration(g) && g > this.generation) this.generation = g;
   }
 
   /**
@@ -375,7 +553,9 @@ export class StoreReplica {
    */
   async refresh(force = false): Promise<boolean> {
     const floor = this.seq;
-    const { seq, head: body } = await this.net(() => this.transport.head());
+    const { seq, head: body, hk, g } = await this.net(() => this.transport.head());
+    // Une montée de génération ne change pas le seq : on la retient avant tout retour
+    this.noteGeneration(g);
     if (seq < floor)
       throw new StoreIntegrityError(`le serveur est revenu en arrière (${seq} < ${floor})`);
     // Une validation de CETTE réplique a avancé le seq pendant la lecture : la réponse est seulement dépassée
@@ -385,14 +565,15 @@ export class StoreReplica {
       if (seq !== 0) throw new StoreIntegrityError(`tête absente au seq ${seq}`);
       this.seq = 0;
       this.head = null;
+      this.headKeyRef = null;
       this.headKeyCache = null;
       this.slotCache.clear();
       this.rebuild();
       return true;
     }
-    const state = await this.openState(seq, body, true);
+    const state = await this.openState(seq, body, true, hk);
     if (!this.install(seq, state)) return false;
-    this.saveCache(seq, body, state.fetched);
+    this.saveCache(seq, body, state.hk, state.fetched);
     return true;
   }
 
@@ -402,12 +583,22 @@ export class StoreReplica {
    * tête avant d'être ouvert, d'où qu'il vienne : un corps faux du cache est
    * redemandé, un corps faux du serveur est une erreur.
    */
-  private async openState(seq: number, body: Uint8Array, network: boolean): Promise<OpenedState> {
-    let opened: { head: StoreHead; keys: StoreKeys };
+  private async openState(
+    seq: number,
+    body: Uint8Array,
+    network: boolean,
+    hk?: HeadKeyRef
+  ): Promise<OpenedState> {
+    let opened: { head: StoreHead; keys: StoreKeys; hk: HeadKeyRef };
     try {
-      opened = await openHeadAnyEpoch(this.c, this.keyring.all, seq, body);
+      opened = await openStoreHead(this.c, this.keyring, seq, body, hk, this.derivedKeys);
     } catch (err) {
       throw new StoreIntegrityError(`tête illisible : ${(err as Error).message}`);
+    }
+    if (opened.hk.g < this.headGenerationFloor) {
+      throw new StoreIntegrityError(
+        `tête d’une génération dépassée (${opened.hk.g} < ${this.headGenerationFloor})`
+      );
     }
     const head = opened.head;
     const keys = headKeyBytes(head);
@@ -415,10 +606,16 @@ export class StoreReplica {
     /** Vérifie puis ouvre un corps ; faux sur une empreinte fausse. */
     const accept = async (p: string, entry: SlotEntry, slotBody: Uint8Array): Promise<boolean> => {
       if (!(await verifySlot(this.c, keys.mac, entry, slotBody))) return false;
-      const epochKeys = this.keyring.all.find((k) => k.epoch === entry.e);
-      if (!epochKeys) throw new StoreIntegrityError(`clé de l'époque ${entry.e} absente`);
-      const plain = await openSlot(this.c, epochKeys, p, entry.ver, slotBody);
-      fresh.set(p, { ver: entry.ver, e: entry.e, mac: entry.mac, rows: plain.rows });
+      // La clé que dit l'entrée du bloc : son époque, sa génération (absente = 0)
+      const g = entryGeneration(entry);
+      const slotKeys = await this.keysFor(entry.e, g);
+      if (!slotKeys) {
+        throw new StoreIntegrityError(
+          g === 0 ? `clé de l'époque ${entry.e} absente` : `clé (e ${entry.e}, g ${g}) absente`
+        );
+      }
+      const plain = await openSlot(this.c, slotKeys, p, entry.ver, slotBody);
+      fresh.set(p, { ver: entry.ver, e: entry.e, g, mac: entry.mac, rows: plain.rows });
       return true;
     };
     let wanted = Object.entries(head.slots).filter(([p, entry]) => {
@@ -473,7 +670,7 @@ export class StoreReplica {
         throw new StoreIntegrityError(`bloc ${p || '-'} manquant`);
       slots.set(p, slot);
     }
-    return { head, keys, slots, fetched };
+    return { head, hk: opened.hk, keys, slots, fetched };
   }
 
   /** Télécharge un lot de blocs, vérifie chaque corps contre la tête et l'ouvre. */
@@ -516,6 +713,8 @@ export class StoreReplica {
     if (seq < this.seq) return false;
     this.slotCache = state.slots;
     this.head = state.head;
+    this.headKeyRef = state.hk;
+    if (state.hk.g > this.headGenerationFloor) this.headGenerationFloor = state.hk.g;
     this.headKeyCache = state.keys;
     this.seq = seq;
     this.clock.observe(state.head.schema.t);
@@ -551,13 +750,14 @@ export class StoreReplica {
   private saveCache(
     seq: number,
     head: Uint8Array,
+    hk: HeadKeyRef,
     bodies: ReadonlyArray<{ p: string; ver: number; body: Uint8Array }>
   ): void {
     const cache = this.opts.cache;
     if (!cache) return;
     const keep = [...this.slotCache].map(([p, slot]) => ({ p, ver: slot.ver }));
     this.cacheWrites = this.cacheWrites
-      .then(() => cache.save({ seq, head, bodies, keep }))
+      .then(() => cache.save({ seq, head, hk, bodies, keep }))
       .catch(() => undefined);
   }
 
@@ -724,6 +924,13 @@ export class StoreReplica {
         await this.refresh(true);
         continue;
       }
+      if (result.code === 'stale_generation') {
+        // Le magasin a changé de génération (un accès API retiré) : relire la tête,
+        // puis resceller sous la génération courante et rejouer (précision 3.9)
+        this.noteGeneration('g' in result ? result.g : undefined);
+        await this.refresh(true);
+        continue;
+      }
       throw new StoreCommitError(result.code, 'detail' in result ? result.detail : undefined);
     }
     throw new StoreCommitError('too_many_conflicts', `${retries} essais`);
@@ -740,7 +947,7 @@ export class StoreReplica {
   private async tryCommit(
     ops: StoreOp[],
     schema: StoreSchema | null
-  ): Promise<{ ok: true; seq: number } | { ok: false; code: string; detail?: string }> {
+  ): Promise<{ ok: true; seq: number } | { ok: false; code: string; detail?: string; g?: number }> {
     const base = this.head;
     const headKeys: HeadKeys = base?.keys ?? (this.newKeys ??= newHeadKeys(this.c));
     const keyBytes = base ? this.headKeyCache! : headKeyBytes({ keys: headKeys });
@@ -748,7 +955,19 @@ export class StoreReplica {
     // calculée sous les nôtres serait fausse
     if (this.placeKeyOf !== headKeys.place) this.placeCache.clear();
     this.placeKeyOf = headKeys.place;
-    const current = this.keyring.current;
+    // L'époque la plus récente, sous la génération COURANTE (précision 3.9)
+    const gen = this.writeGeneration();
+    const current =
+      (this.keyring.current.generation ?? 0) === gen
+        ? this.keyring.current
+        : await this.keysFor(this.keyring.current.epoch, gen);
+    if (!current) {
+      throw new StoreCommitError(
+        'generation_key_missing',
+        `(e ${this.keyring.current.epoch}, g ${gen})`
+      );
+    }
+    const hk: HeadKeyRef = { e: current.epoch, g: gen };
 
     // Les lignes touchées, par bloc de la tête lue (tout part du bloc racine sur un magasin vide)
     const cover = base ? new Set(Object.keys(base.slots)) : new Set(['']);
@@ -761,7 +980,7 @@ export class StoreReplica {
     }
     if (base === null && byPrefix.size === 0) byPrefix.set('', []);
 
-    // Chaque bloc touché est réécrit (et divisé au besoin), sous l'époque courante
+    // Chaque bloc touché est réécrit (et divisé au besoin), sous l'époque et la génération courantes
     const laid: LaidSlot[] = [];
     const removed: string[] = [];
     const index: Record<string, SlotEntry> = { ...(base?.slots ?? {}) };
@@ -784,6 +1003,8 @@ export class StoreReplica {
       for (const slot of out) {
         index[slot.p] = {
           e: current.epoch,
+          // `g` n'est écrit qu'au-delà de 0 : une tête de génération 0 reste celle d'avant 3.9
+          ...(gen > 0 ? { g: gen } : {}),
           mac: await slotMac(this.c, keyBytes.mac, slot.body),
           ver: slot.ver,
         };
@@ -837,19 +1058,20 @@ export class StoreReplica {
       const entry = index[slot.p]!;
       if (slot.body.length <= inlineMax && slot.body.length <= budget) {
         budget -= slot.body.length;
-        slots.push({ p: slot.p, ver: slot.ver, e: entry.e, body: slot.body });
+        slots.push({ p: slot.p, ver: slot.ver, e: entry.e, g: gen, body: slot.body });
       } else {
         slots.push({
           p: slot.p,
           ver: slot.ver,
           e: entry.e,
+          g: gen,
           stage: await this.net(() => this.transport.stage(slot.body)),
         });
       }
     }
 
     const res = await this.net(() =>
-      this.transport.commit({ baseSeq: this.seq, slots, removed, head: headBody })
+      this.transport.commit({ baseSeq: this.seq, slots, removed, head: headBody, hk })
     );
     if (!res.ok) return res;
 
@@ -857,9 +1079,17 @@ export class StoreReplica {
     for (const p of byPrefix.keys()) this.slotCache.delete(p);
     for (const slot of laid) {
       const entry = index[slot.p]!;
-      this.slotCache.set(slot.p, { ver: slot.ver, e: entry.e, mac: entry.mac, rows: slot.rows });
+      this.slotCache.set(slot.p, {
+        ver: slot.ver,
+        e: entry.e,
+        g: gen,
+        mac: entry.mac,
+        rows: slot.rows,
+      });
     }
     this.head = head;
+    this.headKeyRef = hk;
+    if (gen > this.headGenerationFloor) this.headGenerationFloor = gen;
     this.headKeyCache = keyBytes;
     this.seq = res.seq;
     // Une tête ne se rouvre que sous le seq de son AAD : un serveur qui en rendrait un autre n'est pas rangé
@@ -867,6 +1097,7 @@ export class StoreReplica {
       this.saveCache(
         sealedSeq,
         headBody,
+        hk,
         laid.map((slot) => ({ p: slot.p, ver: slot.ver, body: slot.body }))
       );
     }

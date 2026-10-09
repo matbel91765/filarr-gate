@@ -140,7 +140,7 @@
   {
     "file": "packages/core/src/engine/store/codec.ts",
     "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/codec.ts",
-    "commit": "cf89543a",
+    "commit": "e4a34700",
     "rewritten": 0
   },
   {
@@ -236,7 +236,7 @@
   {
     "file": "test/helpers/appReplica.ts",
     "from": "src/renderer/components/notes/extensions/inlineDatabase/engine/store/replica.ts",
-    "commit": "3e9d65cd",
+    "commit": "e4a34700",
     "rewritten": 7
   },
   {
