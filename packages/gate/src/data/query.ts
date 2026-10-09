@@ -11,18 +11,9 @@ import { applySearch, orderedVisibleProperties } from '../../../core/src/viewEng
 import type { DbRow } from '../../../core/src/types';
 import { rowJson, type FieldDef } from './fields';
 import type { BaseInfo, GateModel, ViewInfo } from './model';
+import { ApiError } from '../errors';
 
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    message: string,
-    readonly extra: Record<string, unknown> = {}
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
+export { ApiError };
 
 export const MAX_LIMIT = 1000;
 export const DEFAULT_LIMIT = 100;

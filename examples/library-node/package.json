@@ -1,0 +1,8 @@
+{
+  "name": "filarr-gate-example-library-node",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@filarr/gate": "^0.1.0"
+  }
+}
