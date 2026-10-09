@@ -116,6 +116,7 @@ export class Gate extends GateCore {
     this.stateFiles = files;
     this.nodeOpts = opts;
     host.gate = this;
+    this.replicator.on('link', (state: string, detail: string | null) => log.info(`liaison avec Filarr : ${state}${detail ? ` (${detail})` : ''}`));
   }
 
   /** Ce que la configuration dit (environnement, gate.toml, état). */

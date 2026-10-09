@@ -24,12 +24,16 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import {
   accessAuthHash,
   assignSlugs,
+  bindMessage,
   deriveAccessKeys,
   formatAccessToken,
   grantPlaintext,
   nextSlug,
   sealToKey,
+  toBase64Std,
 } from '../../packages/core/src/engine/store/apiAccess';
+import { computeCreatorTag, deriveAccessKeys3, notifyHeader } from '../../packages/core/src/engine/gate/access3';
+import { boxSigMessage } from '../../packages/core/src/engine/gate/files';
 import { isCover } from '../../packages/core/src/engine/store/codec';
 import { fromBase64Url, personalStoreId, storeKeys, toBase64Url, utf8Encode, type StoreKeys } from '../../packages/core/src/engine/store/crypto';
 import { HlcClock } from '../../packages/core/src/engine/store/hlc';
@@ -119,6 +123,43 @@ interface MockAccess {
   polls: Map<string, number>;
   sockets: Set<WebSocket>;
   baseSlugs: Map<string, string>;
+  // ---- Révision 3 ----
+  /** `creatorTag` (null : accès d'avant la révision 3, ou créé sans étiquette). */
+  creatorTag: string | null;
+  /** `bind_sig` (base64 standard), signé par la clé du créateur sur `A_pub`. */
+  bindSig: string;
+  /** `A_notify` (le serveur en garde la copie pour signer les réveils). */
+  notifyKey: Uint8Array | null;
+  notifyUrl: string | null;
+  files: { requestId: string; publicKey: string; boxSig: string } | null;
+  /** Identité en attente d'une migration (gate-heberge-1 § 8.4). */
+  pending: { authHash: string; aPub: string; bindSig: string; exportSealed: string | null; seenAt: string | null } | null;
+  /** Boîte hébergée (marque `hosting` dans `self`). */
+  hosted: boolean;
+}
+
+export interface MockDeposit {
+  depositId: string;
+  accessId: string;
+  seq: number;
+  sealedFileKey: string;
+  encryptedManifest: string;
+  encryptedManifestIv: string;
+  totalChunks: number;
+  sizeBytes: number;
+  chunks: Map<number, Uint8Array>;
+  status: 'uploading' | 'deposited' | 'filed' | 'rejected' | 'expired';
+  depositedAt: string | null;
+  filedAt: string | null;
+  createdAt: string;
+}
+
+export interface AccessOptions {
+  /** L'étiquette du créateur : juste (d'office), absente, ou faite avec une autre clé. */
+  tag?: 'good' | 'none' | 'other-key';
+  /** `bind_sig` : juste (d'office), ou signée par une autre clé. */
+  bindSig?: 'good' | 'other-key';
+  notifyUrl?: string;
 }
 
 interface Injection {
@@ -136,6 +177,8 @@ export interface MockOptions {
   writeSwitch?: boolean;
   /** Écart minimal entre deux relèves d'un magasin en Free, en millisecondes (300 s au contrat). */
   freePollMs?: number;
+  /** Serveur de la révision 3 (`creator`, fichiers, réveils, migration) ; `false` : un serveur rév. 2. */
+  rev3?: boolean;
 }
 
 export interface NewStore {
@@ -146,7 +189,7 @@ export interface NewStore {
   views?: DbView[];
 }
 
-type MeterKind = 'self' | 'stream' | 'head' | 'changes' | 'slots' | 'stage' | 'commit';
+type MeterKind = 'self' | 'stream' | 'head' | 'changes' | 'slots' | 'stage' | 'commit' | 'files' | 'export' | 'import';
 
 const json = (res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void => {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
@@ -170,11 +213,27 @@ const newToken = (): string => toBase64Url(randomBytes(16));
 const slotRef = (p: string, ver: number, e: number, g = 0) => (g > 0 ? { p, ver, e, g } : { p, ver, e });
 
 /** Ce que la porte décide d'une requête : un refus, ou l'accès qui passe. */
-type GateOutcome = { refusal: { status: number; code: string; extra?: Record<string, unknown>; headers?: Record<string, string> } } | { access: MockAccess };
+type GateOutcome = { refusal: { status: number; code: string; extra?: Record<string, unknown>; headers?: Record<string, string> } } | { access: MockAccess; pending?: boolean };
 
 export class MockFilarr {
   readonly fek = randomBytes(32);
   readonly site = randomBytes(4).toString('hex');
+  // ---- Révision 3 : le compte du créateur et sa boîte de dépôt ----
+  /** Clé d'identité (signature Ed25519) du compte du créateur. */
+  readonly creatorSigningKey = new Uint8Array(randomBytes(32));
+  readonly creatorSigningPublicKey = toBase64Std(curves.ed25519PublicKey(this.creatorSigningKey));
+  readonly creatorUserId = 'u_createur_essai';
+  /** La boîte de dépôt permanente du créateur (clé X25519 ; la privée reste à l'appli). */
+  readonly boxPrivateKey = new Uint8Array(randomBytes(32));
+  readonly boxPublicKey = toBase64Url(curves.x25519PublicKey(this.boxPrivateKey));
+  readonly boxRequestId = 'req_entrees_api';
+  readonly deposits = new Map<string, MockDeposit>();
+  filesSwitch = true;
+  /** Dépôts non rangés de la boîte (tous canaux) : 200 au plus. */
+  pendingMax = 200;
+  rev3: boolean;
+  /** Les réveils envoyés (adresse, statut rendu). */
+  readonly notifications: Array<{ url: string; status: number; body: string }> = [];
   readonly stores = new Map<string, MockStore>();
   readonly accesses = new Map<string, MockAccess>();
   /** Corps chiffrés, par `storeId|p|ver` ou `storeId|head|seq` (le R2 du worker). */
@@ -194,6 +253,7 @@ export class MockFilarr {
     this.baseSwitch = opts.baseSwitch ?? true;
     this.writeSwitch = opts.writeSwitch ?? true;
     this.freePollMs = opts.freePollMs ?? 300_000;
+    this.rev3 = opts.rev3 ?? true;
   }
 
   /** Le barème d'un palier, tel que le mock l'applique (relève Free réglable pour les essais). */
@@ -288,17 +348,46 @@ export class MockFilarr {
     return s;
   }
 
-  private async newProof(): Promise<{ token: string; id: string; authHash: string; aPub: string; idBytes: Uint8Array }> {
-    const idBytes = randomBytes(16);
-    const secret = randomBytes(32);
+  /**
+   * Ce que l'appareil du créateur calcule pendant que le jeton existe en mémoire :
+   * la preuve, la clé publique, et (révision 3) l'étiquette du créateur, `A_notify`
+   * et `bind_sig`. Le serveur n'en garde que ce que le contrat lui laisse.
+   */
+  private async newProof(
+    idBytes: Uint8Array = new Uint8Array(randomBytes(16)),
+    opts: AccessOptions = {}
+  ): Promise<{ token: string; id: string; authHash: string; aPub: string; idBytes: Uint8Array; creatorTag: string | null; notifyKey: Uint8Array; bindSig: string }> {
+    const secret = new Uint8Array(randomBytes(32));
+    const id = toBase64Url(idBytes);
     const keys = await deriveAccessKeys(c, curves, idBytes, secret);
-    return { token: formatAccessToken(idBytes, secret), id: toBase64Url(idBytes), authHash: await accessAuthHash(c, keys.aAuth), aPub: keys.aPub, idBytes };
+    const keys3 = await deriveAccessKeys3(c, idBytes, secret);
+    const other = new Uint8Array(randomBytes(32));
+    const tagKey = opts.tag === 'other-key' ? toBase64Std(curves.ed25519PublicKey(other)) : this.creatorSigningPublicKey;
+    const creatorTag = opts.tag === 'none' ? null : await computeCreatorTag(c, keys3.aMac, id, tagKey);
+    const bindSig = toBase64Std(curves.ed25519Sign(opts.bindSig === 'other-key' ? other : this.creatorSigningKey, bindMessage(id, keys.aPub)));
+    return {
+      token: formatAccessToken(idBytes, secret),
+      id,
+      authHash: await accessAuthHash(c, keys.aAuth),
+      aPub: keys.aPub,
+      idBytes,
+      creatorTag,
+      notifyKey: keys3.aNotify,
+      bindSig,
+    };
   }
 
   /** Crée un accès et rend son jeton (montré une fois, jamais gardé par le serveur). */
-  async createAccess(name: string, tier: Tier = 'pro'): Promise<{ token: string; accessId: string }> {
-    const proof = await this.newProof();
+  async createAccess(name: string, tier: Tier = 'pro', opts: AccessOptions = {}): Promise<{ token: string; accessId: string }> {
+    const proof = await this.newProof(undefined, opts);
     this.accesses.set(proof.id, {
+      creatorTag: proof.creatorTag,
+      bindSig: proof.bindSig,
+      notifyKey: proof.notifyKey,
+      notifyUrl: opts.notifyUrl ?? null,
+      files: null,
+      pending: null,
+      hosted: false,
       id: proof.id,
       name,
       authHash: proof.authHash,
@@ -324,17 +413,95 @@ export class MockFilarr {
    * Remplace le jeton (`POST /api-access/:id/rotate-token`) : nouvelle paire, tout est rescellé
    * vers elle ; les flux de l'ancien jeton reçoivent `revoked` et ferment en 4301.
    */
-  async rotateToken(accessId: string): Promise<string> {
+  async rotateToken(accessId: string, opts: AccessOptions = {}): Promise<string> {
     const access = this.accesses.get(accessId)!;
-    // L'identifiant de l'accès reste ; la preuve et la paire changent
-    const idBytes = fromBase64Url(accessId);
-    const secret = randomBytes(32);
-    const keys = await deriveAccessKeys(c, curves, idBytes, secret);
+    // L'identifiant de l'accès reste ; la preuve et la paire changent (l'étiquette aussi, révision 3)
+    const proof = await this.newProof(fromBase64Url(accessId), opts);
     this.signal(access, { t: 'revoked' }, { code: CLOSE.revoked, reason: 'api_access_token_rotated' });
-    access.authHash = await accessAuthHash(c, keys.aAuth);
-    access.aPub = keys.aPub;
+    access.authHash = proof.authHash;
+    access.aPub = proof.aPub;
+    access.creatorTag = proof.creatorTag;
+    access.bindSig = proof.bindSig;
+    access.notifyKey = proof.notifyKey;
     for (const [storeId, grant] of access.grants) await this.grant(accessId, storeId, grant.rights);
-    return formatAccessToken(idBytes, secret);
+    return proof.token;
+  }
+
+  // ==================== Révision 3 : fichiers, réveils, migration ====================
+
+  /** Lie la boîte de dépôt du créateur à l'accès (`PUT /api-access/:id/files`), signée par sa clé d'identité. */
+  linkFiles(accessId: string, opts: { signedBy?: 'creator' | 'other'; publicKey?: string } = {}): void {
+    const access = this.accesses.get(accessId)!;
+    const publicKey = opts.publicKey ?? this.boxPublicKey;
+    const key = opts.signedBy === 'other' ? new Uint8Array(randomBytes(32)) : this.creatorSigningKey;
+    const boxSig = toBase64Url(curves.ed25519Sign(key, boxSigMessage(accessId, this.boxRequestId, publicKey)));
+    access.files = { requestId: this.boxRequestId, publicKey, boxSig };
+  }
+
+  /** L'appli range (ou refuse) un dépôt : la boîte noire l'apprend par le flux, jamais où ni sous quel nom. */
+  fileDeposit(depositId: string, result: 'filed' | 'rejected' = 'filed'): void {
+    const d = this.deposits.get(depositId)!;
+    d.status = result;
+    d.filedAt = new Date().toISOString();
+    const access = this.accesses.get(d.accessId);
+    if (access) this.signal(access, { t: 'files', depositId, status: result });
+  }
+
+  /** Les dépôts non rangés de la boîte (tous canaux). */
+  private pendingDeposits(): { n: number; bytes: number } {
+    let n = 0;
+    let bytes = 0;
+    for (const d of this.deposits.values()) {
+      if (d.status !== 'deposited') continue;
+      n += 1;
+      bytes += d.sizeBytes;
+    }
+    return { n, bytes };
+  }
+
+  /**
+   * Démarre une migration (`POST /api-access/:id/hosting/migrate`) : une identité
+   * NEUVE en attente ; l'ancienne reste en service et reçoit `export` sur son flux.
+   */
+  async migrateStart(accessId: string, opts: AccessOptions = {}): Promise<string> {
+    const access = this.accesses.get(accessId)!;
+    const proof = await this.newProof(fromBase64Url(accessId), opts);
+    access.pending = { authHash: proof.authHash, aPub: proof.aPub, bindSig: proof.bindSig, exportSealed: null, seenAt: null };
+    this.signal(access, { t: 'export', encPublicKey: proof.aPub, bindSig: proof.bindSig });
+    return proof.token;
+  }
+
+  /** Bascule (`POST …/hosting/migrate/commit`) : l'identité en attente devient celle de l'accès ; l'ancien jeton est refusé. */
+  async migrateCommit(accessId: string): Promise<void> {
+    const access = this.accesses.get(accessId)!;
+    const p = access.pending!;
+    this.signal(access, { t: 'revoked' }, { code: CLOSE.revoked, reason: 'api_access_token_rotated' });
+    access.authHash = p.authHash;
+    access.aPub = p.aPub;
+    access.bindSig = p.bindSig;
+    access.pending = null;
+    for (const [storeId, grant] of access.grants) await this.grant(accessId, storeId, grant.rights);
+  }
+
+  /** Boîte hébergée qui s'endort : son flux ferme en 4308. */
+  sleepHosted(accessId: string): void {
+    const access = this.accesses.get(accessId)!;
+    access.hosted = true;
+    this.signal(access, { t: 'hosting', state: 'asleep' }, { code: 4308, reason: 'hosting_asleep' });
+  }
+
+  /** Un réveil poussé, signé sous `A_notify` (api-base-1 rév. 3 § 5 bis). */
+  private async pushNotify(access: MockAccess, msg: Record<string, unknown>): Promise<void> {
+    if (!access.notifyUrl || !access.notifyKey || !this.rev3) return;
+    const body = JSON.stringify({ a: access.id, t: msg.t, ...(msg.storeId ? { storeId: msg.storeId } : {}), ...(typeof msg.seq === 'number' ? { seq: msg.seq } : {}), ...(msg.state ? { state: msg.state } : {}), at: new Date().toISOString() });
+    const header = await notifyHeader(c, access.notifyKey, body, Math.floor(Date.now() / 1000));
+    try {
+      const res = await fetch(access.notifyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Filarr-Notify': header }, body, redirect: 'manual' });
+      await res.arrayBuffer().catch(() => undefined);
+      this.notifications.push({ url: access.notifyUrl, status: res.status, body });
+    } catch {
+      this.notifications.push({ url: access.notifyUrl, status: 0, body });
+    }
   }
 
   /** Les couples (e, g) en usage dans un magasin, plus le courant. */
@@ -447,6 +614,9 @@ export class MockFilarr {
       if (msg !== null) s.send(JSON.stringify(msg));
       if (close) s.close(close.code, close.reason);
     }
+    // Révision 3 : le même événement en réveil poussé, sans contenu (sauf `export`, qui ne part qu'au flux)
+    const m = msg as Record<string, unknown> | null;
+    if (m && typeof m.t === 'string' && m.t !== 'export') void this.pushNotify(access, m);
   }
 
   // ==================== L'automate du magasin (`dbStoreObject.ts`) ====================
@@ -501,6 +671,86 @@ export class MockFilarr {
     return { ok: true, seq: store.seq };
   }
 
+  // ==================== La fente à fichiers (`gate-fichiers-1` § 2.1) ====================
+
+  private async handleFiles(
+    req: IncomingMessage,
+    res: ServerResponse,
+    access: MockAccess,
+    path: string,
+    method: string,
+    headers: Record<string, string>,
+    log: (status: number, code?: string) => void,
+    refuse: (status: number, code: string, extra?: Record<string, unknown>, headers?: Record<string, string>) => void
+  ): Promise<void> {
+    const rest = path.slice('/api-access/self/files'.length);
+    if (!this.filesSwitch) return refuse(409, 'files_not_switched', {}, headers);
+    if (access.tier === 'free' || access.tier === 'solo') return refuse(403, 'api_tier_files', { remedy: ['upgrade'] }, headers);
+    if (!access.files) return refuse(409, 'files_not_linked', {}, headers);
+    if (rest === '/init' && method === 'POST') {
+      const body = JSON.parse((await readBody(req)).toString('utf8')) as Record<string, unknown>;
+      const size = Number(body.sizeBytes);
+      if (!(typeof body.sealedFileKey === 'string' && typeof body.encryptedManifest === 'string' && typeof body.encryptedManifestIv === 'string' && Number.isInteger(body.totalChunks))) {
+        return refuse(400, 'bad_request', {}, headers);
+      }
+      if (size > 104_857_600) return refuse(413, 'file_too_large', { limit: 104_857_600 }, headers);
+      if (this.pendingDeposits().n >= this.pendingMax) return refuse(409, 'box_full', {}, headers);
+      const seq = [...this.deposits.values()].filter((d) => d.accessId === access.id).length + 1;
+      const depositId = newToken();
+      this.deposits.set(depositId, {
+        depositId,
+        accessId: access.id,
+        seq,
+        sealedFileKey: body.sealedFileKey as string,
+        encryptedManifest: body.encryptedManifest as string,
+        encryptedManifestIv: body.encryptedManifestIv as string,
+        totalChunks: body.totalChunks as number,
+        sizeBytes: size,
+        chunks: new Map(),
+        status: 'uploading',
+        depositedAt: null,
+        filedAt: null,
+        createdAt: new Date().toISOString(),
+      });
+      log(201);
+      return json(res, 201, { success: true, data: { depositId, seq } }, headers);
+    }
+    const chunk = /^\/([A-Za-z0-9_-]+)\/chunk\/(\d+)$/.exec(rest);
+    if (chunk && method === 'PUT') {
+      const d = this.deposits.get(chunk[1]!);
+      if (!d || d.accessId !== access.id) return refuse(404, 'deposit_not_found', {}, headers);
+      const bytes = new Uint8Array(await readBody(req));
+      if (bytes.length > 16 * 1024 * 1024 + 28) return refuse(413, 'chunk_too_large', {}, headers);
+      d.chunks.set(Number(chunk[2]), bytes);
+      log(200);
+      return json(res, 200, { success: true, data: { chunkIndex: Number(chunk[2]), sizeBytes: bytes.length } }, headers);
+    }
+    const fin = /^\/([A-Za-z0-9_-]+)\/finalize$/.exec(rest);
+    if (fin && method === 'POST') {
+      const d = this.deposits.get(fin[1]!);
+      if (!d || d.accessId !== access.id) return refuse(404, 'deposit_not_found', {}, headers);
+      for (let i = 0; i < d.totalChunks; i += 1) if (!d.chunks.has(i)) return refuse(409, 'chunks_missing', {}, headers);
+      d.status = 'deposited';
+      d.depositedAt = new Date().toISOString();
+      log(200);
+      return json(res, 200, { success: true, data: { status: 'deposited', depositedAt: d.depositedAt } }, headers);
+    }
+    const one = /^\/([A-Za-z0-9_-]+)$/.exec(rest);
+    if (one && method === 'GET') {
+      const d = this.deposits.get(one[1]!);
+      if (!d || d.accessId !== access.id) return refuse(404, 'deposit_not_found', {}, headers);
+      log(200);
+      return json(res, 200, { success: true, data: { status: d.status === 'uploading' ? 'deposited' : d.status, depositedAt: d.depositedAt, filedAt: d.filedAt } }, headers);
+    }
+    if (rest === '' && method === 'GET') {
+      const since = new URL(req.url ?? '/', 'http://x').searchParams.get('since') ?? '';
+      const list = [...this.deposits.values()].filter((d) => d.accessId === access.id && d.status !== 'uploading' && (d.depositedAt ?? '') >= since);
+      log(200);
+      return json(res, 200, { success: true, data: { deposits: list.map((d) => ({ depositId: d.depositId, status: d.status, depositedAt: d.depositedAt, filedAt: d.filedAt })), next: null } }, headers);
+    }
+    return refuse(404, 'not_found', {}, headers);
+  }
+
   // ==================== La porte (`apiGate.ts`) ====================
 
   private quotaHeaders(access: MockAccess): Record<string, string> {
@@ -519,8 +769,16 @@ export class MockFilarr {
     if (!caps.includes('db-store-1') || !caps.includes('api-base-1')) return { refusal: { status: 426, code: 'client_upgrade_required' } };
     const m = /^Filarr-Access ([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization ?? '');
     const access = m ? this.accesses.get(m[1]!) : undefined;
-    if (!m || !access || createHash('sha256').update(fromBase64Url(m[2]!)).digest('hex') !== access.authHash) {
+    const proofHash = m ? createHash('sha256').update(fromBase64Url(m[2]!)).digest('hex') : '';
+    // Révision 3 : l'identité en attente d'une migration n'ouvre que `self` et `self/import`
+    const pending = !!access && access.pending !== null && proofHash === access.pending.authHash;
+    if (!m || !access || (proofHash !== access.authHash && !pending)) {
       return { refusal: { status: 401, code: 'api_access_unknown' } };
+    }
+    if (pending) {
+      if (kind !== 'self' && kind !== 'import') return { refusal: { status: 403, code: 'api_access_pending' } };
+      access.pending!.seenAt = new Date().toISOString();
+      return { access, pending: true };
     }
     if (access.revoked) return { refusal: { status: 401, code: 'api_access_revoked' } };
     if (access.expiresAt && Date.now() >= Date.parse(access.expiresAt)) return { refusal: { status: 401, code: 'api_access_expired' } };
@@ -665,13 +923,22 @@ export class MockFilarr {
 
     // L'application (créateur), pour écrire après une montée de génération
     const isApp = req.headers.authorization === 'Bearer mock-app';
+    const rev3Route =
+      this.rev3 && path.startsWith('/api-access/self/files')
+        ? { kind: 'files' as MeterKind, storeId: undefined, action: 'files' }
+        : this.rev3 && path === '/api-access/self/export' && method === 'PUT'
+          ? { kind: 'export' as MeterKind, storeId: undefined, action: 'export' }
+          : this.rev3 && path === '/api-access/self/import' && method === 'GET'
+            ? { kind: 'import' as MeterKind, storeId: undefined, action: 'import' }
+            : null;
     const route =
       path === '/api-access/self' && method === 'GET'
         ? { kind: 'self' as MeterKind, storeId: undefined, action: 'self' }
         : path === '/api-access/self/stream' && method === 'GET'
           ? { kind: 'stream' as MeterKind, storeId: undefined, action: 'stream' }
-          : this.dbStoreRoute(method, path);
+          : (rev3Route ?? this.dbStoreRoute(method, path));
     let access: MockAccess | null = null;
+    let pending = false;
     let headers: Record<string, string> = {};
     if (!isApp) {
       if (!route) return refuse(401, 'session_required');
@@ -680,6 +947,7 @@ export class MockFilarr {
       const outcome = this.gate(req, route.kind, route.storeId);
       if ('refusal' in outcome) return refuse(outcome.refusal.status, outcome.refusal.code, outcome.refusal.extra ?? {}, outcome.refusal.headers ?? {});
       access = outcome.access;
+      pending = outcome.pending === true;
       accessId = access.id;
       headers = this.quotaHeaders(access);
     } else if (!route) {
@@ -687,16 +955,58 @@ export class MockFilarr {
     }
 
     if (route!.kind === 'stream') return refuse(426, 'websocket_required', {}, headers);
+    if (route!.kind === 'self' && access && pending) {
+      // Vue réduite de l'identité en attente (gate-heberge-1 § 8.4)
+      log(200);
+      return json(res, 200, {
+        success: true,
+        data: {
+          access: { id: access.id, name: access.name, encPublicKey: access.pending!.aPub, bindSig: access.pending!.bindSig, pending: true },
+          creator: { userId: this.creatorUserId, signingPublicKey: this.creatorSigningPublicKey, tag: access.creatorTag },
+          grants: [],
+          manifests: [],
+        },
+      });
+    }
+    if (route!.kind === 'files' && access) return this.handleFiles(req, res, access, path, method, headers, log, refuse);
+    if (route!.kind === 'export' && access) {
+      const body = JSON.parse((await readBody(req)).toString('utf8') || '{}') as { sealed?: unknown };
+      if (!access.pending) return refuse(409, 'migration_not_pending', {}, headers);
+      if (typeof body.sealed !== 'string') return refuse(400, 'bad_request', {}, headers);
+      access.pending.exportSealed = body.sealed;
+      log(200);
+      return json(res, 200, { success: true, data: { ok: true } }, headers);
+    }
+    if (route!.kind === 'import' && access) {
+      if (!pending || !access.pending?.exportSealed) return refuse(404, 'export_not_ready', {}, headers);
+      log(200);
+      return json(res, 200, { success: true, data: { sealed: access.pending.exportSealed } }, headers);
+    }
     if (route!.kind === 'self' && access) {
       const lim = this.limitsOf(access.tier);
       log(200);
       return json(res, 200, {
         success: true,
         data: {
+          ...(this.rev3
+            ? {
+                creator: { userId: this.creatorUserId, signingPublicKey: this.creatorSigningPublicKey, tag: access.creatorTag },
+                files: access.files
+                  ? {
+                      ...access.files,
+                      pending: this.pendingDeposits(),
+                      limits: { maxFileBytes: 104_857_600, filesPerMonth: 2000, fileBytesPerMonth: 20 * GIB, pendingMax: this.pendingMax },
+                      usage: { files: [...this.deposits.values()].filter((d) => d.status !== 'uploading').length, fileBytes: 0 },
+                    }
+                  : null,
+                hosting: access.hosted ? { hostName: 'essai-0000' } : null,
+              }
+            : {}),
           access: {
             id: access.id,
             name: access.name,
             encPublicKey: access.aPub,
+            ...(this.rev3 ? { bindSig: access.bindSig } : {}),
             expiresAt: access.expiresAt,
             ipAllowlist: null,
             createdAt: access.createdAt,
