@@ -1,0 +1,13 @@
+{
+  "name": "@filarr/gate-cloudflare",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Filarr Gate on YOUR Cloudflare account: a Worker and a Durable Object that hold the replica.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "fflate": "^0.8.3"
+  }
+}

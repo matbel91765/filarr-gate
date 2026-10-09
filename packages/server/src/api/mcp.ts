@@ -12,9 +12,9 @@
 import { randomUUID } from 'node:crypto';
 import type { AppKeyRecord } from '../state';
 import { canReadBase, canReadView } from './keys';
-import type { GateModel } from './model';
-import { ApiError, listRows, runSql, viewPage } from './query';
-import { rowJson } from './fields';
+import type { GateModel } from '../../../gate/src/data/model';
+import { ApiError, listRows, runSql, viewPage } from '../../../gate/src/data/query';
+import { rowJson } from '../../../gate/src/data/fields';
 
 export const MCP_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 

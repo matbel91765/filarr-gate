@@ -6,16 +6,16 @@
  * (contrat `api-base-1` § 8).
  */
 
-import type { InlineDbIndexEntry } from '../core/dbIndex';
-import { catalogFromDatabases } from '../core/engine/sql/catalog';
-import type { SqlCatalog } from '../core/engine/sql/run';
-import { buildMcd } from '../core/merise/mcd';
-import { buildMld, type MldTable } from '../core/merise/mld';
-import { makeLinkContext, type DbEnv, type DbLinkContext } from '../core/relations';
-import { parseDbData, type DbProperty, type DbRow, type DbView, type InlineDbData } from '../core/types';
+import type { InlineDbIndexEntry } from '../../../core/src/dbIndex';
+import { catalogFromDatabases } from '../../../core/src/engine/sql/catalog';
+import type { SqlCatalog } from '../../../core/src/engine/sql/run';
+import { buildMcd } from '../../../core/src/merise/mcd';
+import { buildMld, type MldTable } from '../../../core/src/merise/mld';
+import { makeLinkContext, type DbEnv, type DbLinkContext } from '../../../core/src/relations';
+import { parseDbData, type DbProperty, type DbRow, type DbView, type InlineDbData } from '../../../core/src/types';
 import type { GateBase, Replicator } from '../replica/replicator';
 import type { MirrorStatus } from '../replica/store';
-import type { StateStore } from '../state';
+import type { StateStore } from '../../../server/src/state';
 import { fieldsOf, type FieldDef } from './fields';
 
 export interface ViewInfo {

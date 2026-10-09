@@ -26,7 +26,7 @@ import {
   toBase64Std,
   type AccessCurves,
   type GrantPlace,
-} from '../../src/core/engine/store/apiAccess';
+} from '../../packages/core/src/engine/store/apiAccess';
 import {
   dbKeyInfo,
   storeKeys,
@@ -34,7 +34,7 @@ import {
   utf8Decode,
   utf8Encode,
   type StoreCrypto,
-} from '../../src/core/engine/store/crypto';
+} from '../../packages/core/src/engine/store/crypto';
 
 const range = (start: number, n: number): Uint8Array =>
   Uint8Array.from({ length: n }, (_, i) => (start + i) & 0xff);

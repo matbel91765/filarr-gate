@@ -29,13 +29,13 @@ import {
   grantPlaintext,
   nextSlug,
   sealToKey,
-} from '../../src/core/engine/store/apiAccess';
-import { isCover } from '../../src/core/engine/store/codec';
-import { fromBase64Url, personalStoreId, storeKeys, toBase64Url, utf8Encode, type StoreKeys } from '../../src/core/engine/store/crypto';
-import { HlcClock } from '../../src/core/engine/store/hlc';
-import type { StoreOp } from '../../src/core/engine/store/registers';
-import type { DbProperty, DbRow, DbView } from '../../src/core/types';
-import { curves, storeCrypto as c } from '../../src/crypto/providers';
+} from '../../packages/core/src/engine/store/apiAccess';
+import { isCover } from '../../packages/core/src/engine/store/codec';
+import { fromBase64Url, personalStoreId, storeKeys, toBase64Url, utf8Encode, type StoreKeys } from '../../packages/core/src/engine/store/crypto';
+import { HlcClock } from '../../packages/core/src/engine/store/hlc';
+import type { StoreOp } from '../../packages/core/src/engine/store/registers';
+import type { DbProperty, DbRow, DbView } from '../../packages/core/src/types';
+import { curves, storeCrypto as c } from '../../packages/gate/src/crypto/providers';
 import {
   StoreReplica,
   slotRefKey,

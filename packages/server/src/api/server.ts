@@ -18,16 +18,16 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Journal, JournalKind } from '../journal';
 import type { Metrics } from '../metrics';
-import type { Replicator } from '../replica/replicator';
+import type { Replicator } from '../../../gate/src/replica/replicator';
 import type { AppKeyRecord, StateStore } from '../state';
-import type { Settings } from '../config';
+import type { Settings } from '../../../cli/src/config';
 import { canReadBase, canReadQuery, canReadView, canWrite, ipInRange, type KeyRegistry, type WriteOp } from './keys';
 import type { McpServer } from './mcp';
-import type { BaseInfo, GateModel } from './model';
+import type { BaseInfo, GateModel } from '../../../gate/src/data/model';
 import { buildOpenApi, docsHtml } from './openapi';
-import { ApiError, listRows, runSql, sqlPage, viewPage } from './query';
-import { rowJson } from './fields';
-import type { Writer } from './write';
+import { ApiError, listRows, runSql, sqlPage, viewPage } from '../../../gate/src/data/query';
+import { rowJson } from '../../../gate/src/data/fields';
+import type { Writer } from '../../../gate/src/data/write';
 
 export interface ApiDeps {
   model: GateModel;

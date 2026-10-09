@@ -1,0 +1,34 @@
+{
+  "name": "filarr-gate",
+  "version": "0.1.0",
+  "description": "Serve a Filarr database as an API, without Filarr ever seeing your data: a customer-hosted replica of end-to-end encrypted Filarr database stores, with a local API, webhooks, MCP and a management UI.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "filarr-gate": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "README.fr.md",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build:server && npm run build:ui",
+    "build:server": "node scripts/build.mjs",
+    "build:ui": "vite build --config ui/vite.config.ts",
+    "dev:ui": "vite --config ui/vite.config.ts",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "fflate": "^0.8.3",
+    "ws": "^8.18.0"
+  }
+}

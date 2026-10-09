@@ -5,9 +5,9 @@
  * lisible, sans rien charger d'ailleurs.
  */
 
-import type { FieldDef } from './fields';
-import type { BaseInfo } from './model';
-import { viewFields } from './query';
+import type { FieldDef } from '../../../gate/src/data/fields';
+import type { BaseInfo } from '../../../gate/src/data/model';
+import { viewFields } from '../../../gate/src/data/query';
 import type { SavedQuery } from '../state';
 
 type Schema = Record<string, unknown>;

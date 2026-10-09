@@ -3,8 +3,8 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadConfig, parseToml } from '../src/config';
-import { ipInRange, validRange } from '../src/api/keys';
+import { loadConfig, parseToml } from '../packages/cli/src/config';
+import { ipInRange, validRange } from '../packages/server/src/api/keys';
 import { tempDir } from './support/util';
 
 describe('gate.toml', () => {

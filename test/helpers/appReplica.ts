@@ -27,7 +27,7 @@
  * Le source passe sous `strict` ET `noUncheckedIndexedAccess`.
  */
 
-import type { DbRow } from '../../src/core/types';
+import type { DbRow } from '../../packages/core/src/types';
 import {
   headKeyBytes,
   isCover,
@@ -47,10 +47,10 @@ import {
   type SlotEntry,
   type StoreHead,
   type StoreSchema,
-} from '../../src/core/engine/store/codec';
-import { newHeadKeys, type HeadKeys, type StoreCrypto, type StoreKeys } from '../../src/core/engine/store/crypto';
-import { evenPositions } from '../../src/core/engine/store/fracIndex';
-import { formatHlc, isHlc, type HlcClock } from '../../src/core/engine/store/hlc';
+} from '../../packages/core/src/engine/store/codec';
+import { newHeadKeys, type HeadKeys, type StoreCrypto, type StoreKeys } from '../../packages/core/src/engine/store/crypto';
+import { evenPositions } from '../../packages/core/src/engine/store/fracIndex';
+import { formatHlc, isHlc, type HlcClock } from '../../packages/core/src/engine/store/hlc';
 import {
   applyOp,
   FIELD_ORDER,
@@ -63,8 +63,8 @@ import {
   type RowRegisters,
   type StoreOp,
   type StoreRows,
-} from '../../src/core/engine/store/registers';
-import { headZones, type SlotZone } from '../../src/core/engine/store/zones';
+} from '../../packages/core/src/engine/store/registers';
+import { headZones, type SlotZone } from '../../packages/core/src/engine/store/zones';
 
 // ==================== Contrats injectés ====================
 

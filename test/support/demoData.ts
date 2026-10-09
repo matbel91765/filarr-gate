@@ -5,7 +5,7 @@
  * fournisseurs qui N'EST PAS ouverte à l'accès (contrat § 8).
  */
 
-import type { DbProperty, DbRow, DbView } from '../../src/core/types';
+import type { DbProperty, DbRow, DbView } from '../../packages/core/src/types';
 import type { NewStore } from './mockFilarr';
 
 export const CLIENTS_DB = 'db-clients-demo';

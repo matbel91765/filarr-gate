@@ -7,8 +7,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { webCryptoStore } from '../src/core/engine/store/crypto';
-import { curves, storeCrypto } from '../src/crypto/providers';
+import { webCryptoStore } from '../packages/core/src/engine/store/crypto';
+import { curves, storeCrypto } from '../packages/gate/src/crypto/providers';
 import { nodeCryptoStore } from './helpers/nodeCryptoStore';
 import { buildStoreVectors, replayStoreVectors, type StoreVectors } from './helpers/storeVectors';
 import {

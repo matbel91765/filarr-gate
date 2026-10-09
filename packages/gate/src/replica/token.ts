@@ -12,7 +12,7 @@ import {
   accessAuthorization,
   deriveAccessKeys,
   parseAccessToken,
-} from '../core/engine/store/apiAccess';
+} from '../../../core/src/engine/store/apiAccess';
 import { curves, storeCrypto } from '../crypto/providers';
 
 export interface AccessIdentity {

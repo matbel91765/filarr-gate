@@ -9,9 +9,9 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { defaultCells } from '../core/dbCore';
-import { positionBetween } from '../core/engine/store/fracIndex';
-import { FIELD_CREATED, FIELD_DELETED, FIELD_ORDER, type StoreOp } from '../core/engine/store/registers';
+import { defaultCells } from '../../../core/src/dbCore';
+import { positionBetween } from '../../../core/src/engine/store/fracIndex';
+import { FIELD_CREATED, FIELD_DELETED, FIELD_ORDER, type StoreOp } from '../../../core/src/engine/store/registers';
 import { FilarrError, RateLimitError, UnreachableError } from '../replica/http';
 import type { Replicator } from '../replica/replicator';
 import { KeyMissingError, WriteRefusedError } from '../replica/store';

@@ -10,12 +10,12 @@
  *   visée n'est pas ouverte à l'accès (il est alors signalé « non résolu »).
  */
 
-import { relationIds } from '../core/dbCore';
-import { evaluateFormula } from '../core/formulaEngine';
-import { peopleOf } from '../core/people';
-import { computeRollup, resolveRelation, type DbEnv } from '../core/relations';
-import { vaultFileRef, type DbProperty, type DbRow, type PropertyType } from '../core/types';
-import type { StateStore } from '../state';
+import { relationIds } from '../../../core/src/dbCore';
+import { evaluateFormula } from '../../../core/src/formulaEngine';
+import { peopleOf } from '../../../core/src/people';
+import { computeRollup, resolveRelation, type DbEnv } from '../../../core/src/relations';
+import { vaultFileRef, type DbProperty, type DbRow, type PropertyType } from '../../../core/src/types';
+import type { StateStore } from '../../../server/src/state';
 
 export type JsonType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'string[]' | 'object';
 

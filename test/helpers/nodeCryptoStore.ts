@@ -13,7 +13,7 @@ import {
   hkdfSync,
   randomBytes,
 } from 'crypto';
-import type { StoreCrypto } from '../../src/core/engine/store/crypto';
+import type { StoreCrypto } from '../../packages/core/src/engine/store/crypto';
 
 export const nodeCryptoStore: StoreCrypto = {
   async hkdf(ikm, salt, info, length) {

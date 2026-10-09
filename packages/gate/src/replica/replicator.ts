@@ -21,7 +21,7 @@ import type { BlockCache } from './blockCache';
 import { FilarrClient, FilarrError, RateLimitError, UnreachableError, parseRetryAfter } from './http';
 import { StoreMirror, type ChangesResponse, type RowDiff } from './store';
 import { openToken, wipeIdentity, type AccessIdentity } from './token';
-import type { Journal } from '../journal';
+import type { Journal } from '../../../server/src/journal';
 
 export type LinkState =
   | 'no_token'

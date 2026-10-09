@@ -11,9 +11,9 @@
  *   l'application ; leur `slug` vient du manifeste, jamais recalculé ici.
  */
 
-import { assignSlugs, openGrant, openSealedBox } from '../core/engine/store/apiAccess';
-import { utf8Decode, type StoreCrypto, type StoreKeys } from '../core/engine/store/crypto';
-import { parseDbData, type DbView } from '../core/types';
+import { assignSlugs, openGrant, openSealedBox } from '../../../core/src/engine/store/apiAccess';
+import { utf8Decode, type StoreCrypto, type StoreKeys } from '../../../core/src/engine/store/crypto';
+import { parseDbData, type DbView } from '../../../core/src/types';
 import { curves, storeCrypto } from '../crypto/providers';
 import type { AccessIdentity } from './token';
 

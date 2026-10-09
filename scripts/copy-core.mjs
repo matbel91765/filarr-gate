@@ -1,4 +1,4 @@
-// Recopie le cœur portable de filarg dans src/core, avec l'en-tête de provenance.
+// Recopie le cœur portable de filarg dans packages/core/src, avec l'en-tête de provenance.
 // Usage : node scripts/copy-core.mjs <chemin de filarg>
 // Les fichiers restent identiques à la source, hormis les chemins d'import listés dans REWRITES.
 import { execFileSync } from 'node:child_process';
@@ -30,7 +30,7 @@ const REWRITES = {
   ],
   'formulaEngine.ts': [["'../../../../../i18n/config'", "'./shims/i18nConfig'"]],
 };
-const out = join(process.cwd(), 'src', 'core');
+const out = join(process.cwd(), 'packages', 'core', 'src');
 const manifest = [];
 for (const rel of FILES) {
   const src = `${BASE}/${rel}`;
@@ -44,7 +44,7 @@ for (const rel of FILES) {
   const header = `// Recopié de filarg ${src} @ ${commit} — relicencié Apache-2.0 par le titulaire des droits.${eol}`;
   mkdirSync(dirname(join(out, rel)), { recursive: true });
   writeFileSync(join(out, rel), header + text, 'utf8');
-  manifest.push({ file: `src/core/${rel}`, from: src, commit, rewritten: (REWRITES[rel] ?? []).length });
+  manifest.push({ file: `packages/core/src/${rel}`, from: src, commit, rewritten: (REWRITES[rel] ?? []).length });
 }
 // Les rejoueurs des vecteurs dorés (code de test de filarg), recopiés dans test/helpers.
 const TESTS = `${BASE}/__tests__/helpers`;
@@ -56,7 +56,7 @@ for (const rel of TEST_FILES) {
   let rewritten = 0;
   text = text.replace(/from '\.\.\/\.\.\/(types|engine\/[^']+)'/g, (_m, path) => {
     rewritten += 1;
-    return `from '../../src/core/${path}'`;
+    return `from '../../packages/core/src/${path}'`;
   });
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
   const header = `// Recopié de filarg ${src} @ ${commit} — relicencié Apache-2.0 par le titulaire des droits.${eol}`;
@@ -73,7 +73,7 @@ for (const rel of TEST_FILES) {
   let rewritten = 0;
   text = text.replace(/from '(\.\/[^']+|\.\.\/\.\.\/types)'/g, (_m, path) => {
     rewritten += 1;
-    return path === '../../types' ? `from '../../src/core/types'` : `from '../../src/core/engine/store/${path.slice(2)}'`;
+    return path === '../../types' ? `from '../../packages/core/src/types'` : `from '../../packages/core/src/engine/store/${path.slice(2)}'`;
   });
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
   const header = `// Recopié de filarg ${src} @ ${commit} — relicencié Apache-2.0 par le titulaire des droits.${eol}`;

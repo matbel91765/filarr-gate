@@ -15,9 +15,9 @@ import { createInterface } from 'node:readline';
 import { coerce, defaultStateDir, loadConfig, type SettingKey } from './config';
 import { Gate } from './gate';
 import { log } from './log';
-import { parseAccessToken } from './core/engine/store/apiAccess';
-import { KeyRegistry } from './api/keys';
-import { StateStore } from './state';
+import { parseAccessToken } from '../../core/src/engine/store/apiAccess';
+import { KeyRegistry } from '../../server/src/api/keys';
+import { StateStore } from '../../server/src/state';
 import { GATE_VERSION } from './version';
 
 function parseArgs(argv: string[]): { command: string[]; flags: Record<string, string | true> } {

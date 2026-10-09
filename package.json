@@ -1,38 +1,24 @@
 {
-  "name": "filarr-gate",
-  "version": "0.1.0",
-  "description": "Serve a Filarr database as an API, without Filarr ever seeing your data: a customer-hosted replica of end-to-end encrypted Filarr database stores.",
+  "name": "filarr-gate-monorepo",
+  "private": true,
+  "description": "Filarr Gate: serve a Filarr database as an API, without Filarr ever seeing your data. Monorepo of the library, the server, the Cloudflare variant and the copied Filarr core.",
   "license": "Apache-2.0",
   "type": "module",
-  "bin": {
-    "filarr-gate": "dist/cli.js"
-  },
-  "files": [
-    "dist",
-    "LICENSE",
-    "NOTICE",
-    "README.md",
-    "README.fr.md",
-    "SECURITY.md"
+  "workspaces": [
+    "packages/core",
+    "packages/gate",
+    "packages/server",
+    "packages/cli",
+    "packages/cloudflare"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "build": "npm run build:server && npm run build:ui",
-    "build:server": "node scripts/build-server.mjs",
-    "build:ui": "vite build --config ui/vite.config.ts",
-    "dev:ui": "vite --config ui/vite.config.ts",
-    "start": "node dist/cli.js",
-    "mock-filarr": "tsx scripts/mock-filarr.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p ui/tsconfig.json --noEmit",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@noble/curves": "^2.2.0",
-    "@noble/hashes": "^2.2.0",
-    "fflate": "^0.8.3",
-    "ws": "^8.18.0"
+    "build": "npm run build -w @filarr/gate && npm run build -w filarr-gate",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p packages/cli/ui/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "mock-filarr": "tsx scripts/mock-filarr.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
@@ -45,6 +31,7 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^8.3.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "ws": "^8.18.0"
   }
 }

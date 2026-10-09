@@ -3,12 +3,12 @@
  * le moteur de vues de Filarr, une requête SQL en lecture seule par son moteur SQL.
  */
 
-import { parseStatement, SqlSyntaxError, type SelectStatement } from '../core/engine/sql/parser';
-import { runSelect, SqlError, type SqlCatalog } from '../core/engine/sql/run';
-import type { SqlValue } from '../core/engine/sql/values';
-import { viewRows } from '../core/engine';
-import { applySearch, orderedVisibleProperties } from '../core/viewEngine';
-import type { DbRow } from '../core/types';
+import { parseStatement, SqlSyntaxError, type SelectStatement } from '../../../core/src/engine/sql/parser';
+import { runSelect, SqlError, type SqlCatalog } from '../../../core/src/engine/sql/run';
+import type { SqlValue } from '../../../core/src/engine/sql/values';
+import { viewRows } from '../../../core/src/engine';
+import { applySearch, orderedVisibleProperties } from '../../../core/src/viewEngine';
+import type { DbRow } from '../../../core/src/types';
 import { rowJson, type FieldDef } from './fields';
 import type { BaseInfo, GateModel, ViewInfo } from './model';
 

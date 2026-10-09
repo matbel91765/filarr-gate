@@ -20,7 +20,7 @@
  * registres est une union, rejouer les mêmes écritures ne change rien.
  */
 
-import type { DbRow } from '../core/types';
+import type { DbRow } from '../../../core/src/types';
 import {
   headKeyBytes,
   isCover,
@@ -36,11 +36,11 @@ import {
   type LaidSlot,
   type SlotEntry,
   type StoreHead,
-} from '../core/engine/store/codec';
-import { canonicalJson } from '../core/engine/store/canonical';
-import { fromBase64Url, toBase64Url, type StoreKeys } from '../core/engine/store/crypto';
-import { HlcClock } from '../core/engine/store/hlc';
-import { positionBetween } from '../core/engine/store/fracIndex';
+} from '../../../core/src/engine/store/codec';
+import { canonicalJson } from '../../../core/src/engine/store/canonical';
+import { fromBase64Url, toBase64Url, type StoreKeys } from '../../../core/src/engine/store/crypto';
+import { HlcClock } from '../../../core/src/engine/store/hlc';
+import { positionBetween } from '../../../core/src/engine/store/fracIndex';
 import {
   applyOp,
   FIELD_ORDER,
@@ -50,8 +50,8 @@ import {
   ownRow,
   type StoreOp,
   type StoreRows,
-} from '../core/engine/store/registers';
-import { headZones, type SlotZone } from '../core/engine/store/zones';
+} from '../../../core/src/engine/store/registers';
+import { headZones, type SlotZone } from '../../../core/src/engine/store/zones';
 import { storeCrypto as c } from '../crypto/providers';
 import { keyId, type Rights } from './access';
 import { refOf, type BlockCache } from './blockCache';

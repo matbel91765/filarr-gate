@@ -14,8 +14,8 @@
  */
 
 import { deflateSync } from 'fflate';
-import type { DbRow } from '../../src/core/types';
-import { canonicalJson } from '../../src/core/engine/store/canonical';
+import type { DbRow } from '../../packages/core/src/types';
+import { canonicalJson } from '../../packages/core/src/engine/store/canonical';
 import {
   headJson,
   headKeyBytes,
@@ -31,7 +31,7 @@ import {
   slotJson,
   slotMac,
   type StoreHead,
-} from '../../src/core/engine/store/codec';
+} from '../../packages/core/src/engine/store/codec';
 import {
   dbKeyInfo,
   fromBase64Url,
@@ -47,10 +47,10 @@ import {
   vaultStoreId,
   type StoreCrypto,
   type StoreKeys,
-} from '../../src/core/engine/store/crypto';
-import { evenPositions, positionBetween } from '../../src/core/engine/store/fracIndex';
-import { headZones, validZones } from '../../src/core/engine/store/zones';
-import { HlcClock, formatHlc, parseHlc } from '../../src/core/engine/store/hlc';
+} from '../../packages/core/src/engine/store/crypto';
+import { evenPositions, positionBetween } from '../../packages/core/src/engine/store/fracIndex';
+import { headZones, validZones } from '../../packages/core/src/engine/store/zones';
+import { HlcClock, formatHlc, parseHlc } from '../../packages/core/src/engine/store/hlc';
 import {
   applyOp,
   materializeRow,
@@ -58,7 +58,7 @@ import {
   rowToRegisters,
   type StoreOp,
   type StoreRows,
-} from '../../src/core/engine/store/registers';
+} from '../../packages/core/src/engine/store/registers';
 
 // ==================== Octets ====================
 

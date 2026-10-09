@@ -14,18 +14,18 @@
  */
 
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { compileViewFilter } from '../core/viewEngine';
-import { parseStatement } from '../core/engine/sql/parser';
-import { catalogOf, runSelect, type SqlCatalog } from '../core/engine/sql/run';
-import type { SqlValue } from '../core/engine/sql/values';
-import type { DbRow } from '../core/types';
+import { compileViewFilter } from '../../../core/src/viewEngine';
+import { parseStatement } from '../../../core/src/engine/sql/parser';
+import { catalogOf, runSelect, type SqlCatalog } from '../../../core/src/engine/sql/run';
+import type { SqlValue } from '../../../core/src/engine/sql/values';
+import type { DbRow } from '../../../core/src/types';
 import type { Journal } from '../journal';
 import type { Metrics } from '../metrics';
-import type { GateBase, QuotaAlert } from '../replica/replicator';
-import type { RowDiff } from '../replica/store';
+import type { GateBase, QuotaAlert } from '../../../gate/src/replica/replicator';
+import type { RowDiff } from '../../../gate/src/replica/store';
 import type { StateStore, WebhookEvent, WebhookRecord } from '../state';
-import { rowJson } from './fields';
-import type { BaseInfo, GateModel } from './model';
+import { rowJson } from '../../../gate/src/data/fields';
+import type { BaseInfo, GateModel } from '../../../gate/src/data/model';
 
 export const SIGNATURE_TOLERANCE_S = 300;
 export const MAX_ATTEMPTS = 8;

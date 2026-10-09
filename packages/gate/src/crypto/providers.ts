@@ -8,8 +8,8 @@
  */
 
 import { ed25519, x25519 } from '@noble/curves/ed25519.js';
-import { webCryptoStore, type StoreCrypto } from '../core/engine/store/crypto';
-import type { AccessCurves } from '../core/engine/store/apiAccess';
+import { webCryptoStore, type StoreCrypto } from '../../../core/src/engine/store/crypto';
+import type { AccessCurves } from '../../../core/src/engine/store/apiAccess';
 
 export const storeCrypto: StoreCrypto = webCryptoStore(globalThis.crypto.subtle);
 
