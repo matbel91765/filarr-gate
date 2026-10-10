@@ -29,14 +29,14 @@ Durable Object); a request body is limited by your Cloudflare plan, which bounds
 
 **With the button** (it forks this repository into your GitHub account and deploys it):
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/matbel91765/filarr-gate)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/filarr-work/filarr-gate)
 
 The form asks for the two secrets of step 2.
 
 **Or by hand**, from a clone:
 
 ```sh
-git clone https://github.com/matbel91765/filarr-gate.git
+git clone https://github.com/filarr-work/filarr-gate.git
 cd filarr-gate
 npm ci
 npm run build                 # the management UI, served by the Worker

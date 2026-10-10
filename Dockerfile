@@ -28,7 +28,7 @@ RUN npm run build -w filarr-gate && npm prune --omit=dev --no-audit --no-fund
 FROM node:22-alpine
 LABEL org.opencontainers.image.title="Filarr Gate" \
       org.opencontainers.image.description="Serve a Filarr database as an API, without Filarr ever seeing your data." \
-      org.opencontainers.image.source="https://github.com/matbel91765/filarr-gate" \
+      org.opencontainers.image.source="https://github.com/filarr-work/filarr-gate" \
       org.opencontainers.image.licenses="Apache-2.0"
 ENV NODE_ENV=production \
     FILARR_GATE_STATE_DIR=/data \

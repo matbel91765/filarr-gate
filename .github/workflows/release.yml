@@ -23,9 +23,9 @@ on:
     tags: ['v*.*.*']
 
 env:
-  # Nom de l'image sur GHCR : À CHOISIR avant la première publication (ghcr.io/filarr/gate ou
-  # ghcr.io/matbel91765/filarr-gate), en minuscules. Tant qu'il vaut ghcr.io/OWNER/NAME, l'image n'est pas publiée.
-  IMAGE: ghcr.io/OWNER/NAME
+  # Nom de l'image sur GHCR (en minuscules, sous le propriétaire du dépôt : le jeton du workflow ne pousse que là).
+  # Le travail de l'image refuse un nom resté au modèle ghcr.io/OWNER/NAME.
+  IMAGE: ghcr.io/filarr-work/gate
   NODE_VERSION: '22'
 
 permissions:

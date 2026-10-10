@@ -28,7 +28,7 @@ Dans Filarr : « ··· » sur une base › **Ouvrir à une API…** donne un je
 ## L'essayer en cinq minutes, sans compte
 
 ```sh
-git clone https://github.com/matbel91765/filarr-gate.git && cd filarr-gate
+git clone https://github.com/filarr-work/filarr-gate.git && cd filarr-gate
 npm ci && npm run build
 npm run mock-filarr      # un Filarr en mémoire avec trois bases de démonstration ; il affiche un jeton. Laissez-le tourner.
 ```
@@ -61,7 +61,7 @@ curl -s -H "Authorization: Bearer gk_…" "http://127.0.0.1:8443/v1/clients?limi
 | **dans Docker** | `docker compose up -d` avec [examples/docker](examples/docker) : la boîte derrière Caddy, l'état dans un volume | [un serveur](docs/tutorials/install-docker.fr.md) |
 | **sur votre compte Cloudflare** | le bouton Deploy, ou `npx wrangler deploy` ; le jeton est un secret de VOTRE Worker | [Cloudflare](docs/tutorials/install-cloudflare.fr.md) |
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/matbel91765/filarr-gate)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/filarr-work/filarr-gate)
 
 ```js
 import { openGate } from '@filarr/gate';

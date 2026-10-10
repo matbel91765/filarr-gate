@@ -19,9 +19,9 @@ builds. **Nothing here has been published yet**; the steps marked *decision* wai
 
 ## Versions
 
-One version for the whole repository, set by the maintainer only (*decision*), in `packages/gate/package.json`,
+One version for the whole repository, set by the maintainer only, in `packages/gate/package.json`,
 `packages/cli/package.json` (and the private packages, to keep them aligned). The library reports it as
-`lib-<version>` to Filarr, the server as `<version>`. Proposed for this release: **0.2.0**.
+`lib-<version>` to Filarr, the server as `<version>`. This release: **0.2.0**.
 
 ## Before tagging
 
@@ -69,8 +69,9 @@ All of it is `.github/workflows/release.yml`; the step-by-step procedure for the
 
 ## Decisions waiting for the maintainer
 
-- **Image name.** The Filarr app shows `ghcr.io/filarr/gate:1`. Publishing there needs a GitHub organisation `filarr`
-  owning the package; otherwise the natural name is `ghcr.io/matbel91765/filarr-gate`, and the app text changes.
-- **Image tag.** `:1` does not exist before a 1.0; until then the app should show `:0.2` (or `:0`).
+- **Image name.** Decided: `ghcr.io/filarr-work/gate`, the repository moving to the GitHub organisation
+  `filarr-work`. The Filarr app still shows `ghcr.io/filarr/gate:1`: its text must change.
+- **Image tag.** `:1` does not exist before a 1.0; until then the app should show `ghcr.io/filarr-work/gate:0.2`.
 - **Volume.** Aligned on the app: `/data` (it was `/var/lib/filarr-gate` in 0.1, never published).
-- **npm scope.** `@filarr` must be an npm organisation owned by the maintainer before the first publish.
+- **npm scope.** `@filarr` must be an npm organisation owned by the maintainer before the first publish; otherwise,
+  what to rename: [RELEASING.md](RELEASING.md#5-npm-the-filarr-organisation-and-trusted-publishing).

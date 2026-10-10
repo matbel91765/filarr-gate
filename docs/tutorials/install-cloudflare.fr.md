@@ -30,14 +30,14 @@ plus gros fichier que la boîte noire peut recevoir.
 
 **Avec le bouton** (il copie ce dépôt dans votre compte GitHub et le déploie) :
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/matbel91765/filarr-gate)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/filarr-work/filarr-gate)
 
 Le formulaire demande les deux secrets de l'étape 2.
 
 **Ou à la main**, depuis un clone :
 
 ```sh
-git clone https://github.com/matbel91765/filarr-gate.git
+git clone https://github.com/filarr-work/filarr-gate.git
 cd filarr-gate
 npm ci
 npm run build                 # l'interface de gestion, servie par le Worker

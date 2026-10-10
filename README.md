@@ -28,7 +28,7 @@ In Filarr: "···" on a database › **Open to an API…** gives a token (`flr_
 ## Try it in five minutes, without an account
 
 ```sh
-git clone https://github.com/matbel91765/filarr-gate.git && cd filarr-gate
+git clone https://github.com/filarr-work/filarr-gate.git && cd filarr-gate
 npm ci && npm run build
 npm run mock-filarr      # an in-memory Filarr with three demo databases; prints a token. Keep it running.
 ```
@@ -61,7 +61,7 @@ curl -s -H "Authorization: Bearer gk_…" "http://127.0.0.1:8443/v1/clients?limi
 | **in Docker** | `docker compose up -d` with [examples/docker](examples/docker): the gate behind Caddy, state in a volume | [a server](docs/tutorials/install-docker.md) |
 | **on your Cloudflare account** | the Deploy button, or `npx wrangler deploy`; the token is a secret of YOUR Worker | [Cloudflare](docs/tutorials/install-cloudflare.md) |
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/matbel91765/filarr-gate)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/filarr-work/filarr-gate)
 
 ```js
 import { openGate } from '@filarr/gate';

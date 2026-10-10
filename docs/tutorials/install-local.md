@@ -20,7 +20,7 @@ minutes, no writes). The limits of each plan are on Filarr's pricing page and in
 ## 1. Get the gate
 
 ```sh
-git clone https://github.com/matbel91765/filarr-gate.git
+git clone https://github.com/filarr-work/filarr-gate.git
 cd filarr-gate
 npm ci
 npm run build

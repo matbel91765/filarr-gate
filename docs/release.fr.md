@@ -19,9 +19,9 @@ dépôt construit. **Rien n'est encore publié** ; les étapes marquées *décis
 
 ## Les versions
 
-Une seule version pour tout le dépôt, fixée par le mainteneur seulement (*décision*), dans `packages/gate/package.json`,
+Une seule version pour tout le dépôt, fixée par le mainteneur seulement, dans `packages/gate/package.json`,
 `packages/cli/package.json` (et les paquets privés, pour les garder alignés). La bibliothèque la déclare à Filarr sous
-la forme `lib-<version>`, le serveur sous la forme `<version>`. Numéro proposé pour cette publication : **0.2.0**.
+la forme `lib-<version>`, le serveur sous la forme `<version>`. Cette publication : **0.2.0**.
 
 ## Avant d'étiqueter
 
@@ -72,9 +72,10 @@ Tout cela est `.github/workflows/release.yml` ; la marche à suivre du mainteneu
 
 ## Les décisions qui attendent le mainteneur
 
-- **Nom de l'image.** L'appli Filarr affiche `ghcr.io/filarr/gate:1`. Publier là demande une organisation GitHub
-  `filarr` qui possède le paquet ; sinon, le nom naturel est `ghcr.io/matbel91765/filarr-gate`, et le texte de l'appli
-  change.
-- **Étiquette de l'image.** `:1` n'existe pas avant une 1.0 ; d'ici là, l'appli devrait afficher `:0.2` (ou `:0`).
+- **Nom de l'image.** Décidé : `ghcr.io/filarr-work/gate`, le dépôt passant dans l'organisation GitHub `filarr-work`.
+  L'appli Filarr affiche encore `ghcr.io/filarr/gate:1` : son texte doit changer.
+- **Étiquette de l'image.** `:1` n'existe pas avant une 1.0 ; d'ici là, l'appli devrait afficher
+  `ghcr.io/filarr-work/gate:0.2`.
 - **Volume.** Aligné sur l'appli : `/data` (c'était `/var/lib/filarr-gate` en 0.1, jamais publiée).
-- **Portée npm.** `@filarr` doit être une organisation npm détenue par le mainteneur avant la première publication.
+- **Portée npm.** `@filarr` doit être une organisation npm détenue par le mainteneur avant la première publication ;
+  sinon, ce qu'il faut renommer : [RELEASING.fr.md](RELEASING.fr.md#5-npm--lorganisation-filarr-et-la-publication-de-confiance).

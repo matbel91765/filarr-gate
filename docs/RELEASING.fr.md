@@ -69,22 +69,29 @@ ssh-keygen -t ed25519 -C "filarr-gate security" -f ~/.ssh/filarr-gate-security
 
 1. Sur npmjs.com, double authentification activée : créez l'organisation `filarr` (offre gratuite, paquets publics),
    à qui appartient la portée `@filarr`. Vérifiez que le nom sans portée `filarr-gate` est libre.
+
+   Si l'organisation `filarr` ne peut pas être créée sur npm (nom pris), choisissez une autre portée, par exemple
+   `@filarr-work`, et renommez la bibliothèque partout avant la première publication : `name` dans
+   `packages/gate/package.json` (et le fichier de verrouillage : `npm install --package-lock-only --legacy-peer-deps`),
+   la paire `"@filarr/gate:release/a/library"` dans `release.yml` et son essai (`test/workflows.test.ts`), les imports
+   `from '@filarr/gate'` de la documentation, des exemples (`examples/library-node`) et des README. Ce que la
+   bibliothèque annonce à Filarr (`lib-<version>`) ne change pas, et la commande `filarr-gate`, sans portée, garde son
+   nom. Les applis Filarr affichent `npm install @filarr/gate` : leur texte change aussi.
 2. **Première publication seulement** : la publication de confiance se règle sur un paquet qui existe. Créez un jeton
    d'accès granulaire (lecture et écriture, paquets `@filarr/gate` et `filarr-gate` ou tous les nouveaux paquets,
    expiration de quelques jours) et rangez-le dans le secret `NPM_TOKEN` de l'environnement `release`. La chaîne
    publie quand même avec `--provenance`.
 3. Après la première publication, pour **chacun** des deux paquets : **Settings › Trusted Publisher › GitHub
-   Actions**, organisation ou utilisateur `matbel91765` (le propriétaire du dépôt), dépôt `filarr-gate`, workflow
+   Actions**, organisation `filarr-work` (le propriétaire du dépôt), dépôt `filarr-gate`, workflow
    `release.yml`, environnement `release`. Supprimez ensuite le secret `NPM_TOKEN`, révoquez le jeton, et réglez
    **Publishing access** sur « Require two-factor authentication and disallow tokens ».
 
-### 6. GHCR : le nom de l'image, puis un paquet public
+### 6. GHCR : l'image, puis un paquet public
 
-1. Choisissez le nom de l'image et écrivez-le en tête de `release.yml` (`IMAGE:`, en minuscules). Tant qu'il vaut
-   `ghcr.io/OWNER/NAME`, le travail de l'image s'arrête sur un message et rien n'est publié après lui.
-   - `ghcr.io/matbel91765/filarr-gate` : marche avec le dépôt tel qu'il est ;
-   - `ghcr.io/filarr/gate` : demande une organisation GitHub `filarr` propriétaire du dépôt (le jeton du workflow ne
-     pousse que sous le propriétaire de son dépôt) ; c'est le nom que montre l'appli Filarr aujourd'hui.
+1. L'image est `ghcr.io/filarr-work/gate`, écrite en tête de `release.yml` (`IMAGE:`). Le jeton du workflow ne pousse
+   que sous le propriétaire de son dépôt : le dépôt doit être dans l'organisation `filarr-work`
+   (`https://github.com/filarr-work/filarr-gate`) avant la première publication. Pour changer de nom, modifiez
+   `IMAGE:` (en minuscules) ; un nom resté au modèle `ghcr.io/OWNER/NAME` arrête le travail de l'image.
 2. Après le premier envoi : la page du paquet sur GitHub › **Package settings › Change visibility › Public**.
    Vérifiez que le paquet est lié au dépôt (l'étiquette `org.opencontainers.image.source` de l'image s'en charge).
 
@@ -147,10 +154,10 @@ en service du service hébergé n'existe pas encore.
 npm view @filarr/gate@X.Y.Z dist.integrity
 npm view filarr-gate@X.Y.Z dist.integrity
 npm pack @filarr/gate@X.Y.Z && sha256sum filarr-gate-X.Y.Z.tgz   # égal à library/… dans SHA256SUMS
-gh release view vX.Y.Z --repo matbel91765/filarr-gate
-docker buildx imagetools inspect <IMAGE>:X.Y.Z                    # linux/amd64 et linux/arm64
-cosign verify <IMAGE>:X.Y.Z \
-  --certificate-identity-regexp '^https://github.com/matbel91765/filarr-gate/\.github/workflows/release\.yml@refs/tags/v' \
+gh release view vX.Y.Z --repo filarr-work/filarr-gate
+docker buildx imagetools inspect ghcr.io/filarr-work/gate:X.Y.Z                    # linux/amd64 et linux/arm64
+cosign verify ghcr.io/filarr-work/gate:X.Y.Z \
+  --certificate-identity-regexp '^https://github.com/filarr-work/filarr-gate/\.github/workflows/release\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 git fetch origin release-journal && git show FETCH_HEAD:journal.jsonl | tail -1
 ```

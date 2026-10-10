@@ -63,21 +63,28 @@ ssh-keygen -t ed25519 -C "filarr-gate security" -f ~/.ssh/filarr-gate-security
 
 1. On npmjs.com, with two-factor authentication on: create the organisation `filarr` (free plan, public packages),
    which owns the scope `@filarr`. Check that the unscoped name `filarr-gate` is free.
+
+   If the organisation `filarr` cannot be created on npm (name taken), choose another scope, for example
+   `@filarr-work`, and rename the library everywhere before the first release: `name` in
+   `packages/gate/package.json` (and the lock file: `npm install --package-lock-only --legacy-peer-deps`), the pair
+   `"@filarr/gate:release/a/library"` in `release.yml` and its test (`test/workflows.test.ts`), the imports
+   `from '@filarr/gate'` of the documentation, the examples (`examples/library-node`) and the READMEs. What the
+   library reports to Filarr (`lib-<version>`) does not change, and the command `filarr-gate`, unscoped, keeps its
+   name. Filarr's apps show `npm install @filarr/gate`: their text changes too.
 2. **First publication only**: trusted publishing can be set on a package that exists. Create a granular access token
    (read and write, packages `@filarr/gate` and `filarr-gate` or all new packages, expiry of a few days) and store it
    as the secret `NPM_TOKEN` of the `release` environment. The chain still publishes with `--provenance`.
 3. After the first release, for **each** of the two packages: **Settings › Trusted Publisher › GitHub Actions**,
-   organisation or user `matbel91765` (the owner of the repository), repository `filarr-gate`, workflow
+   organisation `filarr-work` (the owner of the repository), repository `filarr-gate`, workflow
    `release.yml`, environment `release`. Then delete the `NPM_TOKEN` secret, revoke the token, and set **Publishing
    access** to "Require two-factor authentication and disallow tokens".
 
-### 6. GHCR: the image name, then a public package
+### 6. GHCR: the image, then a public package
 
-1. Choose the image name and write it at the top of `release.yml` (`IMAGE:`, lowercase). While it reads
-   `ghcr.io/OWNER/NAME`, the image job stops with a message and nothing is published after it.
-   - `ghcr.io/matbel91765/filarr-gate`: works with the repository as it is;
-   - `ghcr.io/filarr/gate`: needs a GitHub organisation `filarr` that owns the repository (the workflow's token can
-     only push under its repository's owner); the Filarr app shows this name today.
+1. The image is `ghcr.io/filarr-work/gate`, written at the top of `release.yml` (`IMAGE:`). The workflow's token
+   only pushes under the owner of its repository: the repository must be in the organisation `filarr-work`
+   (`https://github.com/filarr-work/filarr-gate`) before the first release. To change the name, edit `IMAGE:`
+   (lowercase); a name left at the template `ghcr.io/OWNER/NAME` stops the image job.
 2. After the first push: the package page on GitHub › **Package settings › Change visibility › Public**. Check that
    the package is linked to the repository (the image's `org.opencontainers.image.source` label does it).
 
@@ -140,10 +147,10 @@ deployment does not exist yet.
 npm view @filarr/gate@X.Y.Z dist.integrity
 npm view filarr-gate@X.Y.Z dist.integrity
 npm pack @filarr/gate@X.Y.Z && sha256sum filarr-gate-X.Y.Z.tgz   # equals library/… in SHA256SUMS
-gh release view vX.Y.Z --repo matbel91765/filarr-gate
-docker buildx imagetools inspect <IMAGE>:X.Y.Z                    # linux/amd64 and linux/arm64
-cosign verify <IMAGE>:X.Y.Z \
-  --certificate-identity-regexp '^https://github.com/matbel91765/filarr-gate/\.github/workflows/release\.yml@refs/tags/v' \
+gh release view vX.Y.Z --repo filarr-work/filarr-gate
+docker buildx imagetools inspect ghcr.io/filarr-work/gate:X.Y.Z                    # linux/amd64 and linux/arm64
+cosign verify ghcr.io/filarr-work/gate:X.Y.Z \
+  --certificate-identity-regexp '^https://github.com/filarr-work/filarr-gate/\.github/workflows/release\.yml@refs/tags/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 git fetch origin release-journal && git show FETCH_HEAD:journal.jsonl | tail -1
 ```

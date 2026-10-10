@@ -22,7 +22,7 @@ chaque palier change).
 ## 1. Récupérer les fichiers
 
 ```sh
-git clone https://github.com/matbel91765/filarr-gate.git
+git clone https://github.com/filarr-work/filarr-gate.git
 cd filarr-gate/examples/docker
 cp example.env .env
 chmod 600 .env

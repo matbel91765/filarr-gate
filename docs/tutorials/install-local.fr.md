@@ -21,7 +21,7 @@ dans **Paramètres › Accès API**.
 ## 1. Récupérer la boîte noire
 
 ```sh
-git clone https://github.com/matbel91765/filarr-gate.git
+git clone https://github.com/filarr-work/filarr-gate.git
 cd filarr-gate
 npm ci
 npm run build

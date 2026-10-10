@@ -2,7 +2,7 @@
 
 Read and write the rows of a Filarr database opened to an API, from your own code, without Filarr ever seeing your
 data. The library replicates the encrypted blocks, opens them with the keys sealed to your access token, and keeps the
-rows in memory. No HTTP server: for that, see [`filarr-gate`](https://github.com/matbel91765/filarr-gate).
+rows in memory. No HTTP server: for that, see [`filarr-gate`](https://github.com/filarr-work/filarr-gate).
 
 ```js
 import { openGate } from '@filarr/gate';
