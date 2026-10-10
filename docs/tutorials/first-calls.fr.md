@@ -27,7 +27,7 @@ export FILARR_GATE_URL=http://127.0.0.1:8443
 export FILARR_GATE_KEY=gk_…
 ```
 
-Lancez-les en entier : `bash examples/first-calls/calls.sh`, `node examples/first-calls/calls.mjs`,
+Lancez les exemples en entier : `bash examples/first-calls/calls.sh`, `node examples/first-calls/calls.mjs`,
 `python examples/first-calls/calls.py` (Python 3.10 ou plus récent, bibliothèque standard seulement).
 
 ## Un petit client
