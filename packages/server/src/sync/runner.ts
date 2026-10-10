@@ -145,6 +145,12 @@ const PAID = new Set(['solo', 'pro', 'teams', 'enterprise']);
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/** Le journal d'une synchro tel qu'il est gardé (§ 6.10) : 30 jours, 200 entrées au plus, les plus anciennes partent d'abord. */
+function trimJournal(journal: readonly SyncJournalEntry[], now = Date.now()): SyncJournalEntry[] {
+  const cutoff = new Date(now - JOURNAL_DAYS * 86_400_000).toISOString();
+  return journal.filter((j) => j.at >= cutoff).slice(-JOURNAL_MAX);
+}
+
 /**
  * La ligne du journal local pour un passage arrêté par un garde-fou (§ 6.9) : la cause, ce qui était
  * PRÉVU (lu dans la question, jamais dans des écritures) et ce qui a été fait, rien.
@@ -457,6 +463,9 @@ export class SyncRunner {
   }
 
   private async savePersisted(s: SourceInfo, base: GateBase, p: Persisted): Promise<void> {
+    // Coupé AVANT l'écriture (passage réussi comme arrêté) : coupé seulement à la publication, le journal
+    // relu au passage suivant serait l'entier et l'ombre chiffrée grossirait sans fin
+    p.journal = trimJournal(p.journal);
     const k = this.keysOf(base)[0];
     if (!k) return;
     const key = await shadowKey(storeCrypto, k.kDb, s.storeId, s.def.id);
@@ -751,8 +760,7 @@ export class SyncRunner {
     } else rec.nextRunAt = this.nextRunAfter(s.def, Date.now());
     this.core.state.save();
     const prev = s.status;
-    const cutoff = new Date(Date.now() - JOURNAL_DAYS * 86_400_000).toISOString();
-    const journal = (persisted?.journal ?? prev?.journal ?? []).filter((j) => j.at >= cutoff).slice(-JOURNAL_MAX);
+    const journal = trimJournal(persisted?.journal ?? prev?.journal ?? []);
     if (persisted) persisted.journal = journal;
     const plan = out.plan;
     const status: SyncStatus = {

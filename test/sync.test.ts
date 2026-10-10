@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DbProperty, DbRow, DbView } from '../packages/core/src/types';
 import { Gate } from '../packages/cli/src/gate';
 import { memoryBlobs } from '../packages/server/src/sync/runner';
+import { JOURNAL_MAX, openJson, shadowAad, shadowKey, type SyncJournalEntry } from '../packages/core/src/engine/extsrc';
+import { storeCrypto } from '../packages/gate/src/crypto/providers';
 import { setLogLevel } from '../packages/server/src/log';
 import { MockFilarr } from './support/mockFilarr';
 import { D1Sim, routeFetch } from './support/simulators';
@@ -80,7 +82,7 @@ afterEach(async () => {
   await mock.close();
 });
 
-async function startGate(opts: { secret?: string | null; tok?: string } = {}): Promise<Gate> {
+async function startGate(opts: { secret?: string | null; tok?: string; blobs?: ReturnType<typeof memoryBlobs> } = {}): Promise<Gate> {
   const gate = new Gate({
     env: {
       FILARR_GATE_STATE_DIR: tempDir(),
@@ -94,7 +96,7 @@ async function startGate(opts: { secret?: string | null; tok?: string } = {}): P
     },
     replicaTiming: { backoffMinMs: 20, backoffMaxMs: 200, pausedRetryMs: 100 },
     sync: {
-      blobs: memoryBlobs(),
+      blobs: opts.blobs ?? memoryBlobs(),
       tcp: false,
       fetch: routeFetch({ 'api.cloudflare.com': d1.handler }),
       externalSecret: () => (opts.secret === undefined ? d1.token : opts.secret),
@@ -254,6 +256,50 @@ describe('miroir et deux sens contre D1', () => {
     expect(after.journal.find((j) => j.kind === 'guard')).toEqual(guardEntry);
     expect(after.journal.filter((j) => j.kind === 'gone')).toHaveLength(3);
     expect(after.counts.in.gone).toBe(3);
+  });
+
+  it('le journal ENREGISTRÉ (ombre chiffrée) est coupé à 200 entrées avant d’être écrit, passage réussi ou arrêté', async () => {
+    // 80 lignes sans clé : chaque passage en note 80 au journal (« ligne sans clé »), plus son entrée `pass`
+    d1.exec('CREATE TABLE contacts (code TEXT, statut TEXT)');
+    d1.exec("INSERT INTO contacts (code, statut) VALUES ('A', 'Actif'), ('B', 'Actif'), ('C', 'Perdu')");
+    for (let i = 0; i < 80; i += 1) d1.exec("INSERT INTO contacts (code, statut) VALUES (NULL, 'Actif')");
+    await mock.appSetExtSource(
+      storeId,
+      def({
+        from: { table: 'contacts' },
+        key: { cols: ['code'], gen: 'source' },
+        marker: null,
+        mode: 'mirror',
+        map: [
+          { col: 'code', prop: 'p_nom', dir: 'in', type: 'text' },
+          { col: 'statut', prop: 'p_statut', dir: 'in', type: 'select' },
+        ],
+        conflict: undefined,
+        rowConflict: undefined,
+      })
+    );
+    const blobs = memoryBlobs();
+    const gate = await startGate({ blobs });
+    await until(() => gate.sync!.list().length === 1, 5000, 'définition');
+    const saved = async (): Promise<SyncJournalEntry[]> => {
+      const env = JSON.parse(new TextDecoder().decode(blobs.map.get(`shadow-${storeId}-${DEF_ID}`)!)) as { e: number; g: number; sealed: string };
+      const k = await mock.rootKeys(storeId, env.e, env.g);
+      const p = await openJson<{ journal: SyncJournalEntry[] }>(storeCrypto, await shadowKey(storeCrypto, k.kDb, storeId, DEF_ID), env.sealed, shadowAad(storeId, DEF_ID));
+      return p.journal;
+    };
+    for (let pass = 0; pass < 4; pass += 1) {
+      expect(await gate.sync!.runPass(DEF_ID)).toMatchObject({ state: 'ok' });
+      const journal = await saved();
+      expect(journal.length).toBeLessThanOrEqual(JOURNAL_MAX);
+      // Le journal enregistré est celui qui est publié : les plus anciennes entrées partent d'abord
+      expect(journal).toEqual(gate.sync!.get(DEF_ID)!.status!.journal);
+    }
+    // Un passage arrêté (les trois lignes à clé disparues) enregistre aussi un journal coupé, l'arrêt en dernier
+    d1.exec('DELETE FROM contacts WHERE code IS NOT NULL');
+    expect(await gate.sync!.runPass(DEF_ID)).toMatchObject({ state: 'question', code: 'extdb_guard' });
+    const stopped = await saved();
+    expect(stopped).toHaveLength(JOURNAL_MAX);
+    expect(stopped.at(-1)).toMatchObject({ kind: 'guard', code: 'extdb_guard', n: 3 });
   });
 });
 
