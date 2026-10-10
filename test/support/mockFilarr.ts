@@ -167,6 +167,8 @@ export interface MockHosting {
   /** PH9 : la raison et l'heure de l'effacement demandé (absentes : une API d'avant). */
   eraseReason?: string | null;
   eraseRequestedAt?: string | null;
+  /** PH10 : les bases sorties dont le reçu partiel n'est pas encore remis (absent : une API d'avant). */
+  pendingWithdrawals?: Array<{ storeId: string; cause: string; at: string }>;
 }
 
 export interface MockDeposit {
@@ -628,8 +630,9 @@ export class MockFilarr {
   }
 
   /** Une base sort de la boîte (créateur ou administrateur du coffre) : le droit part, la boîte est réveillée. */
-  withdrawStore(accessId: string, storeId: string): void {
+  withdrawStore(accessId: string, storeId: string, cause?: 'creator' | 'vault_admin' | 'consent'): void {
     const access = this.accesses.get(accessId)!;
+    if (cause && access.hosting) access.hosting.pendingWithdrawals = [...(access.hosting.pendingWithdrawals ?? []), { storeId, cause, at: new Date().toISOString() }];
     access.grants.delete(storeId);
     access.manifests.delete(storeId);
     this.signal(access, { t: 'grant' });
@@ -705,6 +708,7 @@ export class MockFilarr {
         redirectUntil: h.redirectUntil,
         exportPending: p?.target === 'self' && p.exportSealed === null,
         ...(h.state === 'erasing' && h.eraseReason ? { eraseReason: h.eraseReason, eraseRequestedAt: h.eraseRequestedAt ?? null } : {}),
+        ...(h.pendingWithdrawals ? { pendingWithdrawals: h.pendingWithdrawals } : {}),
       });
     }
     if (m[2] === 'pending' && method === 'GET') {
@@ -725,6 +729,10 @@ export class MockFilarr {
       const key = receipt ? this.hostKeyOf(receipt.keyId)[0] : undefined;
       if (!receipt || receipt.accessId !== access.id || typeof sig !== 'string' || !key || !verifyHostSignature(receiptMessage(receipt), sig, key.signPublicKey)) return refuse(400, 'invalid');
       const partial = receipt.reason === 'withdrawn';
+      if (partial && h.pendingWithdrawals) {
+        const gone = new Set(((receipt.stores ?? []) as Array<{ storeId: string }>).map((x) => x.storeId));
+        h.pendingWithdrawals = h.pendingWithdrawals.filter((w) => !gone.has(w.storeId));
+      }
       if (!partial) {
         h.state = 'erased';
         h.sealedToken = null;

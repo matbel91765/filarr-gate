@@ -43,7 +43,7 @@ import { corsHeaders, gateAsleep, json, nextMonthUtc, notFound, periodOf } from 
 import { loadKeyring, signingKey, type HostKeyring } from './keys';
 import { opsError } from './ops';
 import { HOST_PREFIX, SealedStorage } from './sealedStorage';
-import { CREATOR_HEADER, ERASED_ALL, RECEIPT_REASONS, parseCreatorHeader, signReceipt, verifyAdminRequest, type ErasureReceipt, type ReceiptReason, type WithdrawCause } from './wire';
+import { CREATOR_HEADER, ERASED_ALL, RECEIPT_REASONS, parseCreatorHeader, signReceipt, verifyAdminRequest, type ErasureReceipt, type ReceiptReason, type WithdrawCause, WITHDRAW_CAUSES } from './wire';
 
 /** Le stockage brut de l'objet durable. */
 export interface RawStorage extends DoStorage {
@@ -129,7 +129,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
  * le service la déduit alors (`sleepReason`, puis `migrated` si une redirection est posée, sinon `revoked`).
  */
 export function erasureReason(t: Pick<HostedToken, 'sleepReason' | 'redirectTo' | 'eraseReason'>): ReceiptReason {
-  if (typeof t.eraseReason === 'string' && (RECEIPT_REASONS as readonly string[]).includes(t.eraseReason)) return t.eraseReason as ReceiptReason;
+  // `withdrawn` ne sert jamais à un effacement complet (PH10) : une telle valeur est ignorée
+  if (typeof t.eraseReason === 'string' && t.eraseReason !== 'withdrawn' && (RECEIPT_REASONS as readonly string[]).includes(t.eraseReason)) return t.eraseReason as ReceiptReason;
   if (t.sleepReason && (RECEIPT_REASONS as readonly string[]).includes(t.sleepReason) && t.sleepReason !== 'withdrawn') return t.sleepReason as ReceiptReason;
   if (t.redirectTo) return 'migrated';
   return 'revoked';
@@ -569,10 +570,21 @@ export class BoxRuntime {
     const gone = meta.stores.filter((s) => !held.some((h) => h.storeId === s.storeId));
     const same = JSON.stringify(held) === JSON.stringify(meta.stores);
     if (same) return;
+    // PH10 : la cause de chaque retrait se lit dans `pendingWithdrawals` de l'API ; absente (API d'avant), pas de `cause`
+    const causes = new Map<string, WithdrawCause>();
+    if (gone.length > 0 && this.api) {
+      try {
+        const t = await this.api.token(meta.accessId);
+        for (const w of t.pendingWithdrawals ?? []) {
+          if (w && typeof w.storeId === 'string' && typeof w.cause === 'string' && (WITHDRAW_CAUSES as readonly string[]).includes(w.cause)) causes.set(w.storeId, w.cause as WithdrawCause);
+        }
+      } catch {
+        /* l'API injoignable : le reçu part sans cause plutôt que pas du tout */
+      }
+    }
     for (const s of gone) {
       const at = new Date(this.now()).toISOString();
-      // PH10 : `cause` (creator, vault_admin, consent) est facultative ; rien ne la dit au service aujourd'hui, elle est omise
-      meta.receipts.push(this.sign({ receipt: this.buildReceipt(meta, 'withdrawn', [s], ['dbKeys', 'copy'], at), sig: null }));
+      meta.receipts.push(this.sign({ receipt: this.buildReceipt(meta, 'withdrawn', [s], ['dbKeys', 'copy'], at, causes.get(s.storeId)), sig: null }));
     }
     meta.stores = held;
     await this.saveMeta();
@@ -837,8 +849,8 @@ export class BoxRuntime {
     const sig = parseCreatorHeader(header)!;
     const seenKey = Array.from(sig.s.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
     for (const [k, until] of this.seenAdmin) if (until < nowS) this.seenAdmin.delete(k);
-    // PH11 : chaque (t, signature) une seule fois ; un rejeu est refusé `401 replay`
-    if (this.seenAdmin.has(seenKey)) return json(401, { error: 'Replayed management request', code: 'replay' }, cors);
+    // PH11 : chaque (t, signature) une seule fois ; un rejeu est refusé `401 admin_replay`
+    if (this.seenAdmin.has(seenKey)) return json(401, { error: 'Replayed management request', code: 'admin_replay' }, cors);
     this.seenAdmin.set(seenKey, nowS + 2 * 300);
     const sub = url.pathname.slice('/_admin'.length).replace(/\/+$/, '') || '/';
     if (ADMIN_BLOCKED.test(sub)) return json(403, { error: 'Not available on a hosted box', code: 'admin_route_forbidden' }, cors);

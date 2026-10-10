@@ -162,7 +162,7 @@ describe('service hébergé, en mémoire', () => {
     expect((await admin('GET', '/_admin/keys', undefined, { t })).status).toBe(200);
     const replay = await admin('GET', '/_admin/keys', undefined, { t });
     expect(replay.status).toBe(401);
-    expect(((await replay.json()) as { code: string }).code).toBe('replay');
+    expect(((await replay.json()) as { code: string }).code).toBe('admin_replay');
     expect(((await (await admin('GET', '/_admin/keys', undefined, { header: null })).json()) as { code: string }).code).toBe('admin_missing');
     expect(((await (await admin('GET', '/_admin/keys', undefined, { key: new Uint8Array(32).fill(3) })).json()) as { code: string }).code).toBe('admin_signature');
     expect(((await (await admin('GET', '/_admin/keys', undefined, { t: t - 600 })).json()) as { code: string }).code).toBe('admin_clock');
@@ -209,11 +209,13 @@ describe('service hébergé, en mémoire', () => {
   }, 30_000);
 
   it('une base retirée de la boîte : sa copie est effacée, reçu PARTIEL signé (withdrawn)', async () => {
-    mock.withdrawStore(accessId, commandes);
+    mock.withdrawStore(accessId, commandes, 'vault_admin');
     await h.settle();
     await until(() => mock.hostedReceipts.some((r) => r.partial), 10_000, 'reçu partiel');
     const r = mock.hostedReceipts.find((x) => x.partial)!;
-    expect(r.receipt).toMatchObject({ v: 1, kind: 'filarr-gate-host/erasure', accessId, hostName, reason: 'withdrawn', stores: [{ storeId: commandes, g: 0 }], erased: ['dbKeys', 'copy'], version: HOST_VERSION });
+    expect(r.receipt).toMatchObject({ v: 1, kind: 'filarr-gate-host/erasure', accessId, hostName, reason: 'withdrawn', cause: 'vault_admin', stores: [{ storeId: commandes, g: 0 }], erased: ['dbKeys', 'copy'], version: HOST_VERSION });
+    // La liste des retraits en attente se vide une fois le reçu partiel remis
+    expect(mock.accesses.get(accessId)!.hosting!.pendingWithdrawals).toEqual([]);
     expect(verifyHostSignature(receiptMessage(r.receipt), r.sig, Buffer.from(h.key.pinned.signPublicKey, 'base64'))).toBe(true);
     expect((await h.fetch(box('/v1/commandes?limit=1'), bearer(FIRST_KEY))).status).toBe(404);
     expect((await h.box(accessId).status()).meta!.stores.map((s) => s.storeId)).toEqual([clients]);
@@ -343,6 +345,8 @@ describe('le reçu (PH9, PH10)', () => {
     expect(erasureReason({ eraseReason: 'inconnue', sleepReason: 'tier', redirectTo: null })).toBe('tier');
     expect(erasureReason({ sleepReason: null, redirectTo: 'https://x.example.org' })).toBe('migrated');
     expect(erasureReason({ sleepReason: null, redirectTo: null })).toBe('revoked');
+    // `withdrawn` ne nomme jamais un effacement complet
+    expect(erasureReason({ eraseReason: 'withdrawn', sleepReason: null, redirectTo: null })).toBe('revoked');
   });
 
   it('un retrait partiel porte sa cause DANS le message signé', () => {

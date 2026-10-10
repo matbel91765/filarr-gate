@@ -71,6 +71,8 @@ export interface HostedToken {
   /** PH9 : la raison et l'heure de l'effacement demandé, quand `state = "erasing"` (absents d'une API d'avant). */
   eraseReason?: string | null;
   eraseRequestedAt?: string | null;
+  /** PH10 : les bases sorties dont le reçu partiel n'est pas encore remis, et leur cause (absent : une API d'avant). */
+  pendingWithdrawals?: Array<{ storeId: string; cause?: string | null; at?: string }>;
 }
 
 /** Ce que rend `GET /api-access/hosted/:id/pending`. */
