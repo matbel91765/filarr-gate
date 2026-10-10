@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { api, ApiFailure } from './api';
 import { lang, setLang, t } from './i18n';
 
-export type Route = 'dashboard' | 'bases' | 'sql' | 'keys' | 'webhooks' | 'journal' | 'limits' | 'settings';
+export type Route = 'dashboard' | 'bases' | 'sql' | 'keys' | 'webhooks' | 'files' | 'sources' | 'journal' | 'limits' | 'settings';
 
 export const ROUTES: Record<Route, string> = {
   dashboard: '#/',
@@ -13,6 +13,8 @@ export const ROUTES: Record<Route, string> = {
   sql: '#/sql',
   keys: '#/keys',
   webhooks: '#/webhooks',
+  files: '#/files',
+  sources: '#/sources',
   journal: '#/journal',
   limits: '#/limits',
   settings: '#/settings',
@@ -53,6 +55,20 @@ const ICONS: Record<Route, ComponentChildren> = {
       <path d="M10 14a4 4 0 1 1 4-4" />
       <path d="M14 10l6 6" />
       <circle cx="18" cy="18" r="3" />
+    </>
+  ),
+  files: (
+    <>
+      <path d="M4 4h10l6 6v10H4z" />
+      <path d="M12 11v6M9 14l3 3 3-3" />
+    </>
+  ),
+  sources: (
+    <>
+      <ellipse cx="7" cy="6" rx="4" ry="2" />
+      <path d="M3 6v6c0 1.1 1.8 2 4 2s4-.9 4-2V6" />
+      <path d="M14 9h4l-2-2M18 15h-4l2 2" />
+      <path d="M17 7v10" />
     </>
   ),
   journal: (
@@ -97,7 +113,7 @@ export interface ShellSummary {
   version: string;
   link?: { state: string; detail: string | null };
   access?: { name: string | null; tier: string | null } | null;
-  counts?: { bases: number; keys: number; webhooks: number };
+  counts?: { bases: number; keys: number; webhooks: number; sources?: number; deposits?: number };
 }
 
 /** L'état de la liaison avec Filarr, en mots et en couleur. */
@@ -166,6 +182,8 @@ export function Shell(props: { route: Route; summary: ShellSummary | null; onLog
         {nav('sql', t('Explorateur SQL'))}
         {nav('keys', t('Clés des applications'), s?.counts?.keys)}
         {nav('webhooks', t('Webhooks'), s?.counts?.webhooks)}
+        {nav('files', t('Fichiers reçus'), s?.counts?.deposits || undefined)}
+        {nav('sources', t('Sources'), s?.counts?.sources || undefined)}
         {nav('journal', t('Journal'))}
         <div class="nav-label">{t('Compte Filarr')}</div>
         {nav('limits', t('Consommation et limites'))}

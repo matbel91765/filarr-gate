@@ -7,6 +7,8 @@ import { lang, t } from './i18n';
 import { Bases } from './screens/Bases';
 import { Dashboard } from './screens/Dashboard';
 import { Explorer } from './screens/Explorer';
+import { Files } from './screens/Files';
+import { Sources } from './screens/Sources';
 import { Installer } from './screens/Installer';
 import { Journal } from './screens/Journal';
 import { Keys } from './screens/Keys';
@@ -21,7 +23,7 @@ interface StateResponse extends ShellSummary {
 
 function routeOf(hash: string): Route {
   const r = hash.replace(/^#\/?/, '').split(/[/?]/)[0];
-  const known: Route[] = ['bases', 'sql', 'keys', 'webhooks', 'journal', 'limits', 'settings'];
+  const known: Route[] = ['bases', 'sql', 'keys', 'webhooks', 'files', 'sources', 'journal', 'limits', 'settings'];
   return (known as string[]).includes(r ?? '') ? (r as Route) : 'dashboard';
 }
 
@@ -121,6 +123,8 @@ function App() {
     sql: <Explorer />,
     keys: <Keys onChange={refresh} />,
     webhooks: <Webhooks onChange={refresh} />,
+    files: <Files />,
+    sources: <Sources />,
     journal: <Journal />,
     limits: <Limits />,
     settings: <Settings onChange={refresh} />,

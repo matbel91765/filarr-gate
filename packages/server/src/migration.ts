@@ -14,7 +14,12 @@
  *   d'un webhook…) voyagent en champs supplémentaires, que tout lecteur conserve.
  */
 
-import type { GateSettings, SettingsAppKey, SettingsWebhook } from '../../core/src/engine/gate/settings';
+import { openSettings, type GateSettings, type SettingsAppKey, type SettingsWebhook } from '../../core/src/engine/gate/settings';
+import { sealToKey } from '../../core/src/engine/store/apiAccess';
+import { utf8Encode } from '../../core/src/engine/store/crypto';
+import { curves, storeCrypto } from '../../gate/src/crypto/providers';
+import { ApiError } from '../../gate/src/errors';
+import { openToken, wipeIdentity } from '../../gate/src/replica/token';
 import { assignSlugs } from '../../core/src/engine/store/apiAccess';
 import { randomUUID } from '../../gate/src/util/bytes';
 import type { GateCore } from './core';
@@ -150,4 +155,56 @@ export function applySettingsPackage(core: GateCore, pkg: GateSettings): { keys:
   core.state.saveNow();
   void core.host.updateSettings({}).catch(() => undefined);
   return { keys, webhooks, queries };
+}
+
+// ==================== Hors ligne : le paquet en fichier (`filarr-gate export`, `init --import`) ====================
+
+/** Le fichier d'un paquet scellé : ce que `export` écrit et ce que `init --import` relit. */
+export interface SealedSettingsFile {
+  v: 1;
+  kind: 'filarr-gate/settings-sealed';
+  accessId: string;
+  sealed: string;
+  createdAt: string;
+}
+
+/**
+ * Scelle le paquet de cette boîte pour un AUTRE jeton du même accès (le jeton de
+ * la boîte qui prendra le relais). Hors ligne, c'est l'administrateur qui tient le
+ * nouveau jeton : la clé publique vient de lui, pas d'un serveur — aucune
+ * substitution possible, donc pas de `bindSig` à vérifier ici.
+ */
+export async function exportForToken(core: GateCore, token: string): Promise<SealedSettingsFile> {
+  const target = await openToken(token);
+  const identity = core.replicator.identity;
+  try {
+    if (!identity) throw new ApiError(409, 'no_token', 'Aucun jeton en service : rien à exporter.');
+    if (target.accessId !== identity.accessId) throw new ApiError(400, 'other_access', 'Ce jeton est celui d’un autre accès.');
+    if (target.aPub === identity.aPub) throw new ApiError(400, 'same_token', 'C’est le jeton de cette boîte : donnez celui de la boîte qui prendra le relais.');
+    await core.sync?.cacheShadows();
+    const sealed = await sealToKey(storeCrypto, curves, target.aPub, utf8Encode(JSON.stringify(core.settingsPackage())));
+    core.journal.add({ kind: 'admin', who: 'migration', what: 'paquet de réglages exporté (fichier)', code: 'ok', note: target.hint });
+    return { v: 1, kind: 'filarr-gate/settings-sealed', accessId: identity.accessId, sealed, createdAt: new Date().toISOString() };
+  } finally {
+    wipeIdentity(target);
+  }
+}
+
+/** Ouvre un paquet scellé pour CETTE boîte (fichier ou chaîne) et l'applique. */
+export async function importSealed(core: GateCore, input: string): Promise<{ keys: number; webhooks: number; queries: number }> {
+  const identity = core.replicator.identity;
+  if (!identity) throw new ApiError(409, 'no_token', 'Aucun jeton en service : le paquet ne peut pas être ouvert.');
+  let sealed = input.trim();
+  if (sealed.startsWith('{')) {
+    const file = JSON.parse(sealed) as Partial<SealedSettingsFile>;
+    if (file.kind !== 'filarr-gate/settings-sealed' || typeof file.sealed !== 'string') throw new ApiError(400, 'bad_package', 'Ce n’est pas un paquet de réglages de Filarr Gate.');
+    sealed = file.sealed;
+  }
+  let pkg: GateSettings;
+  try {
+    pkg = await openSettings(storeCrypto, curves, identity.aEnc, sealed, identity.accessId);
+  } catch (err) {
+    throw new ApiError(400, 'package_unreadable', `Paquet illisible pour ce jeton : ${(err as Error).message}`);
+  }
+  return core.applySettings(pkg);
 }

@@ -26,6 +26,8 @@ import type { GateCore } from '../core';
 import type { JournalKind } from '../journal';
 import { StateStore, type KeyScope, type SavedQuery, type WebhookEvent } from '../state';
 import { log } from '../log';
+import { exportForToken, importSealed } from '../migration';
+import { envNameFor } from '../sync/secrets';
 
 const SESSION_COOKIE = 'gate_admin';
 const SESSION_MS = 12 * 3_600_000;
@@ -338,7 +340,93 @@ export class AdminApi {
       extra['Set-Cookie'] = `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=0`;
       return send(200, { ok: true });
     }
+
+    // ---------- Révision 3 : synchros externes (écran « Sources », source-externe-1 § 7.2) ----------
+    if (path === '/sources' && method === 'GET') return send(200, this.sourcesView());
+    const src = /^\/sources\/(xs_[A-Za-z0-9_-]{22})(?:\/(key|run|pause))?$/.exec(path);
+    if (src && g.sync) {
+      const defId = src[1]!;
+      if (!g.sync.get(defId)) throw new ApiError(404, 'source_not_found', 'Synchro inconnue');
+      if (src[2] === 'key' && method === 'PUT') {
+        const body = (await readJson(request)) as { secret?: string | null } | undefined;
+        await g.sync.setKey(defId, typeof body?.secret === 'string' && body.secret !== '' ? body.secret : null);
+        // Jamais la clé au journal : seulement le geste
+        g.journal.add({ kind: 'admin', who: 'administration', what: `clé de base externe ${body?.secret ? 'donnée' : 'retirée'} · ${g.sync.get(defId)?.def.name ?? defId}`, code: 'ok' });
+        return send(200, this.sourcesView());
+      }
+      if (src[2] === 'run' && method === 'POST') {
+        const body = (await readJson(request)) as { ack?: Record<string, unknown> } | undefined;
+        const status = await g.sync.runPass(defId, { ack: body?.ack ?? null });
+        return send(200, { status, ...this.sourcesView() });
+      }
+      if (src[2] === 'pause' && method === 'POST') {
+        const body = (await readJson(request)) as { paused?: boolean } | undefined;
+        g.sync.pause(defId, body?.paused !== false);
+        return send(200, this.sourcesView());
+      }
+    }
+
+    // ---------- Révision 3 : la fente à fichiers (gate-fichiers-1) ----------
+    if (path === '/files' && method === 'GET') return send(200, this.filesView());
+    if (path === '/files/test' && method === 'POST') {
+      const content = new TextEncoder().encode(`Essai de dépôt depuis Filarr Gate, ${new Date().toISOString()}\n`);
+      const record = await g.files.deposit(content, { name: 'filarr-gate-essai.txt', mimeType: 'text/plain', tags: ['essai'] }, null);
+      return send(200, { deposit: record, ...this.filesView() });
+    }
+
+    // ---------- Migration : le paquet de réglages (gate-heberge-1 § 8.6) ----------
+    if (path === '/export' && method === 'POST') {
+      const body = (await readJson(request)) as { token?: string } | undefined;
+      return send(200, await exportForToken(g, String(body?.token ?? '')));
+    }
+    if (path === '/import' && method === 'POST') {
+      const body = (await readJson(request, 12 * 1024 * 1024)) as { sealed?: string } | undefined;
+      return send(200, await importSealed(g, String(body?.sealed ?? '')));
+    }
     throw new ApiError(404, 'not_found', `Route inconnue : ${method} ${path}`);
+  }
+
+  private sourcesView() {
+    const g = this.gate;
+    return {
+      enabled: g.sync !== null,
+      creator: g.replicator.creator.status,
+      sources: (g.sync?.list() ?? []).map((s) => ({
+        defId: s.def.id,
+        rev: s.def.rev,
+        name: s.def.name,
+        base: s.base,
+        connector: s.def.connector,
+        host: s.def.host,
+        mode: s.def.mode,
+        every: s.def.schedule?.every ?? null,
+        signer: s.def.signer,
+        blocked: s.blocked,
+        detail: s.detail,
+        key: { source: s.keySource, env: envNameFor(s.def.id) },
+        paused: s.record.paused,
+        lastRunAt: s.record.lastRunAt,
+        lastOkAt: s.record.lastOkAt,
+        nextRunAt: s.record.nextRunAt,
+        failures: s.record.failures,
+        running: s.running,
+        status: s.status
+          ? { state: s.status.state, code: s.status.code, counts: s.status.counts, queue: s.status.queue, question: s.status.question, columns: s.status.columns, journal: s.status.journal.slice(-50) }
+          : null,
+      })),
+    };
+  }
+
+  private filesView() {
+    const g = this.gate;
+    const f = g.replicator.files;
+    const s = g.settings;
+    return {
+      creator: g.replicator.creator.status,
+      link: f ? { requestId: f.requestId, signed: f.signed, pending: f.pending, limits: f.limits, usage: f.usage } : null,
+      filter: { deny: s.filesDeny, allow: s.filesAllow, maxBytes: s.filesMaxBytes },
+      deposits: g.files.list().slice(0, 100),
+    };
   }
 
   // ==================== Vues des écrans ====================
@@ -350,7 +438,9 @@ export class AdminApi {
       link: { state: r.link, detail: r.linkDetail, lastChangeAt: r.lastChangeAt, streamRefused: r.streamRefused },
       access: r.access ? { name: r.access.name ?? null, tier: (r.limits?.tier as string | undefined) ?? r.access.tier ?? null, expiresAt: r.access.expiresAt ?? null } : null,
       token: r.identity ? { hint: r.identity.hint, fingerprint: r.identity.fingerprint, source: g.tokenSource } : null,
-      counts: { bases: r.bases.size, keys: g.keys.list().length, webhooks: g.webhooks.list().length },
+      counts: { bases: r.bases.size, keys: g.keys.list().length, webhooks: g.webhooks.list().length, sources: g.sync?.list().length ?? 0, deposits: g.files.list().filter((d) => d.status === 'deposited').length },
+      creator: r.creator.status,
+      files: r.files ? { linked: true, signed: r.files.signed } : { linked: false, signed: false },
       flags: { write: g.settings.write, mcp: g.settings.mcp, metrics: g.settings.metrics, docs: g.settings.docs },
       adminUrl: g.adminUrl(),
       publicUrl: g.publicUrl(),
