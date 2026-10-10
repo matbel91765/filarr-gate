@@ -6,12 +6,11 @@
 
 [Lire en français](README.fr.md)
 
-> **Status: v0.2, ahead of the server.** The gate implements the frozen contracts `api-base-1` (revisions 2 and 3),
-> `db-store-1` (3.9), `gate-fichiers-1`, `source-externe-1` and the settings package of `gate-heberge-1`. It is tested
-> end to end against a local Filarr server (reads, live changes, writes, revocation, an external PostgreSQL sync, a
-> file deposit, the Cloudflare variant). The Filarr side is merged but switched off (`API_BASE_SWITCH`,
-> `GATE_FILES_SWITCH`…); it opens account by account. Nothing is published to npm or a registry yet: run it from a
-> clone. The box hosted by Filarr is not open.
+> **0.2.0: first release** ([changes](CHANGELOG.md)), on npm (`@filarr/gate`, `filarr-gate`) and on GHCR
+> (`ghcr.io/filarr-work/gate`). The gate implements the frozen contracts `api-base-1` (revisions 2 and 3), `db-store-1`
+> (3.9), `gate-fichiers-1`, `source-externe-1` and the settings package of `gate-heberge-1`, and is tested end to end
+> against a local Filarr server (reads, live changes, writes, revocation, an external PostgreSQL sync, a file deposit,
+> the Cloudflare variant). In Filarr, API access opens account by account; the box hosted by Filarr is not open yet.
 
 Filarr encrypts your notes and databases end to end: its servers store blocks they cannot read. Filarr Gate is a small
 **gate you run yourself** (in your code, on a PC, in Docker, on your own Cloudflare account) that holds the key to the
