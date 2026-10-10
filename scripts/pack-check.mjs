@@ -1,5 +1,6 @@
-// La construction est-elle REPRODUCTIBLE ? Construit et empaquette @filarr/gate et filarr-gate deux fois
-// (rien n'est publié), compare les empreintes SHA-256 des archives, et écrit SHA256SUMS dans le dossier donné.
+// La construction est-elle REPRODUCTIBLE ? Construit et empaquette @filarr/gate et filarr-gate deux fois, et le
+// module du service hébergé (filarr-gate-host, gate-heberge-1 PH7) deux fois aussi (rien n'est publié), compare les
+// empreintes SHA-256, et écrit SHA256SUMS dans le dossier donné.
 //   node scripts/pack-check.mjs <dossier>
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -10,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const out = resolve(process.argv[2] ?? join(root, 'release'));
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const version = JSON.parse(readFileSync(join(root, 'packages', 'cli', 'package.json'), 'utf8')).version;
 const run = (args, cwd = root) => execFileSync(npm, args, { cwd, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8', shell: process.platform === 'win32' });
 
 function packOnce(dir) {
@@ -23,6 +25,10 @@ function packOnce(dir) {
     run(['pack', '--silent', '--pack-destination', join(dir, sub), '-w', ws]);
     for (const f of readdirSync(join(dir, sub)).filter((x) => x.endsWith('.tgz'))) sums[`${sub}/${f}`] = createHash('sha256').update(readFileSync(join(dir, sub, f))).digest('hex');
   }
+  // Le service hébergé : le module que deploy-host.yml met en service TEL QUEL (wrangler deploy --no-bundle)
+  const host = `host/filarr-gate-host-${version}.js`;
+  execFileSync(process.execPath, [join(root, 'scripts', 'host', 'build.mjs'), '--outfile', join(dir, host)], { cwd: root, stdio: ['ignore', 'pipe', 'inherit'] });
+  sums[host] = createHash('sha256').update(readFileSync(join(dir, host))).digest('hex');
   return sums;
 }
 

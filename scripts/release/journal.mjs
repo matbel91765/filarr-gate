@@ -9,6 +9,8 @@
 //
 //   node scripts/release/journal.mjs append <journal.jsonl> --kind published --version 0.2.0 --tag v0.2.0 \
 //        --commit <sha> --sums release/SHA256SUMS [--published-at <ISO>]
+//   … --kind deployed --published-at <ISO> --deployed-at <ISO>                      (deploy-host.yml)
+//   … --kind security --published-at <ISO> --deployed-at <ISO> --advisory GHSA-… --severity high
 
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
@@ -89,6 +91,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     commit: arg('commit'),
     codeHash: codeHashOf(readFileSync(arg('sums'))),
     publishedAt: arg('published-at') ?? new Date(Math.floor(Date.now() / 1000) * 1000).toISOString(),
+    // Mise en service (deploy-host.yml) : `deployed`, ou `security` avec l'avis et sa gravité
+    ...(arg('deployed-at') ? { deployedAt: arg('deployed-at') } : {}),
+    ...(arg('advisory') ? { advisory: arg('advisory') } : {}),
+    ...(arg('severity') ? { severity: arg('severity') } : {}),
   };
   if (existsSync(file) && readFileSync(file, 'utf8').split('\n').some((l) => l && JSON.parse(l).tag === entry.tag && JSON.parse(l).kind === entry.kind)) {
     console.log(`déjà au journal : ${entry.kind} ${entry.tag}`);

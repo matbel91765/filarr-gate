@@ -61,8 +61,8 @@ const SECRET_PATTERNS: Array<[string, RegExp]> = [
 ];
 
 describe('la chaîne de publication (.github)', () => {
-  it('existe : ci.yml, release.yml, release-signers', () => {
-    expect(workflows.sort()).toEqual(['ci.yml', 'release.yml']);
+  it('existe : ci.yml, release.yml, deploy-host.yml, release-signers', () => {
+    expect(workflows.sort()).toEqual(['ci.yml', 'deploy-host.yml', 'release.yml']);
     expect(read(gh, 'release-signers')).toContain('allowed_signers');
   });
 
@@ -81,7 +81,7 @@ describe('la chaîne de publication (.github)', () => {
   it.each(workflows)('%s : aucune expression ${{ }} dans un script shell, aucun pull_request_target', (name) => {
     const text = read(gh, 'workflows', name);
     expect(text).not.toContain('pull_request_target');
-    expect(runBlocks(text).length).toBeGreaterThan(name === 'release.yml' ? 15 : 4);
+    expect(runBlocks(text).length).toBeGreaterThan(name === 'release.yml' ? 15 : name === 'deploy-host.yml' ? 10 : 4);
     for (const block of runBlocks(text)) expect(block, block).not.toContain('${{');
     expect(runBlocks('      - run: echo "${{ github.event.head_commit.message }}"\n').join('')).toContain('${{');
   });

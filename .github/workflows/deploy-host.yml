@@ -1,0 +1,310 @@
+# Mise en service du SERVICE HÉBERGÉ de Filarr Gate (script filarr-gate-host) — contrat gate-heberge-1 § 10.1, PH4 à PH7.
+# Marche à suivre : docs/RELEASING.md (« Mettre en service le service hébergé »).
+#
+# La SEULE façon de mettre le service en service. Aucun déploiement depuis un poste : le jeton de déploiement de
+# Cloudflare n'existe que comme secret de l'environnement GitHub « host-deploy » (CLOUDFLARE_API_TOKEN), que seul le
+# travail `deploy` lit.
+#
+# Lancée à la main (Actions › Deploy hosted service › Run workflow, depuis la branche par défaut), avec une étiquette
+# DÉJÀ PUBLIÉE par release.yml :
+#   1. l'étiquette est annotée et SIGNÉE par une clé de .github/release-signers (lus sur la branche par défaut,
+#      jamais dans l'arbre étiqueté), relue deux fois (tag-check.mjs, puis git verify-tag) ;
+#   2. elle a son entrée « published » au journal public (branche release-journal), avec la même empreinte du code
+#      que la publication téléchargée (`codeHash` = sha256 du SHA256SUMS, PH7), et le module du service y est compté ;
+#   3. SEPT JOURS au moins depuis `publishedAt` de cette entrée (la date de réception de l'étiquette par la chaîne,
+#      jamais la date que porte l'étiquette) — sauf correctif de sécurité ACCEPTÉ (PH5) : étiquette vX.Y.Z-security
+#      signée par une clé de rôle security, lignes Filarr-Release-Kind et Filarr-Advisory, avis existant, version qui
+#      descend de la dernière version EN SERVICE ; une condition manque → publication ordinaire (sept jours) ;
+#   4. les essais repassent sur le commit étiqueté, et le module se reconstruit à l'identique ;
+#   5. wrangler deploy du module PUBLIÉ, tel quel (--no-bundle), avec l'empreinte, l'étiquette et la date de mise en
+#      service en variables (l'annonce de version, § 7.4) ; l'annonce servie est relue ;
+#   6. l'entrée « deployed » (ou « security ») du journal public.
+#
+# Actions figées par SHA de commit, la version en commentaire (voir l'en-tête de release.yml pour en changer).
+name: Deploy hosted service
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Étiquette publiée à mettre en service (vX.Y.Z ou vX.Y.Z-security)'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '22'
+  # L'adresse de contrôle du service : l'annonce de version y est relue après la mise en service
+  CONTROL_URL: https://ctl.gate.filarr.com
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-host
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Étiquette signée, journal public, sept jours
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      version: ${{ steps.decide.outputs.version }}
+      commit: ${{ steps.decide.outputs.commit }}
+      entry_kind: ${{ steps.decide.outputs.entry_kind }}
+      code_hash: ${{ steps.decide.outputs.code_hash }}
+      published_at: ${{ steps.decide.outputs.published_at }}
+      deployed_at: ${{ steps.decide.outputs.deployed_at }}
+      advisory: ${{ steps.decide.outputs.advisory }}
+      severity: ${{ steps.decide.outputs.severity }}
+    steps:
+      - name: Étiquette demandée, depuis la branche par défaut
+        id: tag
+        env:
+          TAG: ${{ inputs.tag }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          [ "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH" ] || { echo "::error::lancer depuis la branche par défaut ($DEFAULT_BRANCH)"; exit 1; }
+          [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-security)?$ ]] \
+            || { echo "::error::étiquette « $TAG » : vX.Y.Z ou vX.Y.Z-security attendu"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Objet d'étiquette annotée (une étiquette légère n'a pas de signature)
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          git fetch --force --no-tags origin "+refs/tags/$TAG:refs/tags/$TAG"
+          if [ "$(git cat-file -t "refs/tags/$TAG")" != tag ]; then
+            echo "::error::étiquette légère : git tag -s exigé"; exit 1
+          fi
+          git cat-file tag "refs/tags/$TAG" > "$RUNNER_TEMP/tag.raw"
+      - name: Signataires et vérificateurs lus sur la branche par défaut, journal sur release-journal
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH"
+          for f in .github/release-signers scripts/release/tag-check.mjs scripts/release/journal.mjs scripts/release/host-deploy.mjs; do
+            git show "FETCH_HEAD:$f" > "$RUNNER_TEMP/$(basename "$f")"
+          done
+          git fetch --no-tags origin refs/heads/release-journal
+          git show "FETCH_HEAD:journal.jsonl" > "$RUNNER_TEMP/journal.jsonl"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Signature, rôle, correctif de sécurité
+        id: check
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          # Un avis encore privé ne se lit qu'avec un jeton qui y a accès (secret facultatif ADVISORY_READ_TOKEN)
+          GH_TOKEN: ${{ secrets.ADVISORY_READ_TOKEN || github.token }}
+        run: >-
+          node "$RUNNER_TEMP/tag-check.mjs" --tag "$TAG" --raw "$RUNNER_TEMP/tag.raw"
+          --signers "$RUNNER_TEMP/release-signers" --github-output "$GITHUB_OUTPUT"
+      - name: Deuxième lecture de la signature, par git et ssh-keygen
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$RUNNER_TEMP/release-signers" verify-tag "$TAG"
+      - name: Le commit étiqueté est publié sur une branche du dépôt
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          if [ -z "$(git branch -r --contains "$commit")" ]; then
+            echo "::error::le commit $commit n'est sur aucune branche du dépôt"; exit 1
+          fi
+      - name: Le module du service, téléchargé de la publication et compté dans son SHA256SUMS
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.check.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/release" \
+            --pattern SHA256SUMS --pattern "filarr-gate-host-$VERSION.js"
+          want="$(grep -E "^[0-9a-f]{64}  host/filarr-gate-host-$VERSION\.js$" "$RUNNER_TEMP/release/SHA256SUMS" | cut -d' ' -f1)"
+          got="$(sha256sum "$RUNNER_TEMP/release/filarr-gate-host-$VERSION.js" | cut -d' ' -f1)"
+          if [ -z "$want" ] || [ "$want" != "$got" ]; then
+            echo "::error::le module du service est absent de SHA256SUMS, ou ses octets diffèrent"; exit 1
+          fi
+      - name: La version en service, et la gravité de l'avis d'un correctif
+        id: context
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          KIND: ${{ steps.check.outputs.kind }}
+          ADVISORY: ${{ steps.check.outputs.advisory }}
+          GH_TOKEN: ${{ secrets.ADVISORY_READ_TOKEN || github.token }}
+        run: |
+          commit="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          last="$(node "$RUNNER_TEMP/host-deploy.mjs" last-deployed --journal "$RUNNER_TEMP/journal.jsonl")"
+          ancestor=false
+          if [ -n "$last" ] && git cat-file -e "$last^{commit}" 2>/dev/null && git merge-base --is-ancestor "$last" "$commit"; then
+            ancestor=true
+          fi
+          severity=""
+          if [ "$KIND" = security ] && [ -n "$ADVISORY" ]; then
+            severity="$(gh api "repos/$GITHUB_REPOSITORY/security-advisories/$ADVISORY" --jq .severity || true)"
+          fi
+          { echo "ancestor=$ancestor"; echo "severity=$severity"; } >> "$GITHUB_OUTPUT"
+      - name: Sept jours depuis l'entrée « published », ou correctif de sécurité accepté
+        id: decide
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          KIND: ${{ steps.check.outputs.kind }}
+          ADVISORY: ${{ steps.check.outputs.advisory }}
+          SEVERITY: ${{ steps.context.outputs.severity }}
+          ANCESTOR: ${{ steps.context.outputs.ancestor }}
+        run: >-
+          node "$RUNNER_TEMP/host-deploy.mjs" decide --journal "$RUNNER_TEMP/journal.jsonl" --tag "$TAG"
+          --sums "$RUNNER_TEMP/release/SHA256SUMS" --kind "$KIND" --advisory "$ADVISORY" --severity "$SEVERITY"
+          --ancestor "$ANCESTOR" --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: host-release
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+      - name: Résumé
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          ENTRY: ${{ steps.decide.outputs.entry_kind }}
+          CODE_HASH: ${{ steps.decide.outputs.code_hash }}
+          PUBLISHED_AT: ${{ steps.decide.outputs.published_at }}
+          REFUSED: ${{ steps.decide.outputs.security_refused }}
+        run: |
+          {
+            echo "### $TAG"
+            echo "- entrée : $ENTRY"
+            echo "- empreinte : $CODE_HASH"
+            echo "- publiée le : $PUBLISHED_AT"
+            [ -n "$REFUSED" ] && echo "- correctif ramené à une publication ordinaire : $REFUSED"
+            true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Essais sur le commit étiqueté, module reconstruit à l'identique
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.verify.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npx vitest run --maxWorkers=2
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+      - run: npm run docs:check
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: host-release
+          path: ${{ runner.temp }}/release
+      - name: Le module se reconstruit octet pour octet depuis l'étiquette
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          node scripts/host/build.mjs --outfile "$RUNNER_TEMP/rebuilt.js"
+          cmp "$RUNNER_TEMP/rebuilt.js" "$RUNNER_TEMP/release/filarr-gate-host-$VERSION.js"
+
+  deploy:
+    name: Mise en service (wrangler deploy du module publié)
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Le seul endroit où vit le jeton de déploiement de Cloudflare ; règles de protection réglées dans GitHub
+    environment: host-deploy
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.verify.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: wrangler à la version figée par package-lock.json
+        run: npm ci --no-audit --no-fund
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: host-release
+          path: ${{ runner.temp }}/release
+      - name: wrangler deploy du module publié, tel quel
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+          VERSION: ${{ needs.verify.outputs.version }}
+          TAG: ${{ needs.verify.outputs.tag }}
+          CODE_HASH: ${{ needs.verify.outputs.code_hash }}
+          DEPLOYED_AT: ${{ needs.verify.outputs.deployed_at }}
+          ADVISORY: ${{ needs.verify.outputs.advisory }}
+        run: |
+          set -- --var "HOST_CODE_HASH:$CODE_HASH" --var "HOST_BUILD_REF:$TAG" --var "HOST_DEPLOYED_AT:$DEPLOYED_AT"
+          if [ -n "$ADVISORY" ]; then set -- "$@" --var "HOST_SECURITY_ADVISORY:$ADVISORY"; fi
+          npx wrangler deploy "$RUNNER_TEMP/release/filarr-gate-host-$VERSION.js" --no-bundle \
+            --config packages/host/wrangler.jsonc "$@"
+      - name: L'annonce servie est celle de la publication
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          CODE_HASH: ${{ needs.verify.outputs.code_hash }}
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "$CONTROL_URL/.well-known/filarr-gate-host.json" -o "$RUNNER_TEMP/announce.json" \
+              && node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(a.codeHash===process.env.CODE_HASH&&a.version===process.env.VERSION?0:1)' "$RUNNER_TEMP/announce.json"; then
+              echo "annonce relue : $VERSION, $CODE_HASH"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::l'annonce servie par $CONTROL_URL n'est pas celle de la publication"; exit 1
+
+  journal:
+    name: Journal public (entrée « deployed » ou « security »)
+    needs: [verify, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: host-release
+          path: ${{ runner.temp }}/release
+      - name: Ajouter l'entrée à journal.jsonl (branche release-journal)
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          TAG: ${{ needs.verify.outputs.tag }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          COMMIT: ${{ needs.verify.outputs.commit }}
+          ENTRY: ${{ needs.verify.outputs.entry_kind }}
+          PUBLISHED_AT: ${{ needs.verify.outputs.published_at }}
+          DEPLOYED_AT: ${{ needs.verify.outputs.deployed_at }}
+          ADVISORY: ${{ needs.verify.outputs.advisory }}
+          SEVERITY: ${{ needs.verify.outputs.severity }}
+        run: |
+          git fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH"
+          git show "FETCH_HEAD:scripts/release/journal.mjs" > "$RUNNER_TEMP/journal.mjs"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin release-journal
+          git switch -C release-journal FETCH_HEAD
+          set -- --kind "$ENTRY" --version "$VERSION" --tag "$TAG" --commit "$COMMIT" \
+            --sums "$RUNNER_TEMP/release/SHA256SUMS" --published-at "$PUBLISHED_AT" --deployed-at "$DEPLOYED_AT"
+          if [ "$ENTRY" = security ]; then set -- "$@" --advisory "$ADVISORY" --severity "$SEVERITY"; fi
+          node "$RUNNER_TEMP/journal.mjs" append journal.jsonl "$@"
+          git add journal.jsonl
+          git diff --cached --quiet || git commit -m "Journal : $TAG mise en service"
+          git push origin release-journal

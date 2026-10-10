@@ -14,8 +14,9 @@
 # du journal public des mises en service (branche release-journal, fichier journal.jsonl).
 #
 # Correctif de sécurité (vX.Y.Z-security) : la chaîne ne fait QUE vérifier et publier, comme une version
-# ordinaire. La mise en service du service hébergé n'existe pas encore : quand elle viendra, ce sera un travail
-# à part, qui attendra sept jours après l'entrée « published », sauf pour un correctif accepté (kind=security).
+# ordinaire. La mise en service du service hébergé est un travail À PART (deploy-host.yml), lancé à la main, qui
+# attend sept jours après l'entrée « published », sauf pour un correctif accepté (kind=security). Le module du
+# service (host/filarr-gate-host-X.Y.Z.js) est construit deux fois, compté dans SHA256SUMS et joint à la publication.
 #
 # Les actions sont figées par SHA de commit, la version en commentaire. Pour en changer :
 #   git ls-remote https://github.com/<propriétaire>/<action> refs/tags/vX.Y.Z    → recopier le SHA et la version.
@@ -171,6 +172,7 @@ jobs:
             release/SHA256SUMS
             release/a/library/*.tgz
             release/a/cli/*.tgz
+            release/a/host/*.js
           if-no-files-found: error
 
   npm:
@@ -287,11 +289,12 @@ jobs:
           cp release/SHA256SUMS assets/SHA256SUMS
           cp "release/a/library/filarr-gate-$VERSION.tgz" "assets/library-filarr-gate-$VERSION.tgz"
           cp "release/a/cli/filarr-gate-$VERSION.tgz" "assets/cli-filarr-gate-$VERSION.tgz"
+          cp "release/a/host/filarr-gate-host-$VERSION.js" "assets/filarr-gate-host-$VERSION.js"
           {
             echo "Filarr Gate $VERSION."
             echo
             if [ "$KIND" = security ]; then echo "Correctif de sécurité : $ADVISORY."; echo; fi
-            echo "SHA256SUMS : library/… = library-filarr-gate-$VERSION.tgz (@filarr/gate), cli/… = cli-filarr-gate-$VERSION.tgz (filarr-gate)."
+            echo "SHA256SUMS : library/… = library-filarr-gate-$VERSION.tgz (@filarr/gate), cli/… = cli-filarr-gate-$VERSION.tgz (filarr-gate), host/… = filarr-gate-host-$VERSION.js (service hébergé, mis en service tel quel)."
             echo "Image : $IMAGE:$VERSION (linux/amd64, linux/arm64), signée par cosign."
           } > notes.md
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
