@@ -272,6 +272,7 @@ export const EN: Record<string, string> = {
   "Se déconnecter": "Sign out",
   "Secret de signature": "Signing secret",
   "Serveur MCP (assistants IA)": "MCP server (AI assistants)",
+  "Déposer des fichiers (POST /v1/files)": "Deposit files (POST /v1/files)",
   "Serveur MCP pour les assistants IA (lecture seule, par clé)": "MCP server for AI assistants (read-only, per key)",
   "Seulement quand la condition DEVIENT vraie (« statut devient Perdu »)": "Only when the condition BECOMES true (“status becomes Lost”)",
   "Seuls les échanges avec Filarr sont comptés. Les lectures servies par la boîte noire sont illimitées.": "Only exchanges with Filarr are counted. Reads served by the gate are unlimited.",

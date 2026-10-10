@@ -51,6 +51,7 @@ export function Keys(props: { onChange: () => void }) {
   const [allRead, setAllRead] = useState(false);
   const [sql, setSql] = useState(false);
   const [mcp, setMcp] = useState(false);
+  const [files, setFiles] = useState(false);
   const [rate, setRate] = useState('600');
   const [ips, setIps] = useState('');
   const [created, setCreated] = useState<{ key: string; name: string } | null>(null);
@@ -66,6 +67,7 @@ export function Keys(props: { onChange: () => void }) {
     setAllRead(false);
     setSql(false);
     setMcp(false);
+    setFiles(false);
     setRate('600');
     setIps('');
   };
@@ -74,6 +76,7 @@ export function Keys(props: { onChange: () => void }) {
     setFailure(null);
     const scopes: unknown[] = [];
     if (allRead) scopes.push({ target: 'all' });
+    if (files) scopes.push({ target: 'files' });
     for (const ep of data?.endpoints ?? []) {
       const p = perm(ep.path);
       if (!p.read && !p.create && !p.update && !p.delete) continue;
@@ -209,6 +212,9 @@ export function Keys(props: { onChange: () => void }) {
             </label>
             <label class="check">
               <input type="checkbox" checked={mcp} onChange={() => setMcp(!mcp)} /> {t('Serveur MCP (assistants IA)')}
+            </label>
+            <label class="check">
+              <input type="checkbox" checked={files} onChange={() => setFiles(!files)} /> {t('Déposer des fichiers (POST /v1/files)')}
             </label>
           </div>
           <div class="grid2">

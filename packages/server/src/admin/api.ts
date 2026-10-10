@@ -706,6 +706,7 @@ export class AdminApi {
         if (scope.read || scope.create || scope.update || scope.delete) scopes.push(scope);
       } else if (s.target === 'view' && typeof s.storeId === 'string' && typeof s.viewId === 'string') scopes.push({ target: 'view', storeId: s.storeId, viewId: s.viewId, read: true });
       else if (s.target === 'query' && typeof s.queryId === 'string') scopes.push({ target: 'query', queryId: s.queryId, read: true });
+      else if (s.target === 'files') scopes.push({ target: 'files', deposit: true });
     }
     if (scopes.length === 0 && body.sql !== true && body.mcp !== true) throw new ApiError(400, 'scope_required', 'Choisissez au moins un point d’accès');
     const ipAllow = (Array.isArray(body.ipAllow) ? body.ipAllow : String(body.ipAllow ?? '').split(','))
