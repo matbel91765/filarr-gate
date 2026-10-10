@@ -17,7 +17,7 @@ gate.on('change', (event) => console.log(event.base, event.added, event.changed,
 await gate.close();
 ```
 
-The token comes from Filarr ("···" on a database › **Open to an API**). Node 20+ (tested); standard Web APIs only
+The token comes from Filarr ("···" on a database › **Open to an API**). Node 20.19+ (tested); standard Web APIs only
 (WebCrypto, `fetch`, WebSocket).
 
 ## `openGate(options)`
