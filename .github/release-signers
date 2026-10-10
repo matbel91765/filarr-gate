@@ -23,3 +23,6 @@
 # Exemples — PAS de vraies clés, à remplacer :
 # release:mainteneur namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA-remplacer-par-la-cle-publique-release
 # security:mainteneur namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA-remplacer-par-une-AUTRE-cle-security
+
+release:matbel91765 namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHCR8LA9Tom4RRx5nzXCkZ1kYKBp7dDY9hAkLnrJcN60
+security:matbel91765 namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFzboBMSRFxtNVpwdVOMnI2hycY6J5I4KL55VGcNtPGX

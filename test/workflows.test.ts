@@ -68,7 +68,9 @@ describe('la chaîne de publication (.github)', () => {
 
   it.each([...workflows.map((f) => ['workflows/' + f] as const), ['release-signers'] as const])('%s : aucun secret en clair', (name) => {
     const text = read(gh, name);
-    for (const [what, re] of SECRET_PATTERNS) expect(re.test(text), what).toBe(false);
+    // Une clé PUBLIQUE de signature est attendue dans release-signers : ce n'est pas un secret.
+    const patterns = name === 'release-signers' ? SECRET_PATTERNS.filter(([what]) => what !== 'clé SSH publique réelle') : SECRET_PATTERNS;
+    for (const [what, re] of patterns) expect(re.test(text), what).toBe(false);
     // Un secret ne s'écrit jamais en dur : seulement `${{ secrets.NOM }}`
     for (const line of text.split('\n').filter((l) => /secrets\./.test(l))) {
       expect(line, line).toMatch(/\$\{\{[^}]*\bsecrets\.[A-Z_]+[^}]*\}\}/);
@@ -152,15 +154,17 @@ describe('la chaîne de publication (.github)', () => {
     expect(all.get('journal')!.body).toContain('journal.mjs" append journal.jsonl --kind published');
   });
 
-  it('le modèle release-signers ne déclare aucune clé : toute étiquette, même bien signée, est refusée', async () => {
-    const template = read(gh, 'release-signers');
-    expect(parseSigners(template)).toEqual([]);
+  it('release-signers : une clé release et une clé security, distinctes ; une étiquette signée par une clé de test est refusée', async () => {
+    const declared = read(gh, 'release-signers');
+    const signers = parseSigners(declared);
+    expect(signers.map((s) => s.role).sort()).toEqual(['release', 'security']);
+    expect(new Set(signers.map((s) => s.keyB64)).size).toBe(2);
     const v = JSON.parse(read(repo, 'test', 'vectors', 'gate-heberge-1-gate.vectors.json')) as {
       securityTag: { tags: Record<string, Array<{ tag: string; raw: string; expected: { refused?: string } }>> };
     };
     const signed = v.securityTag.tags.ordinary![0]!;
-    expect(await checkTag({ tag: signed.tag, raw: signed.raw, signers: template, advisoryExists: () => true })).toMatchObject({ ok: false, refused: 'signer-unknown' });
+    expect(await checkTag({ tag: signed.tag, raw: signed.raw, signers: declared, advisoryExists: () => true })).toMatchObject({ ok: false, refused: 'signer-unknown' });
     const unsigned = v.securityTag.tags.refused!.find((t) => t.expected.refused === 'unsigned')!;
-    expect(await checkTag({ tag: unsigned.tag, raw: unsigned.raw, signers: template, advisoryExists: () => true })).toMatchObject({ ok: false, refused: 'unsigned' });
+    expect(await checkTag({ tag: unsigned.tag, raw: unsigned.raw, signers: declared, advisoryExists: () => true })).toMatchObject({ ok: false, refused: 'unsigned' });
   });
 });
