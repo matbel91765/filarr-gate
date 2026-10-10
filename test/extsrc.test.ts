@@ -545,8 +545,21 @@ describe('définitions (§ 2.2, § 8.3)', () => {
     [{ conflict: 'random' }, 'bad_policy'],
     [{ map: def().map.map((m) => (m.col === 'nom' ? { ...m, askPending: 'peut-être' } : m)) }, 'ask_pending_bad'],
     [{ name: 'x'.repeat(60), ignored: Array.from({ length: 2000 }, (_, i) => `colonne_${i}`) }, 'too_large'],
+    [{ map: [...def().map, { col: 'societe_id', prop: 'p_soc', dir: 'in', type: 'relation' }] }, 'unsupported_column'],
   ] as Array<[Partial<ExtSourceDef>, string]>)('%j → %s', (over, code) => {
     expect(validateDef({ ...def(), ...over })).toContain(code);
+  });
+
+  it('P3 : une relation ENTRANTE (`in`, `both`, ou la clé) est refusée (`unsupported_column`) ; sortante (`out`), elle reste permise ; le type lu dans la base fait foi', () => {
+    const rel = (dir: 'in' | 'out' | 'both', type = 'relation') => ({ ...def(), map: [...def().map, { col: 'societe_id', prop: 'p_soc', dir, type }] });
+    expect(validateDef(rel('in'))).toEqual(['unsupported_column']);
+    expect(validateDef(rel('both'))).toEqual(['unsupported_column']);
+    expect(validateDef(rel('out'))).toEqual([]);
+    expect(validateDef({ ...def(), mode: 'mirror', conflict: undefined, rowConflict: undefined, map: def().map.map((m) => ({ ...m, dir: 'in' as const })).concat([{ col: 'societe_id', prop: 'p_soc', dir: 'in', type: 'relation' }]) })).toEqual(['unsupported_column']);
+    // Une association déclarée « texte » vers une propriété qui est une relation dans la base : refusée aussi
+    expect(validateDef(rel('in', 'text'), { propTypes: { p_soc: 'relation' } })).toEqual(['unsupported_column']);
+    // Une clé étrangère de la source associée à un nombre ou un texte reste permise (§ 4)
+    expect(validateDef(rel('in', 'number'))).toEqual([]);
   });
 
   it('signée par le bon compte : vérifiée ; une autre clé, ou un champ changé : refusée', () => {

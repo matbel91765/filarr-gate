@@ -39,7 +39,7 @@ export type DefCode =
   | 'key_not_mapped' | 'marker_bad_kind' | 'latest_without_time_marker' | 'map_empty' | 'map_duplicate_prop'
   | 'map_duplicate_col' | 'dir_forbidden_for_mode' | 'type_unmappable' | 'computed_prop_inbound'
   | 'runner_unsupported' | 'schedule_too_fast' | 'bad_signature' | 'too_large' | 'conflict_policy_missing'
-  | 'row_conflict_missing' | 'bad_policy' | 'ask_pending_bad';
+  | 'row_conflict_missing' | 'bad_policy' | 'ask_pending_bad' | 'unsupported_column';
 
 export interface DefContext {
   /** Le type de chaque propriété de la base (`propId → type`), pour les contrôles de type. */
@@ -129,8 +129,9 @@ export function isSelectQuery(sql: string): boolean {
 }
 
 /**
- * Valide une définition ; rend les codes du § 2.2 (vide : valide). Les contrôles
- * de signature et de taille sont à part (`verifyDefSignature`, `defTooLarge`).
+ * Valide une définition ; rend les codes du § 2.2 (vide : valide), plus `unsupported_column`
+ * (précision P3 : une relation entrante). Les contrôles de signature et de taille sont à part
+ * (`verifyDefSignature`, `defTooLarge`).
  */
 export function validateDef(raw: unknown, ctx: DefContext = {}): DefCode[] {
   const codes = new Set<DefCode>();
@@ -192,6 +193,9 @@ export function validateDef(raw: unknown, ctx: DefContext = {}): DefCode[] {
     const type = ctx.propTypes?.[m.prop] ?? m.type;
     if (!MAPPABLE.has(String(type))) codes.add('type_unmappable');
     if (COMPUTED.has(String(type)) && m.dir !== 'out') codes.add('computed_prop_inbound');
+    // Précision P3 : une relation ENTRANTE n'est pas prise en charge en v1 (la définition ne nomme
+    // pas la base visée) ; la colonne est refusée, jamais importée en texte en silence
+    if (String(type) === 'relation' && m.dir !== 'out') codes.add('unsupported_column');
     if (m.conflict !== undefined && !POLICIES.includes(m.conflict)) codes.add('bad_policy');
     if (m.askPending !== undefined && m.askPending !== 'apply' && m.askPending !== 'keep') codes.add('ask_pending_bad');
     const policy = m.conflict ?? def.conflict;

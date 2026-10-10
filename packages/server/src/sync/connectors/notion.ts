@@ -13,7 +13,7 @@
 
 import { canonicalJson } from '../../../../core/src/engine/store/canonical';
 import { canonicalKey, type SourceOp, type SourceRow } from '../../../../core/src/engine/extsrc';
-import { call, ConnectorError, httpError, markerParam, pacer, type Connector, type ConnectorContext, type SourceWriteResult } from './types';
+import { call, columnsOf, ConnectorError, httpError, markerParam, pacer, unsupportedColumn, type Connector, type ConnectorContext, type SourceWriteResult } from './types';
 
 export const NOTION_VERSION = '2022-06-28';
 const ROOT = 'https://api.notion.com/v1';
@@ -106,9 +106,14 @@ export function notionConnector(ctx: ConnectorContext): Connector {
   const pace = pacer(ctx, 350);
   const keyCols = def.key.cols;
   let types: Record<string, string> | null = null;
+  // Précision P3 : une propriété `relation` associée est refusée (identifiants de pages, jamais en texte)
+  const mapped = new Set(columnsOf(def));
   const toRaw = (p: NotionPage): Record<string, unknown> => {
     const raw: Record<string, unknown> = { id: p.id, last_edited_time: p.last_edited_time ?? null, created_time: p.created_time ?? null };
-    for (const [name, prop] of Object.entries(p.properties ?? {})) raw[name] = notionValue(prop);
+    for (const [name, prop] of Object.entries(p.properties ?? {})) {
+      if (prop.type === 'relation' && mapped.has(name)) throw unsupportedColumn('Notion', name);
+      raw[name] = notionValue(prop);
+    }
     return raw;
   };
   const req = async (method: string, path: string, body?: unknown): Promise<unknown> => {

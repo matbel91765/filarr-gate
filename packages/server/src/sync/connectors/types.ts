@@ -19,7 +19,9 @@ export type ExtdbCode =
   | 'extdb_not_found'
   | 'extdb_upstream_limited'
   | 'extdb_too_large'
-  | 'extdb_schema_changed';
+  | 'extdb_schema_changed'
+  /** La définition ne peut pas s'exécuter telle quelle (détail : le code de validation). */
+  | 'extdb_def_invalid';
 
 export class ConnectorError extends Error {
   constructor(
@@ -61,6 +63,16 @@ export interface Connector {
   readKeys(keys: ReadonlyArray<Record<string, unknown>>): Promise<SourceRow[]>;
   write(ops: readonly SourceOp[]): Promise<SourceWriteResult>;
   close(): Promise<void>;
+}
+
+/**
+ * Précision P3 (`source-externe-1`, 2026-10-10) : une colonne RELATION de la source (relation
+ * Notion, enregistrements liés d'Airtable) n'est pas prise en charge en v1 — la définition ne nomme
+ * pas la base visée. Associée, elle arrête le passage à la lecture, avant toute écriture : jamais
+ * importée en texte (des identifiants de pages ou d'enregistrements) en silence.
+ */
+export function unsupportedColumn(what: string, col: string): ConnectorError {
+  return new ConnectorError('extdb_def_invalid', `unsupported_column · ${what} : la colonne « ${col} » est une relation de la source, non prise en charge (v1)`);
 }
 
 /** Les colonnes à lire : la clé, les colonnes associées, le repère (jamais les colonnes ignorées). */

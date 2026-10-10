@@ -13,13 +13,16 @@
 
 import { canonicalJson } from '../../../../core/src/engine/store/canonical';
 import { canonicalKey, type SourceOp, type SourceRow } from '../../../../core/src/engine/extsrc';
-import { call, columnsOf, ConnectorError, httpError, markerParam, pacer, type Connector, type ConnectorContext, type SourceWriteResult } from './types';
+import { call, columnsOf, ConnectorError, httpError, markerParam, pacer, unsupportedColumn, type Connector, type ConnectorContext, type SourceWriteResult } from './types';
 
 interface AirRecord {
   id: string;
   createdTime?: string;
   fields: Record<string, unknown>;
 }
+
+/** Des enregistrements liés (un champ « Lien vers un autre enregistrement ») : une liste d'identifiants `rec…`. */
+export const isLinkedRecords = (v: unknown): boolean => Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === 'string' && /^rec[A-Za-z0-9]{14}$/.test(x));
 
 const formulaString = (v: unknown): string => `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
@@ -31,7 +34,13 @@ export function airtableConnector(ctx: ConnectorContext): Connector {
   const pace = pacer(ctx, 210);
   const cols = columnsOf(def).filter((col) => col !== 'id');
   const keyCols = def.key.cols;
-  const toRaw = (r: AirRecord): Record<string, unknown> => ({ ...r.fields, id: r.id });
+  // Précision P3 : un champ d'enregistrements liés associé est refusé (identifiants `rec…`, jamais en texte).
+  // Airtable ne donne pas le type des champs à la lecture (le schéma demande une autre portée de la
+  // clé) : il se reconnaît à sa valeur, une liste d'identifiants d'enregistrements.
+  const toRaw = (r: AirRecord): Record<string, unknown> => {
+    for (const col of cols) if (isLinkedRecords(r.fields[col])) throw unsupportedColumn('Airtable', col);
+    return { ...r.fields, id: r.id };
+  };
 
   const list = async (formula: string | null): Promise<AirRecord[]> => {
     const out: AirRecord[] = [];

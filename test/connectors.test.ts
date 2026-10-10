@@ -220,6 +220,33 @@ describe('airtable', () => {
   });
 });
 
+// ==================== Relations de la source (précision P3) ====================
+
+describe('une colonne relation de la source (P3)', () => {
+  it('Notion : une propriété `relation` associée arrête la lecture (`unsupported_column`), jamais des identifiants de pages en texte ; non associée, elle est ignorée', async () => {
+    const nt = new NotionSim({ Nom: 'title', Société: 'relation' });
+    nt.add({ Nom: 'Camille', Société: [{ id: '11111111-2222-4333-8444-555555555555' }] });
+    const asText = baseDef({ connector: 'notion', conn: { database: 'db-notion' }, host: 'api.notion.com', marker: null, map: [{ col: 'id', prop: 'p_id', dir: 'in', type: 'text' }, { col: 'Nom', prop: 'p_nom', dir: 'both', type: 'text' }, { col: 'Société', prop: 'p_soc', dir: 'in', type: 'text' }] });
+    const c = await openConnector(ctx(asText, nt.token, routeFetch({ 'api.notion.com': nt.handler })), { tcp: false });
+    await expect(c.readAll()).rejects.toMatchObject({ code: 'extdb_def_invalid', message: expect.stringContaining('unsupported_column') });
+    await expect(c.readKeys([{ id: [...nt.pages.keys()][0] }])).rejects.toMatchObject({ code: 'extdb_def_invalid' });
+    const ignored = baseDef({ ...asText, map: asText.map.filter((m) => m.col !== 'Société') });
+    const c2 = await openConnector(ctx(ignored, nt.token, routeFetch({ 'api.notion.com': nt.handler })), { tcp: false });
+    expect((await c2.readAll())[0]!.raw).toMatchObject({ Nom: 'Camille' });
+  });
+
+  it('Airtable : un champ d’enregistrements liés associé arrête la lecture ; une multi-sélection (libellés) passe', async () => {
+    const at = new AirtableSim();
+    const lie = at.add({ Nom: 'Acme' });
+    at.add({ Nom: 'Globex', Société: [lie], Tags: ['Client', 'Grand compte'] });
+    const def = (col: string, type: string) => baseDef({ connector: 'airtable', conn: { base: 'appXYZ', table: 'Clients' }, host: 'api.airtable.com', marker: null, map: [{ col: 'id', prop: 'p_id', dir: 'in', type: 'text' }, { col: 'Nom', prop: 'p_nom', dir: 'both', type: 'text' }, { col, prop: 'p_x', dir: 'in', type }] });
+    const c = await openConnector(ctx(def('Société', 'text'), at.token, routeFetch({ 'api.airtable.com': at.handler })), { tcp: false });
+    await expect(c.readAll()).rejects.toMatchObject({ code: 'extdb_def_invalid', message: expect.stringContaining('« Société »') });
+    const c2 = await openConnector(ctx(def('Tags', 'multiSelect'), at.token, routeFetch({ 'api.airtable.com': at.handler })), { tcp: false });
+    expect((await c2.readAll()).map((r) => r.raw.Tags)).toEqual([undefined, ['Client', 'Grand compte']]);
+  });
+});
+
 // ==================== Notion ====================
 
 describe('notion', () => {

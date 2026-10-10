@@ -420,6 +420,8 @@ function defFamily(curves: AccessCurves) {
     { conflict: 'random' as 'source' },
     { map: def().map.map((m) => (m.col === 'nom' ? { ...m, askPending: 'peut-être' as 'apply' } : m)) },
     { name: 'x'.repeat(60), ignored: Array.from({ length: 2000 }, (_, i) => `colonne_${i}`) },
+    // Précision P3 : une relation entrante
+    { map: [...def().map, { col: 'societe_id', prop: 'p_soc', dir: 'in', type: 'relation' }] },
   ];
   const key = unhex(SIGNING_KEY_HEX);
   const signed = signDef(curves, def(), key);
