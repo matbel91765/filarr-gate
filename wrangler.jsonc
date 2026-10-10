@@ -3,7 +3,7 @@
 //   npx wrangler secret put FILARR_GATE_TOKEN           (le jeton montré une fois par Filarr)
 //   npx wrangler secret put FILARR_GATE_ADMIN_PASSWORD  (l'interface de gestion, sous /admin/)
 // Réglages : `vars` ci-dessous (FILARR_GATE_WRITE, FILARR_GATE_CORS_ORIGINS…), verrouillés dans l'interface.
-// Voir docs/cloudflare.md.
+// Voir docs/tutorials/install-cloudflare.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "filarr-gate",
@@ -20,5 +20,7 @@
     "bindings": [{ "name": "GATE", "class_name": "FilarrGate" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FilarrGate"] }],
-  "observability": { "enabled": true }
+  // Workers Logs éteints : allumés ("enabled": true), Cloudflare garderait sur votre compte, pour chaque requête,
+  // son URL avec la requête (donc les filtres et les recherches) et les lignes de console. Voir docs/tutorials/install-cloudflare.md.
+  "observability": { "enabled": false }
 }

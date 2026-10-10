@@ -126,9 +126,13 @@ state surviving a restart.
 
 The Durable Object keeps, in its own storage: the state (fingerprints of the app keys, webhook secrets, settings),
 the encrypted blocks as Filarr stores them, the local log, and the encrypted state of the syncs. The decrypted rows
-live in memory only, while the object is awake. The repository's `wrangler.jsonc` switches Workers Logs on
-(`observability`): they receive the gate's console lines (paths, codes, durations; never a token, a key or a row) on
-YOUR account. Turn it off there if you prefer.
+live in memory only, while the object is awake.
+
+Workers Logs are off in the repository's `wrangler.jsonc` (`"observability": { "enabled": false }`). To turn them on,
+set `"enabled": true` and deploy again. Cloudflare then keeps on YOUR account, for each request, its metadata
+(method, the URL with its query string, status, duration) and the gate's console lines (paths, codes, durations; never
+a token, a key or a row). The query string carries what the callers ask for: filters (`where`), searches (`q`),
+sorts. They stay for the retention of your Cloudflare plan.
 
 ## Next
 

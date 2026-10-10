@@ -41,7 +41,7 @@ shown locked in the UI. Listening, TLS and cache settings do not apply here. Two
 | variable | |
 |---|---|
 | `FILARR_GATE_PUBLIC_URL` | the address to show and give out, when it is not the one requests arrive on |
-| `FILARR_GATE_LOG_LEVEL` | `debug`, `info`, `warn`, `error` (Workers logs) |
+| `FILARR_GATE_LOG_LEVEL` | `debug`, `info`, `warn`, `error` (Workers Logs, off by default: [what they keep once on](tutorials/install-cloudflare.md#what-stays-on-your-account)) |
 
 ## Try it locally
 

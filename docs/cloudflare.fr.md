@@ -44,7 +44,7 @@ de TLS et de cache ne s'appliquent pas ici. Deux de plus :
 | variable | |
 |---|---|
 | `FILARR_GATE_PUBLIC_URL` | l'adresse à afficher et à donner, quand ce n'est pas celle où arrivent les requêtes |
-| `FILARR_GATE_LOG_LEVEL` | `debug`, `info`, `warn`, `error` (journaux des Workers) |
+| `FILARR_GATE_LOG_LEVEL` | `debug`, `info`, `warn`, `error` (Workers Logs, éteints par défaut : [ce qu'ils gardent une fois allumés](tutorials/install-cloudflare.fr.md#ce-qui-reste-sur-votre-compte)) |
 
 ## L'essayer en local
 

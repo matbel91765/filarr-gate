@@ -128,9 +128,13 @@ signé, l'état qui survit à un redémarrage.
 
 Le Durable Object garde, dans son propre stockage : l'état (empreintes des clés d'application, secrets des webhooks,
 réglages), les blocs chiffrés tels que Filarr les garde, le journal local, et l'état chiffré des synchros. Les lignes
-déchiffrées ne vivent qu'en mémoire, tant que l'objet est éveillé. Le `wrangler.jsonc` du dépôt allume Workers Logs
-(`observability`) : ils reçoivent les lignes de console de la boîte noire (chemins, codes, durées ; jamais un jeton,
-une clé ni une ligne) sur VOTRE compte. Désactivez `observability` dans ce fichier si vous préférez.
+déchiffrées ne vivent qu'en mémoire, tant que l'objet est éveillé.
+
+Workers Logs sont éteints dans le `wrangler.jsonc` du dépôt (`"observability": { "enabled": false }`). Pour les
+allumer, mettez `"enabled": true` et redéployez. Cloudflare garde alors sur VOTRE compte, pour chaque requête, ses
+métadonnées (méthode, l'URL avec sa requête, statut, durée) et les lignes de console de la boîte noire (chemins, codes,
+durées ; jamais un jeton, une clé ni une ligne). La requête de l'URL porte ce que demandent les appelants : filtres
+(`where`), recherches (`q`), tris. Ils sont gardés le temps de rétention de votre offre Cloudflare.
 
 ## Et ensuite
 
