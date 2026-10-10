@@ -27,6 +27,7 @@
     "dist",
     "LICENSE",
     "NOTICE",
+    "THIRD_PARTY_NOTICES",
     "README.md",
     "README.fr.md",
     "SECURITY.md"
@@ -40,7 +41,7 @@
     "build:ui": "vite build --config ui/vite.config.ts",
     "dev:ui": "vite --config ui/vite.config.ts",
     "start": "node dist/cli.js",
-    "prepack": "node ../../scripts/prepack.mjs LICENSE NOTICE README.md README.fr.md SECURITY.md"
+    "prepack": "node ../../scripts/prepack.mjs LICENSE NOTICE THIRD_PARTY_NOTICES README.md README.fr.md SECURITY.md"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",

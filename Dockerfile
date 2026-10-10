@@ -44,7 +44,7 @@ RUN mkdir -p /data && chown node:node /data
 COPY --from=build --chown=node:node /src/node_modules ./node_modules
 COPY --from=build --chown=node:node /src/packages/cli/package.json ./package.json
 COPY --from=build --chown=node:node /src/packages/cli/dist ./dist
-COPY --chown=node:node LICENSE NOTICE README.md ./
+COPY --chown=node:node LICENSE NOTICE THIRD_PARTY_NOTICES README.md ./
 RUN chmod 755 /app/dist/cli.js && ln -s /app/dist/cli.js /usr/local/bin/filarr-gate
 USER node
 VOLUME ["/data"]

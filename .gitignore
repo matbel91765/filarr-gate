@@ -9,6 +9,7 @@ dist/
 .wrangler/
 packages/*/LICENSE
 packages/*/NOTICE
+packages/*/THIRD_PARTY_NOTICES
 packages/cli/README.md
 packages/cli/README.fr.md
 packages/cli/SECURITY.md

@@ -10,7 +10,7 @@ dépôt construit. **Rien n'est encore publié** ; les étapes marquées *décis
 | artefact | depuis | où |
 |---|---|---|
 | `@filarr/gate` (bibliothèque) | `packages/gate` (`dist/`, `README.md`, `LICENSE`, `NOTICE`) | npm |
-| `filarr-gate` (commande, serveur, interface) | `packages/cli` (`dist/cli.js`, `dist/ui/`, les README, `SECURITY.md`) | npm |
+| `filarr-gate` (commande, serveur, interface) | `packages/cli` (`dist/cli.js`, `dist/ui/`, les README aux liens absolus, `SECURITY.md`, `THIRD_PARTY_NOTICES`) | npm |
 | image Docker | `Dockerfile` | GitHub Container Registry |
 | variante Cloudflare | les sources étiquetées (`wrangler.jsonc`, `packages/cloudflare`) | le bouton Deploy pointe vers le dépôt |
 | sommes de contrôle et attestations | `SHA256SUMS`, provenance npm, provenance et SBOM de l'image | version publiée sur GitHub, à l'étiquette |

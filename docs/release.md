@@ -10,7 +10,7 @@ builds. **Nothing here has been published yet**; the steps marked *decision* wai
 | artifact | from | where |
 |---|---|---|
 | `@filarr/gate` (library) | `packages/gate` (`dist/`, `README.md`, `LICENSE`, `NOTICE`) | npm |
-| `filarr-gate` (command, server, UI) | `packages/cli` (`dist/cli.js`, `dist/ui/`, READMEs, `SECURITY.md`) | npm |
+| `filarr-gate` (command, server, UI) | `packages/cli` (`dist/cli.js`, `dist/ui/`, READMEs with absolute links, `SECURITY.md`, `THIRD_PARTY_NOTICES`) | npm |
 | Docker image | `Dockerfile` | GitHub Container Registry |
 | Cloudflare variant | the tagged source (`wrangler.jsonc`, `packages/cloudflare`) | the Deploy button points at the repository |
 | checksums and attestations | `SHA256SUMS`, npm provenance, image provenance and SBOM | GitHub release of the tag |

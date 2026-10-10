@@ -3,3 +3,6 @@ Portions copied from the Filarr application and relicensed under Apache-2.0 by t
 
 The copied portions are listed, file by file with their source commit, in packages/core/src/PROVENANCE.json
 of the source repository, https://github.com/filarr-work/filarr-gate.
+
+Third-party software distributed with Filarr Gate (the management interface, the runtime dependencies of the
+command and of the Docker image), with its licenses: THIRD_PARTY_NOTICES.
