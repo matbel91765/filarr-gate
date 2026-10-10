@@ -41,6 +41,9 @@ import { HlcClock } from '../../packages/core/src/engine/store/hlc';
 import type { StoreOp } from '../../packages/core/src/engine/store/registers';
 import type { DbProperty, DbRow, DbView } from '../../packages/core/src/types';
 import { curves, storeCrypto as c } from '../../packages/gate/src/crypto/providers';
+import { sealToken } from '../../packages/core/src/engine/gate/host';
+import type { PinnedHostKey } from '../../packages/host/src/keys';
+import { receiptMessage, verifyHostRequestHeader, verifyHostSignature, versionMessage } from '../../packages/host/src/wire';
 import {
   StoreReplica,
   slotRefKey,
@@ -134,9 +137,33 @@ interface MockAccess {
   notifyUrl: string | null;
   files: { requestId: string; publicKey: string; boxSig: string } | null;
   /** Identité en attente d'une migration (gate-heberge-1 § 8.4). */
-  pending: { authHash: string; aPub: string; bindSig: string; exportSealed: string | null; seenAt: string | null; expiresAt: string } | null;
+  pending: {
+    authHash: string;
+    aPub: string;
+    bindSig: string;
+    exportSealed: string | null;
+    seenAt: string | null;
+    expiresAt: string;
+    /** Où va l'identité en attente : chez soi (le service exporte) ou chez Filarr (d'office, l'ancienne boîte exporte). */
+    target?: 'self' | 'filarr';
+    creatorTag?: string | null;
+  } | null;
   /** Boîte hébergée (marque `hosting` dans `self`). */
   hosted: boolean;
+  /** Révision 3, gate-heberge-1 : l'hébergement tel que l'API le tient (jamais le jeton en clair). */
+  hosting?: MockHosting | null;
+}
+
+/** La ligne `api_access_hosting` du worker, en mémoire. */
+export interface MockHosting {
+  hostName: string;
+  keyId: string;
+  sealedToken: string | null;
+  state: 'running' | 'asleep' | 'erasing' | 'erased';
+  sleepReason: string | null;
+  sleepUntil: string | null;
+  redirectTo: string | null;
+  redirectUntil: string | null;
 }
 
 export interface MockDeposit {
@@ -211,7 +238,9 @@ const fail = (res: ServerResponse, status: number, code: string, extra: Record<s
   json(res, status, { success: false, error: code, code, ...extra }, headers);
 
 const readBody = (req: IncomingMessage): Promise<Buffer> =>
-  new Promise((resolve, reject) => {
+  (req as IncomingMessage & { preread?: Buffer }).preread !== undefined
+    ? Promise.resolve((req as IncomingMessage & { preread?: Buffer }).preread!)
+    : new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', () => resolve(Buffer.concat(chunks)));
@@ -501,8 +530,218 @@ export class MockFilarr {
     this.signal(access, { t: 'hosting', state: 'asleep' }, { code: 4308, reason: 'hosting_asleep' });
   }
 
+  // ==================== gate-heberge-1 : le côté API de la boîte hébergée ====================
+
+  /** `GATE_HOST_SIGN_KEYS` : les clés du service que l'API croit. */
+  hostKeys: PinnedHostKey[] = [];
+  /** `GATE_HOST_CONTROL_URL` : l'adresse de contrôle du service (`https://ctl.<domaine>`). */
+  hostControlUrl: string | null = null;
+  /** Par où partent les réveils d'une boîte hébergée (essais : le service en mémoire). */
+  hostWakeFetch: typeof fetch | null = null;
+  /** `GATE_HOSTED_KILL` : l'arrêt d'urgence endort tout sans toucher aux lignes. */
+  hostedKill = false;
+  /** Le barème des appels d'une boîte hébergée, servi dans `self.limits` (`hostedCallsPerMonth`). */
+  hostedCallsPerMonth: number | null = null;
+  readonly hostedReceipts: Array<{ accessId: string; receipt: Record<string, unknown>; sig: string; partial: boolean }> = [];
+  readonly hostedVersions: Array<Record<string, unknown>> = [];
+  readonly hostedUsage: Array<{ accessId: string; period: string; calls: number }> = [];
+  /** Les requêtes signées reçues, et leur verdict. */
+  readonly hostChecks: Array<{ method: string; path: string; ok: boolean; reason?: string }> = [];
+
+  private hostKeyOf(id: unknown) {
+    return this.hostKeys
+      .filter((k) => k.id === id)
+      .map((k) => ({ id: k.id, signPublicKey: Buffer.from(k.signPublicKey, 'base64'), notBefore: k.notBefore, notAfter: k.notAfter }));
+  }
+
+  /** L'en-tête `Filarr-Gate-Host` est-il celui du service (clé connue, horloge, signature) ? */
+  private fromGateHost(req: IncomingMessage, pathWithQuery: string, body: Buffer): boolean {
+    const header = req.headers['filarr-gate-host'];
+    const verdict = verifyHostRequestHeader({
+      header: typeof header === 'string' ? header : null,
+      method: req.method ?? 'GET',
+      pathWithQuery,
+      body: new Uint8Array(body),
+      keys: this.hostKeys.map((k) => ({ id: k.id, signPublicKey: Buffer.from(k.signPublicKey, 'base64'), notBefore: k.notBefore, notAfter: k.notAfter })),
+      nowMs: Date.now(),
+    });
+    if (typeof header === 'string') this.hostChecks.push({ method: req.method ?? 'GET', path: pathWithQuery, ok: verdict.ok, ...(verdict.ok ? {} : { reason: verdict.reason }) });
+    return verdict.ok;
+  }
+
+  /**
+   * Une boîte HÉBERGÉE créée par l'appli (`POST /api-access` avec `hosting`) : le jeton n'existe que
+   * le temps du scellé vers la clé du service ; `settings` est le paquet initial `s` (§ 2.1). Le jeton
+   * est rendu à l'essai pour qu'il puisse jouer l'appareil du créateur (réveil, vérifications).
+   */
+  async createHostedAccess(
+    name: string,
+    opts: { hostName: string; key: PinnedHostKey; settings?: (accessId: string) => Record<string, unknown>; tier?: Tier }
+  ): Promise<{ token: string; accessId: string }> {
+    const { token, accessId } = await this.createAccess(name, opts.tier ?? 'pro');
+    const access = this.accesses.get(accessId)!;
+    const s = opts.settings?.(accessId);
+    const sealed = await sealToken(c, curves, { a: accessId, k: opts.key.id, ...(s ? { s } : {}), t: token, v: 1 }, opts.key.encPublicKey);
+    access.hosting = { hostName: opts.hostName, keyId: opts.key.id, sealedToken: sealed, state: 'running', sleepReason: null, sleepUntil: null, redirectTo: null, redirectUntil: null };
+    access.hosted = true;
+    return { token, accessId };
+  }
+
+  /** Le cron endort une boîte (impayé, palier, politique) : 30 jours. */
+  hostingSleep(accessId: string, reason: string): void {
+    const h = this.accesses.get(accessId)!.hosting!;
+    h.state = 'asleep';
+    h.sleepReason = reason;
+    h.sleepUntil = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    this.signal(this.accesses.get(accessId)!, { t: 'hosting', state: 'asleep' }, { code: 4308, reason: 'hosting_asleep' });
+  }
+
+  /** Paiement reçu : réveil sans geste. */
+  hostingWake(accessId: string): void {
+    const h = this.accesses.get(accessId)!.hosting!;
+    h.state = 'running';
+    h.sleepReason = null;
+    h.sleepUntil = null;
+    this.signal(this.accesses.get(accessId)!, { t: 'hosting', state: 'running' });
+  }
+
+  /** Révocation, sommeil échu, migration basculée : le jeton scellé est effacé, le service réveillé. */
+  hostingErase(accessId: string, opts: { revoke?: boolean; redirectTo?: string } = {}): void {
+    const access = this.accesses.get(accessId)!;
+    const h = access.hosting!;
+    if (opts.revoke !== false) access.revoked = true;
+    if (opts.redirectTo) {
+      h.redirectTo = opts.redirectTo;
+      h.redirectUntil = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    }
+    h.state = 'erasing';
+    h.sealedToken = null;
+    this.signal(access, { t: 'hosting', state: 'erasing' });
+  }
+
+  /** Une base sort de la boîte (créateur ou administrateur du coffre) : le droit part, la boîte est réveillée. */
+  withdrawStore(accessId: string, storeId: string): void {
+    const access = this.accesses.get(accessId)!;
+    access.grants.delete(storeId);
+    access.manifests.delete(storeId);
+    this.signal(access, { t: 'grant' });
+  }
+
+  /** « Reprendre chez moi » (§ 8.4) : une identité neuve en attente ; le service doit exporter vers elle. */
+  async migrateToSelf(accessId: string): Promise<string> {
+    const access = this.accesses.get(accessId)!;
+    const proof = await this.newProof(fromBase64Url(accessId));
+    access.pending = {
+      authHash: proof.authHash,
+      aPub: proof.aPub,
+      bindSig: proof.bindSig,
+      exportSealed: null,
+      seenAt: null,
+      expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+      target: 'self',
+      creatorTag: proof.creatorTag,
+    };
+    this.signal(access, { t: 'export' });
+    return proof.token;
+  }
+
+  /** Les routes du service (`/api-access/hosted/*`), signées : rien d'autre n'y entre. */
+  private async handleHosted(req: IncomingMessage, res: ServerResponse, path: string, pathWithQuery: string, method: string): Promise<void> {
+    const body = await readBody(req);
+    const log = (status: number, code?: string) => this.requests.push({ method, path, status, ...(code ? { code } : {}) });
+    const refuse = (status: number, code: string) => {
+      log(status, code);
+      fail(res, status, code);
+    };
+    if (!this.fromGateHost(req, pathWithQuery, body)) return refuse(401, 'hosted_origin_required');
+    const ok = (data: unknown) => {
+      log(200);
+      json(res, 200, { success: true, data });
+    };
+    const parsed = (): Record<string, unknown> | null => {
+      try {
+        return JSON.parse(body.toString('utf8')) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    };
+    if (path === '/api-access/hosted/version' && method === 'POST') {
+      const a = parsed();
+      const { sig, ...rest } = a ?? {};
+      const key = this.hostKeyOf(rest.keyId)[0];
+      if (!a || !key || typeof sig !== 'string' || !verifyHostSignature(versionMessage(rest), sig, key.signPublicKey)) return refuse(400, 'invalid');
+      this.hostedVersions.push(a);
+      return ok({ accesses: [...this.accesses.values()].filter((x) => x.hosting && x.hosting.state !== 'erased').length });
+    }
+    if (path === '/api-access/hosted/usage' && method === 'POST') {
+      const items = (parsed()?.items ?? null) as Array<{ accessId: string; period: string; calls: number }> | null;
+      if (!Array.isArray(items) || items.length === 0) return refuse(400, 'invalid');
+      for (const it of items) this.hostedUsage.push({ accessId: it.accessId, period: it.period, calls: it.calls });
+      return ok({ recorded: items.length });
+    }
+    const m = /^\/api-access\/hosted\/([A-Za-z0-9_-]{22})\/(token|pending|export|receipt)$/.exec(path);
+    const access = m ? this.accesses.get(m[1]!) : undefined;
+    if (!m || !access || !access.hosting) return refuse(404, 'hosting_not_found');
+    const h = access.hosting;
+    const p = access.pending;
+    if (m[2] === 'token' && method === 'GET') {
+      return ok({
+        accessId: access.id,
+        hostName: h.hostName,
+        keyId: h.keyId,
+        sealedToken: h.sealedToken,
+        state: h.state,
+        sleepReason: h.sleepReason,
+        sleepUntil: h.sleepUntil,
+        redirectTo: h.redirectTo,
+        redirectUntil: h.redirectUntil,
+        exportPending: p?.target === 'self' && p.exportSealed === null,
+      });
+    }
+    if (m[2] === 'pending' && method === 'GET') {
+      if (!p || p.target !== 'self') return refuse(409, 'migration_not_ready');
+      return ok({ encPublicKey: p.aPub, bindSig: p.bindSig, creatorTag: p.creatorTag ?? '', createdAt: new Date().toISOString(), expiresAt: p.expiresAt });
+    }
+    if (m[2] === 'export' && method === 'PUT') {
+      if (!p || p.target !== 'self') return refuse(409, 'migration_not_ready');
+      const sealed = parsed()?.sealed;
+      if (typeof sealed !== 'string') return refuse(400, 'invalid');
+      p.exportSealed = sealed;
+      return ok({ size: Buffer.from(sealed, 'base64').length });
+    }
+    if (m[2] === 'receipt' && method === 'POST') {
+      const b = parsed();
+      const receipt = b?.receipt as Record<string, unknown> | undefined;
+      const sig = b?.sig;
+      const key = receipt ? this.hostKeyOf(receipt.keyId)[0] : undefined;
+      if (!receipt || receipt.accessId !== access.id || typeof sig !== 'string' || !key || !verifyHostSignature(receiptMessage(receipt), sig, key.signPublicKey)) return refuse(400, 'invalid');
+      const partial = receipt.reason === 'withdrawn';
+      if (!partial) {
+        h.state = 'erased';
+        h.sealedToken = null;
+      }
+      this.hostedReceipts.push({ accessId: access.id, receipt, sig, partial });
+      return ok({ state: partial ? h.state : 'erased' });
+    }
+    return refuse(404, 'not_found');
+  }
+
   /** Un réveil poussé, signé sous `A_notify` (api-base-1 rév. 3 § 5 bis). */
   private async pushNotify(access: MockAccess, msg: Record<string, unknown>): Promise<void> {
+    // Une boîte hébergée : l'adresse de contrôle du service, posée par l'API (jamais une adresse de l'utilisateur)
+    if (access.hosting && this.hostControlUrl && access.notifyKey) {
+      const url = `${this.hostControlUrl}/_filarr/notify/${access.id}`;
+      const body = JSON.stringify({ a: access.id, t: msg.t, ...(msg.storeId ? { storeId: msg.storeId } : {}), ...(typeof msg.seq === 'number' ? { seq: msg.seq } : {}), ...(msg.state ? { state: msg.state } : {}), at: new Date().toISOString() });
+      const header = await notifyHeader(c, access.notifyKey, body, Math.floor(Date.now() / 1000));
+      try {
+        const res = await (this.hostWakeFetch ?? fetch)(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Filarr-Notify': header }, body, redirect: 'manual' });
+        await res.arrayBuffer().catch(() => undefined);
+        this.notifications.push({ url, status: res.status, body });
+      } catch {
+        this.notifications.push({ url, status: 0, body });
+      }
+      return;
+    }
     if (!access.notifyUrl || !access.notifyKey || !this.rev3) return;
     const body = JSON.stringify({ a: access.id, t: msg.t, ...(msg.storeId ? { storeId: msg.storeId } : {}), ...(typeof msg.seq === 'number' ? { seq: msg.seq } : {}), ...(msg.state ? { state: msg.state } : {}), at: new Date().toISOString() });
     const header = await notifyHeader(c, access.notifyKey, body, Math.floor(Date.now() / 1000));
@@ -1097,6 +1336,10 @@ export class MockFilarr {
       fail(res, status, code, extra, headers);
     };
 
+    if (this.rev3 && path.startsWith('/api-access/hosted/')) return this.handleHosted(req, res, path, url.pathname + url.search, method);
+    // L'en-tête du service se vérifie sur le corps : on le lit d'avance (readBody le rendra)
+    if (typeof req.headers['filarr-gate-host'] === 'string') (req as IncomingMessage & { preread?: Buffer }).preread = await readBody(req);
+
     if (path === '/public/api-limits' && method === 'GET') {
       log(200);
       return json(res, 200, { success: true, data: { version: 1, tiers: API_LIMITS } }, { 'Cache-Control': 'public, max-age=3600' });
@@ -1129,6 +1372,17 @@ export class MockFilarr {
       if (injected) return refuse(injected.status, injected.code, {}, injected.retryAfter !== undefined ? { 'Retry-After': String(injected.retryAfter) } : {});
       const outcome = this.gate(req, route.kind, route.storeId);
       if ('refusal' in outcome) return refuse(outcome.refusal.status, outcome.refusal.code, outcome.refusal.extra ?? {}, outcome.refusal.headers ?? {});
+      // gate-heberge-1 § 2.2 : le jeton d'une boîte hébergée n'est reçu QUE du service, signé
+      const hosting = outcome.access.hosting;
+      if (hosting) {
+        const preread = (req as IncomingMessage & { preread?: Buffer }).preread ?? Buffer.alloc(0);
+        if (!this.fromGateHost(req, url.pathname + url.search, preread)) return refuse(401, 'hosted_origin_required');
+        if (!outcome.pending && (hosting.state === 'erasing' || hosting.state === 'erased')) return refuse(401, 'api_access_revoked');
+        if (!outcome.pending && (this.hostedKill || hosting.state === 'asleep')) {
+          const reason = this.hostedKill ? 'service' : hosting.sleepReason;
+          return refuse(403, 'hosting_asleep', { reason, sleepUntil: this.hostedKill ? null : hosting.sleepUntil });
+        }
+      }
       access = outcome.access;
       pending = outcome.pending === true;
       accessId = access.id;
@@ -1183,7 +1437,7 @@ export class MockFilarr {
                       usage: { files: [...this.deposits.values()].filter((d) => d.status !== 'uploading').length, fileBytes: 0 },
                     }
                   : null,
-                hosting: access.hosted ? { hostName: 'essai-0000' } : null,
+                hosting: access.hosting ? { hostName: access.hosting.hostName } : access.hosted ? { hostName: 'essai-0000' } : null,
                 // « Export sans flux » : la cible d'un export attendu de cette boîte, jusqu'au dépôt
                 pendingExport:
                   access.pending && access.pending.exportSealed === null && !this.hidePendingExport
@@ -1206,7 +1460,7 @@ export class MockFilarr {
           // Le droit EFFECTIF : `rw` se lit `r` sans écriture au palier ou sans l'interrupteur
           grants: [...access.grants].map(([storeId, g]) => ({ storeId, rights: g.rights === 'rw' && lim.write && this.writeSwitch ? 'rw' : 'r', keys: g.keys })),
           manifests: [...access.manifests].map(([storeId, m]) => ({ storeId, sealed: m.sealed, rev: m.rev })),
-          limits: lim,
+          limits: access.hosting && this.hostedCallsPerMonth !== null ? { ...lim, hostedCallsPerMonth: this.hostedCallsPerMonth } : lim,
           usage: {
             period: new Date().toISOString().slice(0, 7),
             day: new Date().toISOString().slice(0, 10),

@@ -18,8 +18,9 @@
  *  3. un processus enfant lancé avec une adresse de production dans ses arguments ou dans
  *     `FILARR_GATE_API_URL` ; sans `FILARR_GATE_API_URL`, l'enfant reçoit une adresse MORTE de la
  *     boucle locale (rien n'y écoute) au lieu du défaut de production ;
- *  4. `wrangler dev` sans `--var FILARR_GATE_API_URL:<adresse de la boucle locale>` (workerd
- *     échappe aux points 1 et 2), et tout `wrangler deploy` ou `--remote`.
+ *  4. `wrangler dev` sans `--var FILARR_GATE_API_URL:<adresse de la boucle locale>` (ou
+ *     `FILARR_API_URL:` pour le service hébergé ; workerd échappe aux points 1 et 2), et tout
+ *     `wrangler deploy`, `wrangler secret` ou `--remote`.
  *
  * Hôtes interdits : `filarr.com` et ses sous-domaines, plus `garde-production.invalid` (le domaine
  * des essais de la garde elle-même : `.invalid` ne se résout jamais, donc une garde cassée ne fait
@@ -143,9 +144,10 @@ function install() {
     const joined = all.join(' ');
     if (!/wrangler/i.test(joined)) return;
     const words = joined.split(/\s+/);
-    if (words.includes('deploy') || words.includes('publish') || words.includes('--remote')) throw refusal(`wrangler contre Cloudflare : ${joined.slice(0, 120)}`);
+    if (words.includes('deploy') || words.includes('publish') || words.includes('secret') || words.includes('--remote')) throw refusal(`wrangler contre Cloudflare : ${joined.slice(0, 120)}`);
     if (words.includes('dev')) {
-      const v = /FILARR_GATE_API_URL:(\S+)/.exec(joined);
+      // La boîte chez soi lit FILARR_GATE_API_URL ; le service hébergé, FILARR_API_URL
+      const v = /\bFILARR_(?:GATE_)?API_URL:(\S+)/.exec(joined);
       if (!v) throw refusal('wrangler dev sans --var FILARR_GATE_API_URL:<adresse de la boucle locale> (workerd échappe à la garde)');
       if (!isLoopbackUrl(v[1])) throw refusal(`wrangler dev vers ${v[1]} (boucle locale seulement)`);
     }

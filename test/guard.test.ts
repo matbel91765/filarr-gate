@@ -79,7 +79,7 @@ describe('la garde des essais : aucune connexion vers la production', () => {
     expect(out.stdout).not.toContain('PARTI');
   });
 
-  it('refus SYNCHRONES : adresse de production dans les arguments ou l’environnement d’un enfant ; wrangler dev sans adresse locale ; wrangler deploy', () => {
+  it('refus SYNCHRONES : adresse de production dans les arguments ou l’environnement d’un enfant ; wrangler dev sans adresse locale ; wrangler deploy et wrangler secret', () => {
     // Rien n'est lancé : la garde lève avant (un chemin inexistant, au cas où elle ne lèverait pas)
     const absent = 'C:/garde-nexiste-pas/script.js';
     expect(() => spawn(process.execPath, [absent], { env: { ...process.env, FILARR_GATE_API_URL: 'https://api.filarr.com' } })).toThrow(/production refusée/);
@@ -89,6 +89,11 @@ describe('la garde des essais : aucune connexion vers la production', () => {
     expect(() => spawn(process.execPath, [wrangler, 'dev', '--var', 'FILARR_GATE_API_URL:http://10.0.0.5:8787'])).toThrow(/boucle locale seulement/);
     expect(() => spawn(process.execPath, [wrangler, 'dev', '--var', 'FILARR_GATE_API_URL:https://api.filarr.com'])).toThrow(/production refusée/);
     expect(() => spawn(process.execPath, [wrangler, 'deploy'])).toThrow(/wrangler contre Cloudflare/);
+    // Le service hébergé : ni secret posé, ni déploiement ; wrangler dev seulement vers la boucle locale (FILARR_API_URL)
+    expect(() => spawn(process.execPath, [wrangler, 'secret', 'put', 'HOST_SIG', '--name', 'filarr-gate-host'])).toThrow(/wrangler contre Cloudflare/);
+    expect(() => spawn(process.execPath, [wrangler, 'deploy', 'dist/filarr-gate-host.js', '--no-bundle', '--config', 'packages/host/wrangler.jsonc'])).toThrow(/wrangler contre Cloudflare/);
+    expect(() => spawn(process.execPath, [wrangler, 'dev', '--config', 'packages/host/wrangler.jsonc', '--var', 'FILARR_API_URL:https://api.filarr.com'])).toThrow(/production refusée/);
+    expect(() => spawn(process.execPath, [wrangler, 'dev', '--config', 'packages/host/wrangler.jsonc', '--var', 'FILARR_API_URL:http://10.0.0.5:8787'])).toThrow(/boucle locale seulement/);
     expect(() => spawn(process.execPath, [wrangler, 'd1', 'execute', 'filarr-auth', '--remote'])).toThrow(/wrangler contre Cloudflare/);
   });
 });
