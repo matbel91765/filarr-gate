@@ -18,7 +18,8 @@
     "build": "npm run build -w @filarr/gate && npm run build -w filarr-gate",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p packages/cli/ui/tsconfig.json --noEmit && tsc -p packages/cloudflare/tsconfig.json --noEmit",
     "test": "vitest run",
-    "mock-filarr": "tsx scripts/mock-filarr.ts"
+    "mock-filarr": "tsx scripts/mock-filarr.ts",
+    "test:e2e": "vitest run test/worker.e2e.test.ts"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
