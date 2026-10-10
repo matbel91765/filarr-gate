@@ -3,7 +3,7 @@
 [Read in English](hosted.md)
 
 > Bientôt : la boîte hébergée par Filarr n'est pas ouverte. Cette page dit ce qui sera vérifiable, et ce que ce dépôt
-> ne fournit pas encore. Ce que Filarr peut voir dans ce mode, et ce qui le protège :
+> ne fournit pas encore. Ce qui n'est plus chiffré de bout en bout dans ce mode, et ce qui le protège :
 > [sécurité et confiance](../security-and-trust.fr.md#hébergée-par-filarr). L'aller et le retour :
 > [le tutoriel](../tutorials/hosted-and-back.fr.md).
 

@@ -9,7 +9,7 @@ que sur des engagements. Là où une limite existe, elle est écrite ici.
 
 ## Les trois modes
 
-| | où tourne la boîte noire | qui tient le jeton | Filarr peut-il lire les bases ouvertes ? |
+| | où tourne la boîte noire | qui tient le jeton | bases ouvertes déchiffrées par les serveurs de Filarr ? |
 |---|---|---|---|
 | **Dans votre code, sur votre machine** (bibliothèque, Node, Docker) | votre ordinateur, votre serveur | vous | **non** |
 | **Sur votre compte Cloudflare** | un Worker et un Durable Object de VOTRE compte | vous (un secret du Worker) | **non** (Cloudflare, votre hébergeur, est dans la même position que pour n'importe quel Worker que vous faites tourner) |
@@ -91,40 +91,42 @@ façonner ce que rend un point d'accès. Pour partager moins, ouvrez une base qu
 > Bientôt. Cette section décrit la boîte hébergée telle que la définit le contrat gelé `gate-heberge-1`, pour que vous
 > puissiez la juger avant qu'elle ouvre.
 
-Pour les bases que vous lui **confiez**, et tant qu'elles restent confiées, un service de Filarr tient leur clé et fait
-tourner la même Filarr Gate. Filarr n'emploiera qu'une expression : une base « confiée à Filarr », une boîte « hébergée
-par Filarr ».
+Pour les bases que vous lui **confiez**, et tant qu'elles restent confiées, un service de Filarr gère leur clé et fait
+tourner la même Filarr Gate : ces bases ne sont plus chiffrées de bout en bout. Filarr n'emploiera qu'une expression :
+une base « confiée à Filarr », une boîte « hébergée par Filarr ».
 
-### Ce que Filarr peut techniquement voir
+### Ce qui n'est plus chiffré de bout en bout
 
-| quoi | qui chez Filarr | pourquoi |
+| quoi | déchiffré par | pourquoi |
 |---|---|---|
-| toutes les lignes et toutes les colonnes des bases confiées, qu'une vue les montre ou non | le service hébergé | il tient leurs clés et sert l'API depuis sa copie |
+| toutes les lignes et toutes les colonnes des bases confiées, qu'une vue les montre ou non | le service hébergé | il gère leurs clés et sert l'API depuis sa copie |
 | ce qui s'y écrit tant qu'elles restent confiées (par vous, les membres, l'API) | le service hébergé | la génération en cours lui est scellée tant que la base reste confiée |
 | les requêtes de vos logiciels et les réponses | le service hébergé | il sert l'API |
 | les mêmes requêtes et réponses, **en transit** | le compte Cloudflare qui gère filarr.com, celui de l'API de Filarr, qui héberge aussi le service | l'adresse de la boîte, `<nom>.gate.filarr.com`, est un nom de sa zone : il termine lui-même le TLS |
 | la clé d'une base externe branchée sur la boîte, et ses lignes | le service hébergé | la synchro planifiée y tourne |
 | les fichiers que reçoit la boîte, au passage | le service hébergé | il les scelle pour votre boîte de dépôt après les avoir reçus |
-| des blocs chiffrés, des clés scellées, des compteurs | l'API de Filarr | comme chez vous |
-| le jeton, scellé pour le service | l'API de Filarr, **sans pouvoir l'ouvrir** | scellé pour la clé du service, que les applis portent en elles |
 
-Ce qu'il ne peut toujours pas voir : les bases que vous n'avez pas confiées, vos notes, fichiers et coffres ; vos clés
-racines (une clé de base en est tirée à sens unique) ; ce qui s'écrit après que vous avez repris la clé (la génération
-change, et la nouvelle clé n'est jamais scellée pour le service) ; le dossier où sont rangés vos fichiers reçus (seuls
-vos appareils les rangent).
+L'API de Filarr, elle, ne traite comme chez vous que des blocs chiffrés, des clés scellées et des compteurs, et le
+jeton scellé pour le service, qu'elle ne sait pas ouvrir (il est scellé pour la clé du service, que les applis portent
+en elles).
+
+Ce qui n'est pas concerné : les bases que vous n'avez pas confiées, vos notes, fichiers et coffres ; vos clés racines
+(une clé de base en est tirée à sens unique) ; ce qui s'écrit après que vous avez repris la clé (la génération change,
+la nouvelle clé n'est jamais scellée pour le service, et ces bases redeviennent chiffrées de bout en bout) ; le dossier
+où sont rangés vos fichiers reçus (seuls vos appareils les rangent).
 
 ### Ce qui protège, classé par force
 
 | force | protection | sa limite exacte |
 |---|---|---|
 | chiffrement | une base, pas le compte | la clé confiée ouvre une base, à une génération |
-| chiffrement | reprendre la clé coupe l'avenir | ce que le service a lu AVANT n'est couvert que par les engagements |
-| chiffrement | le jeton n'est jamais en clair dans la base de données de l'API ni dans ses sauvegardes | cela ne protège PAS du trafic en transit, ni de qui tient la clé privée du service |
-| aucune | le trafic d'une boîte hébergée, en transit | le compte qui gère filarr.com peut le voir ; l'accord le dit |
-| vérifiable | l'empreinte de code que le service annonce égale celle de la version publiée | **cela vérifie ce que le service ANNONCE ; aucune attestation à distance n'existe sur les Workers : personne ne peut prouver que le code qui tourne est celui-là.** D'où la revue externe, le journal public des mises en service, et l'engagement |
+| chiffrement | reprendre la clé coupe l'avenir | ce que le service a traité AVANT n'est couvert que par les engagements |
+| chiffrement | le jeton n'est jamais en clair dans la base de données de l'API ni dans ses sauvegardes | cela ne couvre pas le trafic en transit, ni le service lui-même, qui détient sa clé privée |
+| aucune | le trafic d'une boîte hébergée, en transit | il n'est pas chiffré de bout en bout : le compte qui gère filarr.com termine le TLS et le déchiffre ; l'accord le dit |
+| vérifiable | l'empreinte de code que le service annonce égale celle de la version publiée | cela vérifie ce que le service annonce ; les Workers n'offrent pas d'attestation à distance, cela ne prouve donc pas que le code qui tourne est celui-là. D'où la revue externe, le journal public des mises en service, et l'engagement |
 | vérifiable | tout se trace | accord, versions du service, sommeil, reprise, reçu d'effacement, au journal de l'accès |
 | vérifiable | cela se voit | quiconque voit une base confiée voit la marque, sur tous les appareils |
-| engagement | isolement, aucune journalisation du contenu, copies dans l'UE, aucun autre usage | Cloudflare, l'hébergeur, peut techniquement atteindre la mémoire de ses machines ; une requête traverse le point de présence le plus proche de l'appelant, qui peut être hors de l'UE (seules les COPIES restent dans l'UE) ; qui administre le compte Cloudflare de Filarr pourrait changer le code ou la configuration : l'engagement, la chaîne de mise en service et la revue externe encadrent cela, pas une barrière technique |
+| engagement | isolement, aucune journalisation du contenu, copies dans l'UE, aucun autre usage | ce sont des engagements, pas une protection par le chiffrement : Cloudflare, l'hébergeur, fait tourner les machines où le service déchiffre les données ; une requête traverse le point de présence le plus proche de l'appelant, qui peut être hors de l'UE (seules les COPIES restent dans l'UE) ; le code et la configuration sont mis en service depuis le compte Cloudflare de Filarr : l'engagement, la chaîne de mise en service et la revue externe encadrent cela, pas une barrière technique |
 | engagement | effacement | un reçu signé prouve que le service a exécuté l'ordre, pas qu'aucune copie n'existe ailleurs |
 
 ### L'isolement par script, dans le même compte
@@ -135,10 +137,10 @@ ses propres Durable Objects ; le script de l'API n'a aucune liaison vers eux.
 - **Ce que cela garantit** : le jeton n'est jamais en clair dans la base de données de l'API, ses sauvegardes, son
   historique ou un export ; une faille ou une compromission du CODE de l'API (un défaut dans une route, une dépendance
   empoisonnée) ne donne ni les secrets du service, ni son stockage, ni un jeton en clair.
-- **Ce que cela ne garantit pas** : la protection contre un administrateur du compte, qui pourrait déployer un code qui
-  lit les secrets du service, son stockage ou le trafic de la zone ; et la protection contre le trafic en transit,
-  visible du compte à tout moment. Une interception par le compte ne laisse aucune trace publique (son certificat est
-  légitimement le sien).
+- **Ce que cela ne couvre pas** : la mise en service elle-même, puisque le code du service et la configuration de la
+  zone sont déployés depuis ce compte (c'est la chaîne de mise en service ci-dessous qui l'encadre, pas l'isolement) ;
+  et le trafic en transit, que le compte déchiffre en terminant le TLS de la zone. Son certificat est légitimement le
+  sien, cela ne se voit donc pas de l'extérieur : l'engagement et la chaîne de mise en service l'encadrent.
 
 ### Comment une version entre en service
 
@@ -165,9 +167,9 @@ ultérieur.
 
 | | chez vous | hébergée |
 |---|---|---|
-| Filarr lit les bases ouvertes | non | oui, tant qu'elles sont confiées |
-| le trafic de vos logiciels vu par Filarr | non | oui, en transit |
-| clés des bases externes | dans votre boîte noire | tenues par Filarr |
+| les bases ouvertes restent chiffrées de bout en bout | oui | non, tant qu'elles sont confiées |
+| le trafic de vos logiciels déchiffré par les serveurs de Filarr | non | oui, en transit |
+| clés des bases externes | dans votre boîte noire | gérées par les serveurs de Filarr |
 | quelque chose à installer et à garder en marche | oui | non |
 | synchros PostgreSQL et MySQL | oui | non (connecteurs HTTPS seulement) |
 
@@ -182,16 +184,16 @@ retirée de la boîte.
 <!-- consent: hebergement-v1 fr -->
 ```text
 Confier ces bases à la boîte noire hébergée par Filarr ?
-Jusqu'ici, Filarr ne pouvait pas lire ces bases : seuls vos appareils en avaient la clé.
+Aujourd'hui, ces bases sont chiffrées de bout en bout : seuls vos appareils en ont la clé.
 Si vous les confiez à la boîte noire « {{box}} », hébergée par Filarr :
-la clé de chaque base cochée sera remise à un service de Filarr, isolé, qui la déchiffre pour répondre à vos logiciels ;
-Filarr pourra donc techniquement lire toutes leurs lignes et toutes leurs colonnes, y compris celles qu'aucune vue ne montre, ainsi que tout ce qui s'y écrira tant qu'elles restent confiées ;
-cela vaut aussi en transit : l'adresse de la boîte est un nom de filarr.com, et le compte de Filarr qui gère ce nom, celui qui sert aussi l'API de Filarr, peut techniquement voir les appels de vos logiciels et les réponses ;
-si vous y branchez une base externe, Filarr tiendra aussi sa clé et verra ses lignes ; si la boîte reçoit des fichiers, Filarr les verra au passage ;
-vos autres bases, vos notes, vos fichiers et vos coffres resteront illisibles pour Filarr.
-Filarr s'engage à ne pas journaliser ce contenu, à ne l'utiliser que pour servir votre API, à en garder les copies dans l'Union européenne et à effacer la clé et la copie quand vous la reprenez. Ce sont des engagements, pas une protection par le chiffrement.
-Vous pouvez reprendre la clé à tout moment. Les clés de ces bases changent alors : la boîte hébergée ne pourra plus rien lire de ce qui s'écrira ensuite. Ce qu'elle a lu avant reste couvert par les seuls engagements ci-dessus.
-J'ai compris que Filarr pourra lire les bases cochées tant qu'elles lui sont confiées.
+la clé de chaque base cochée sera gérée par un service isolé de Filarr, qui la déchiffre pour répondre à vos logiciels ;
+tant qu'elles restent confiées, ces bases ne sont donc plus chiffrées de bout en bout : leurs lignes et leurs colonnes, y compris celles qu'aucune vue ne montre, et tout ce qui s'y écrira, sont déchiffrées par nos serveurs ;
+les appels de vos logiciels et les réponses ne sont pas non plus chiffrés de bout en bout : ils passent par une adresse filarr.com, gérée par le même compte que l'API de Filarr ;
+si vous y branchez une base externe, sa clé sera aussi gérée par nos serveurs ; les fichiers que reçoit la boîte passent eux aussi par nos serveurs sans chiffrement de bout en bout ;
+vos autres bases, vos notes, vos fichiers et vos coffres ne sont pas concernés.
+Filarr s'engage à ne pas journaliser ce contenu, à ne l'utiliser que pour servir votre API, à en garder les copies dans l'Union européenne et à effacer la clé et la copie quand vous la reprenez. Ce sont des engagements de Filarr, et non une protection par le chiffrement de bout en bout.
+Vous pouvez reprendre la clé à tout moment. Les clés de ces bases changent alors, et ce qui s'écrira ensuite est de nouveau chiffré de bout en bout. Ce que la boîte a traité avant reste couvert par les engagements ci-dessus.
+J'ai compris que les bases cochées ne seront plus chiffrées de bout en bout tant qu'elles sont confiées à Filarr.
 ```
 
 ## Signaler une faille

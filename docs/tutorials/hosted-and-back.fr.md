@@ -17,23 +17,22 @@ sur la page des offres de Filarr et dans **Paramètres › Accès API**.
 
 ## Ce qui change, dit simplement
 
-Avec une boîte noire à vous, Filarr ne lit jamais vos bases. Avec la boîte hébergée, **pour les bases que vous lui
-confiez et tant qu'elles le restent**, un service de Filarr tient leur clé et fait tourner pour vous la même Filarr
-Gate :
+Avec une boîte noire à vous, vos bases restent chiffrées de bout en bout. Avec la boîte hébergée, **pour les bases que
+vous lui confiez et tant qu'elles le restent**, un service de Filarr gère leur clé et fait tourner pour vous la même
+Filarr Gate : ces bases ne sont donc plus chiffrées de bout en bout.
 
-- il peut techniquement lire **toutes les lignes et toutes les colonnes** de ces bases, y compris ce qu'aucune vue ne
-  montre, et ce qui s'y écrit entre-temps ;
-- les appels de vos logiciels et les réponses passent par `https://<nom>.gate.filarr.com`, un nom de filarr.com : le
-  compte Cloudflare qui gère filarr.com, celui qui sert aussi l'API de Filarr, peut techniquement les voir **en
-  transit** ;
-- si vous y branchez une base externe, Filarr tient sa clé et voit ses lignes ; si la boîte reçoit des fichiers, Filarr
-  les voit au passage.
+- **toutes les lignes et toutes les colonnes** de ces bases, y compris ce qu'aucune vue ne montre, et ce qui s'y écrit
+  entre-temps, sont déchiffrées par les serveurs de Filarr ;
+- les appels de vos logiciels et les réponses ne sont pas non plus chiffrés de bout en bout : ils passent par
+  `https://<nom>.gate.filarr.com`, un nom de filarr.com, géré par le même compte Cloudflare que l'API de Filarr ;
+- si vous y branchez une base externe, sa clé est aussi gérée par les serveurs de Filarr ; les fichiers que reçoit la
+  boîte passent eux aussi par les serveurs de Filarr sans chiffrement de bout en bout.
 
-Vos autres bases, vos notes, vos fichiers et vos coffres restent illisibles pour Filarr. Filarr s'engage à ne pas
-journaliser ce contenu, à ne l'utiliser que pour servir votre API, à en garder les copies dans l'Union européenne, et à
-effacer la clé et la copie quand vous la reprenez : **ce sont des engagements, pas une protection par le
-chiffrement**. Reprendre la clé change les clés de ces bases : la boîte ne peut plus lire ce qui s'écrit ensuite ; ce
-qu'elle a lu avant reste couvert par les seuls engagements. Le modèle complet :
+Vos autres bases, vos notes, vos fichiers et vos coffres ne sont pas concernés. Filarr s'engage à ne pas journaliser ce
+contenu, à ne l'utiliser que pour servir votre API, à en garder les copies dans l'Union européenne, et à effacer la clé
+et la copie quand vous la reprenez : **ce sont des engagements de Filarr, et non une protection par le chiffrement de
+bout en bout**. Reprendre la clé change les clés de ces bases : ce qui s'écrit ensuite est de nouveau chiffré de bout en
+bout ; ce que la boîte a traité avant reste couvert par les seuls engagements. Le modèle complet :
 [sécurité et confiance](../security-and-trust.fr.md#hébergée-par-filarr).
 
 ## Confier des bases (dans Filarr)
@@ -42,8 +41,8 @@ Quand vous ouvrez une base à une API, « Où tourne la boîte noire ? » propos
 Filarr**. Chez Filarr :
 
 1. cochez chaque base à confier (aucune n'est cochée pour vous) ;
-2. lisez l'accord et cochez « J'ai compris que Filarr pourra lire les bases cochées tant qu'elles lui sont confiées. »
-   (le texte est versionné : s'il change, Filarr vous redemande votre accord) ;
+2. lisez l'accord et cochez « J'ai compris que les bases cochées ne seront plus chiffrées de bout en bout tant qu'elles
+   sont confiées à Filarr. » (le texte est versionné : s'il change, Filarr vous redemande votre accord) ;
 3. prouvez de nouveau que c'est vous (mot de passe et code de double authentification, ou une clé d'accès) ;
 4. **Confier 1 base à Filarr**.
 
@@ -53,8 +52,8 @@ voit le jeton, pas même vous. Il vous montre, une seule fois, l'adresse de la b
 d'interface de gestion : ses clés d'application, ses webhooks, ses requêtes enregistrées et son filtre de fichiers se
 règlent dans **Paramètres › Accès API**.
 
-Toute personne qui peut voir une base confiée la voit marquée « API hébergée par Filarr · Filarr peut lire cette
-base », sur tous les appareils ; les membres d'un coffre apprennent qui l'a confiée. Seuls le propriétaire ou les
+Toute personne qui peut voir une base confiée la voit marquée « API hébergée par Filarr · pas chiffrée de bout en
+bout », sur tous les appareils ; les membres d'un coffre apprennent qui l'a confiée. Seuls le propriétaire ou les
 administrateurs du coffre peuvent confier ou reprendre une base de ce coffre.
 
 En sommeil : si le paiement échoue ou si le palier descend sous Pro, la boîte dort 30 jours (elle répond `503
@@ -89,8 +88,8 @@ Cinq étapes, sans arrêter vos logiciels :
    appareil fait passer chaque base à une nouvelle génération de clés.
 
 Les clés des bases externes ne sont **pas** dans le paquet : sur votre propre boîte noire, une clé ne transite jamais
-par Filarr. Filarr les a tenues : changez-les chez leur fournisseur, puis donnez les nouvelles à votre boîte noire
-(`filarr-gate sources key`).
+par Filarr. Elles ont été gérées par les serveurs de Filarr : changez-les chez leur fournisseur, puis donnez les
+nouvelles à votre boîte noire (`filarr-gate sources key`).
 
 ### Le même déménagement, par fichier
 
@@ -118,8 +117,8 @@ scellé pour le nouveau jeton seulement ; une autre boîte noire ne peut pas l'o
 
 signé par la clé du service hébergé, gardé 5 ans au journal de l'accès, montré par les applis avec la génération d'après
 le déménagement (« génération 4 → 5 »). **Il prouve que le service a exécuté l'ordre ; il ne peut pas prouver qu'aucune
-copie n'existe ailleurs.** Ce qui s'écrit désormais dans ces bases est illisible pour l'ancienne boîte : cela, c'est
-garanti par le chiffrement.
+copie n'existe ailleurs.** Ce qui s'écrit désormais dans ces bases est de nouveau chiffré de bout en bout,
+avec des clés que l'ancienne boîte n'a jamais eues : cela, c'est garanti par le chiffrement.
 
 ## Et ensuite
 
@@ -127,5 +126,5 @@ garanti par le chiffrement.
   du service hébergé.
 - [Révoquer un accès](revoke.fr.md), hébergé ou non.
 - Dans l'aide de Filarr : [la boîte noire hébergée](https://filarr.com/docs/gate-hosted),
-  [ce que Filarr peut voir](https://filarr.com/docs/gate-hosted-trust) et
+  [ce qui n'est plus chiffré de bout en bout](https://filarr.com/docs/gate-hosted-trust) et
   [une base de coffre confiée à Filarr](https://filarr.com/docs/gate-sharing-vaults).

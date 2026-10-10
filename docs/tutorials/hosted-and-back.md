@@ -15,22 +15,23 @@ pricing page and in **Settings › API access**.
 
 ## What changes, said plainly
 
-With a gate of your own, Filarr never reads your databases. With the hosted box, **for the databases you entrust to
-it and while they stay entrusted**, a service of Filarr holds their key and runs the same Filarr Gate for you:
+With a gate of your own, your databases stay end-to-end encrypted. With the hosted box, **for the databases you entrust
+to it and while they stay entrusted**, a service of Filarr manages their key and runs the same Filarr Gate for you, so
+those databases are no longer end-to-end encrypted:
 
-- it can technically read **every row and every column** of those databases, including what no view shows, and what
-  is written to them meanwhile;
-- the calls of your software and the answers pass through `https://<name>.gate.filarr.com`, a name of filarr.com:
-  the Cloudflare account that manages filarr.com, the one that also serves Filarr's API, can technically see them **in
-  transit**;
-- if you connect an external database to it, Filarr holds its key and sees its rows; if the box receives files, Filarr
-  sees them in passing.
+- **every row and every column** of those databases, including what no view shows, and what is written to them
+  meanwhile, are decrypted by Filarr's servers;
+- the calls of your software and the answers are not end-to-end encrypted either: they pass through
+  `https://<name>.gate.filarr.com`, a name of filarr.com, managed by the same Cloudflare account as Filarr's API;
+- if you connect an external database to it, its key is also managed by Filarr's servers; files the box receives
+  also pass through Filarr's servers without end-to-end encryption.
 
-Your other databases, your notes, your files and your vaults stay unreadable to Filarr. Filarr commits to not logging
-this content, to using it only to serve your API, to keeping its copies in the European Union, and to erasing the key
-and the copy when you take it back: **these are commitments, not protection by encryption**. Taking the key back
-changes the keys of those databases: the box can no longer read what is written afterwards; what it read before stays
-covered by the commitments only. The full model: [security and trust](../security-and-trust.md#hosted-by-filarr).
+Your other databases, your notes, your files and your vaults are not affected. Filarr commits to not logging this
+content, to using it only to serve your API, to keeping its copies in the European Union, and to erasing the key and
+the copy when you take it back: **these are Filarr's commitments, not protection by end-to-end encryption**. Taking the
+key back changes the keys of those databases: what is written afterwards is end-to-end encrypted again; what the box
+processed before stays covered by the commitments only. The full model:
+[security and trust](../security-and-trust.md#hosted-by-filarr).
 
 ## Entrust databases (in Filarr)
 
@@ -38,8 +39,8 @@ When you open a database to an API, "Where does the gate run?" offers **on my si
 Filarr**. At Filarr:
 
 1. tick each database to entrust (none is ticked for you);
-2. read the consent and tick "I understand that Filarr will be able to read the checked databases while they are
-   entrusted to it" (the text is versioned: a change of text asks you again);
+2. read the consent and tick "I understand that the checked databases will no longer be end-to-end encrypted while
+   they are entrusted to Filarr" (the text is versioned: a change of text asks you again);
 3. prove it is you again (password and two-factor code, or a passkey);
 4. **Entrust 1 database to Filarr**.
 
@@ -48,7 +49,7 @@ token, not even you. It shows you the box's address (`https://site-vitrine-7qm2.
 (`gk_…`), once. There is no management UI on the hosted box: its app keys, webhooks, saved queries and file filter are
 set in **Settings › API access**.
 
-Everyone who can see an entrusted database sees it marked "API hosted by Filarr · Filarr can read this database", on
+Everyone who can see an entrusted database sees it marked "API hosted by Filarr · not end-to-end encrypted", on
 every device; the members of a vault are told who entrusted it. Only the vault's owner or admins can entrust or take
 back a database of a vault.
 
@@ -83,7 +84,8 @@ Five steps, without stopping your software:
    database to a new generation of keys.
 
 The keys of external databases are **not** in the package: on your own gate a key never transits through Filarr.
-Filarr held them: change them at their provider, then give the new ones to your gate (`filarr-gate sources key`).
+They were managed by Filarr's servers: change them at their provider, then give the new ones to your gate
+(`filarr-gate sources key`).
 
 ### The same move, as a file
 
@@ -110,13 +112,13 @@ another gate cannot open it. More: [explain/migration.md](../explain/migration.m
 
 signed by the hosted service's key, kept 5 years in the access's log, shown by the apps with the generation after the
 move ("generation 4 → 5"). **It proves the service executed the order; it cannot prove that no copy exists
-elsewhere.** What is written from then on in those databases is unreadable to the old box: that is guaranteed by
-encryption.
+elsewhere.** What is written from then on in those databases is end-to-end encrypted again, with
+keys the old box never had: that is guaranteed by encryption.
 
 ## Next
 
 - [Security and trust](../security-and-trust.md): who sees what in each mode, and how to check the hosted service's
   code.
 - [Revoke an access](revoke.md), hosted or not.
-- In Filarr's help: [the hosted gate](https://filarr.com/en/docs/gate-hosted), [what Filarr can see](https://filarr.com/en/docs/gate-hosted-trust)
+- In Filarr's help: [the hosted gate](https://filarr.com/en/docs/gate-hosted), [what is no longer end-to-end encrypted](https://filarr.com/en/docs/gate-hosted-trust)
   and [a vault database entrusted to Filarr](https://filarr.com/en/docs/gate-sharing-vaults).
