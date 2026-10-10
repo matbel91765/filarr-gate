@@ -8,7 +8,8 @@
  *   dont `a` n'est pas l'accès qu'il sert ou dont `k` n'est pas la clé qui l'ouvre.
  * - `K_box` (§ 7.1) : HKDF-SHA256(ikm = secret du jeton, sel = accessId (16 o),
  *   info `filarr/gate-host/v1|box`, 32 o), et l'AAD de l'état au repos :
- *   `"filarr/gate-host/v1|state|" + accessId + "|" + clé`.
+ *   `"filarr/gate-host/v1|state|" + accessId + "|" + clé` ; l'enveloppe d'une entrée stockée est
+ *   `IV (12 o) ‖ chiffré ‖ étiquette GCM (16 o)` (§ 16 bis, PH3).
  *
  * Vecteurs : `test/vectors/gate-heberge-1-gate.vectors.json` (familles 2 et 8),
  * écrits par une référence en Node seul (`scripts/gen-gate-heberge-1-gate-vectors.mjs`).
@@ -18,10 +19,12 @@
 
 import { openSealedBox, parseAccessToken, sealToKey, type AccessCurves } from '../store/apiAccess';
 import { canonicalJson } from '../store/canonical';
-import { utf8Decode, utf8Encode, type StoreCrypto } from '../store/crypto';
+import { concatBytes, utf8Decode, utf8Encode, type StoreCrypto } from '../store/crypto';
 
 const HOST_INFO = 'filarr/gate-host/v1';
 const KEY_BYTES = 32;
+const IV_BYTES = 12;
+const TAG_BYTES = 16;
 
 /** Le clair du jeton scellé. `s` : le paquet `gate-settings-1` initial (§ 8.6), facultatif. */
 export interface SealedTokenPlain {
@@ -84,4 +87,23 @@ export function deriveBoxKey(c: StoreCrypto, accessIdBytes: Uint8Array, secret: 
 /** L'AAD d'une entrée de l'état au repos (AES-256-GCM sous `K_box`). */
 export function stateAad(accessId: string, key: string): Uint8Array {
   return utf8Encode(`${HOST_INFO}|state|${accessId}|${key}`);
+}
+
+/** Chiffre une entrée de l'état sous `K_box` : l'enveloppe `IV ‖ chiffré ‖ étiquette`. L'IV n'est imposable que pour les vecteurs. */
+export async function sealState(
+  c: StoreCrypto,
+  kBox: Uint8Array,
+  accessId: string,
+  key: string,
+  plaintext: Uint8Array,
+  fixedIv?: Uint8Array
+): Promise<Uint8Array> {
+  const iv = fixedIv ?? c.randomBytes(IV_BYTES);
+  return concatBytes(iv, await c.aesGcmEncrypt(kBox, iv, plaintext, stateAad(accessId, key)));
+}
+
+/** Ouvre une enveloppe de l'état ; lève si elle est tronquée, altérée, ou d'une autre clé ou d'un autre accès. */
+export function openState(c: StoreCrypto, kBox: Uint8Array, accessId: string, key: string, envelope: Uint8Array): Promise<Uint8Array> {
+  if (envelope.length < IV_BYTES + TAG_BYTES) throw new Error('entrée d’état tronquée');
+  return c.aesGcmDecrypt(kBox, envelope.slice(0, IV_BYTES), envelope.slice(IV_BYTES), stateAad(accessId, key));
 }

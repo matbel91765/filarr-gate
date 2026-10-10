@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { webCryptoStore } from '../packages/core/src/engine/store/crypto';
 import { parseAccessToken } from '../packages/core/src/engine/store/apiAccess';
-import { deriveBoxKey, openSealedToken, sealToken, sealedTokenPlaintext, stateAad, type SealedTokenPlain } from '../packages/core/src/engine/gate/host';
+import { deriveBoxKey, openSealedToken, openState, sealState, sealToken, sealedTokenPlaintext, stateAad, type SealedTokenPlain } from '../packages/core/src/engine/gate/host';
 import { curves } from '../packages/gate/src/crypto/providers';
 import { buildHebergeGateVectors, formatHebergeGateVectors } from '../scripts/gen-gate-heberge-1-gate-vectors.mjs';
 import { checkEntry, codeHashOf, journalLine } from '../scripts/release/journal.mjs';
@@ -44,7 +44,7 @@ interface Vectors {
     otherToken: string;
     otherKBoxHex: string;
     aad: Array<{ key: string; aad: string; aadHex: string }>;
-    state: { key: string; ivHex: string; plaintext: string; ciphertextHex: string };
+    state: { key: string; ivHex: string; plaintext: string; ciphertextHex: string; envelopeHex: string };
     refused: Array<{ why: string; aad?: string; kBoxHex?: string }>;
   };
   securityTag: {
@@ -129,6 +129,9 @@ describe('gate-heberge-1, famille 8 : K_box et l’AAD de l’état', () => {
     const aad = stateAad(v.accessId, v.state.key);
     expect(hex(await c.aesGcmEncrypt(kBox, iv, utf8(v.state.plaintext), aad))).toBe(v.state.ciphertextHex);
     expect(new TextDecoder().decode(await c.aesGcmDecrypt(kBox, iv, unhex(v.state.ciphertextHex), aad))).toBe(v.state.plaintext);
+    expect(hex(await sealState(c, kBox, v.accessId, v.state.key, utf8(v.state.plaintext), iv))).toBe(v.state.envelopeHex);
+    expect(new TextDecoder().decode(await openState(c, kBox, v.accessId, v.state.key, unhex(v.state.envelopeHex)))).toBe(v.state.plaintext);
+    await expect(openState(c, kBox, v.accessId, 'queries', unhex(v.state.envelopeHex))).rejects.toThrow();
     for (const r of v.refused) {
       const key = r.kBoxHex ? unhex(r.kBoxHex) : kBox;
       const wrongAad = r.aad ? utf8(r.aad) : aad;

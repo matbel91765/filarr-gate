@@ -171,7 +171,7 @@ function family8() {
     lecture:
       'K_box = HKDF-SHA256(ikm = secret du jeton (32 o), sel = accessId (16 o, décodé du base64url), info = "filarr/gate-host/v1|box", 32 o). ' +
       'AAD d’une entrée de l’état = UTF-8("filarr/gate-host/v1|state|" + accessId (base64url, 22 car.) + "|" + clé). ' +
-      'L’exemple chiffre une entrée par AES-256-GCM sous K_box (chiffré ‖ étiquette de 16 o) ; l’enveloppe de stockage (où va l’IV) n’est pas gelée.',
+      'Enveloppe d’une entrée stockée (§ 16 bis, PH3) : IV (12 o) ‖ chiffré ‖ étiquette GCM (16 o), AES-256-GCM sous K_box avec cette AAD.',
     token,
     accessId,
     secretHex: hex(secret),
@@ -179,7 +179,10 @@ function family8() {
     otherToken,
     otherKBoxHex: hex(derive(otherAccessIdBytes, otherSecret)),
     aad: keys.map((key) => ({ key, aad: aad(accessId, key), aadHex: hex(utf8(aad(accessId, key))) })),
-    state: { key: 'webhooks', ivHex: hex(iv), plaintext, ciphertextHex: hex(aesGcm(kBox, iv, utf8(plaintext), utf8(aad(accessId, 'webhooks')))) },
+    state: (() => {
+      const ct = aesGcm(kBox, iv, utf8(plaintext), utf8(aad(accessId, 'webhooks')));
+      return { key: 'webhooks', ivHex: hex(iv), plaintext, ciphertextHex: hex(ct), envelopeHex: hex(Buffer.concat([iv, ct])) };
+    })(),
     refused: [
       { why: 'AAD d’une autre clé de l’état', aad: aad(accessId, 'queries') },
       { why: 'AAD d’un autre accès', aad: aad(otherAccessId, 'webhooks') },

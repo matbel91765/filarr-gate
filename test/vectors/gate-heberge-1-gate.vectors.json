@@ -122,7 +122,7 @@
   },
   "box": {
     "famille": 8,
-    "lecture": "K_box = HKDF-SHA256(ikm = secret du jeton (32 o), sel = accessId (16 o, décodé du base64url), info = \"filarr/gate-host/v1|box\", 32 o). AAD d’une entrée de l’état = UTF-8(\"filarr/gate-host/v1|state|\" + accessId (base64url, 22 car.) + \"|\" + clé). L’exemple chiffre une entrée par AES-256-GCM sous K_box (chiffré ‖ étiquette de 16 o) ; l’enveloppe de stockage (où va l’IV) n’est pas gelée.",
+    "lecture": "K_box = HKDF-SHA256(ikm = secret du jeton (32 o), sel = accessId (16 o, décodé du base64url), info = \"filarr/gate-host/v1|box\", 32 o). AAD d’une entrée de l’état = UTF-8(\"filarr/gate-host/v1|state|\" + accessId (base64url, 22 car.) + \"|\" + clé). Enveloppe d’une entrée stockée (§ 16 bis, PH3) : IV (12 o) ‖ chiffré ‖ étiquette GCM (16 o), AES-256-GCM sous K_box avec cette AAD.",
     "token": "flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y",
     "accessId": "jpWco6qxuL_GzdTb4unw9w",
     "secretHex": "adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f86",
@@ -160,7 +160,8 @@
       "key": "webhooks",
       "ivHex": "30373e454c535a61686f767d",
       "plaintext": "[{\"id\":\"6c1f0a9e\",\"secret\":\"whsec_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"https://erp.example.test/hooks/filarr\"}]",
-      "ciphertextHex": "ab23070ba5791c84e4da1e574f0f0b3196a57c7a51da00550e8b9f50848e68e50c6817d4e3b4259c29d0c07fed0a18d4342eb4f7b005fe04b9dd3ed9e2a514824810b4313f70ac0e55e3486507f194c1cfe8b18c836c1ebe0d1133e22bf2c544115b6198f5f3292ed6e8efc34f5ee06644b1ce8f4a5f0b059cab338e3c5f404a706561b00d638167419cb9eaf106"
+      "ciphertextHex": "ab23070ba5791c84e4da1e574f0f0b3196a57c7a51da00550e8b9f50848e68e50c6817d4e3b4259c29d0c07fed0a18d4342eb4f7b005fe04b9dd3ed9e2a514824810b4313f70ac0e55e3486507f194c1cfe8b18c836c1ebe0d1133e22bf2c544115b6198f5f3292ed6e8efc34f5ee06644b1ce8f4a5f0b059cab338e3c5f404a706561b00d638167419cb9eaf106",
+      "envelopeHex": "30373e454c535a61686f767dab23070ba5791c84e4da1e574f0f0b3196a57c7a51da00550e8b9f50848e68e50c6817d4e3b4259c29d0c07fed0a18d4342eb4f7b005fe04b9dd3ed9e2a514824810b4313f70ac0e55e3486507f194c1cfe8b18c836c1ebe0d1133e22bf2c544115b6198f5f3292ed6e8efc34f5ee06644b1ce8f4a5f0b059cab338e3c5f404a706561b00d638167419cb9eaf106"
     },
     "refused": [
       {
