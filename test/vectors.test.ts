@@ -1,9 +1,10 @@
 /**
  * Les vecteurs dorés, rejoués par la copie du cœur que porte la boîte noire.
- * db-store-1 et api-base-1 : les fichiers sont ceux de `.filarr-parity/contracts/`,
- * à l'octet près, et leurs rejoueurs ceux de filarg (`test/helpers`), recopiés.
- * source-externe-1 et gate-fichiers-1 : la boîte noire en est l'ORIGINE (rien dans
- * filarg à ce jour) ; `scripts/build-vectors.ts` les écrit.
+ * db-store-1 et api-base-1 : les fichiers sont ceux des contrats gelés avec les applis
+ * Filarr, à l'octet près, et leurs rejoueurs ceux de filarg (`test/helpers`), recopiés.
+ * source-externe-1, gate-fichiers-1 et gate-settings-1 : la boîte noire en est l'ORIGINE
+ * (rien dans filarg à ce jour) ; `scripts/build-vectors.ts` les écrit. Les familles 2, 8
+ * et 9 de gate-heberge-1 : `test/hebergeGateVectors.test.ts`.
  */
 
 import { readFileSync } from 'node:fs';
