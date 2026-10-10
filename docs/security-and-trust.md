@@ -1,5 +1,7 @@
 # Security and trust: who sees what
 
+[Lire en français](security-and-trust.fr.md)
+
 Filarr encrypts your notes and databases end to end: its servers store blocks they cannot read. To serve a database
 as an API, something must decrypt it. This page says exactly what does, in each mode, who can therefore read what, and
 what is guaranteed by encryption, what can be checked, and what rests on commitments only. Where a limit exists, it is
@@ -161,6 +163,29 @@ processing agreement comes with the option, Cloudflare listed as sub-processor.
 | external database keys | in your gate | held by Filarr |
 | something to install and keep running | yes | no |
 | PostgreSQL and MySQL syncs | yes | no (HTTPS connectors only) |
+
+### The consent text
+
+What you accept when you entrust databases, word for word (version `hebergement-v1`). `{{box}}` becomes the box's
+name. The layout (title, bullets, checkbox) may differ from one app to another; the words may not: each Filarr app is
+tested against the SHA-256 fingerprint of this text that the contract fixes, and so is this page (`npm test`). If the
+text changes, Filarr asks you to accept it again; without a new consent after 30 days, the database is removed from the
+box.
+
+<!-- consent: hebergement-v1 en -->
+```text
+Entrust these databases to the black box hosted by Filarr?
+Until now, Filarr could not read these databases: only your devices had their key.
+If you entrust them to the black box "{{box}}", hosted by Filarr:
+the key of each checked database will be handed to an isolated Filarr service, which decrypts it to answer your software;
+Filarr will therefore technically be able to read all their rows and all their columns, including those no view shows, and everything written to them while they remain entrusted;
+this also holds in transit: the box's address is a filarr.com name, and the Filarr account that manages that name, the one that also serves Filarr's API, can technically see your software's calls and the responses;
+if you connect an external database to it, Filarr will also hold its key and see its rows; if the box receives files, Filarr will see them in passing;
+your other databases, your notes, your files and your vaults will remain unreadable to Filarr.
+Filarr commits to not logging this content, to using it only to serve your API, to keeping its copies in the European Union and to erasing the key and the copy when you take it back. These are commitments, not protection by encryption.
+You can take the key back at any time. The keys of these databases then change: the hosted box will no longer be able to read anything written afterwards. What it read before remains covered only by the commitments above.
+I understand that Filarr will be able to read the checked databases while they are entrusted to it.
+```
 
 ## Report a vulnerability
 

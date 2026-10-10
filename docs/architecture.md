@@ -1,5 +1,7 @@
 # Architecture
 
+[Lire en français](architecture.fr.md)
+
 > Follows the frozen contracts of the Filarr apps: `api-base-1` (revisions 2 and 3), `db-store-1` (3.9),
 > `gate-fichiers-1`, `source-externe-1`, and the settings package of `gate-heberge-1`. Where this document and the
 > contracts disagree, the contracts win.

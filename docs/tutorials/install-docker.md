@@ -1,5 +1,7 @@
 # Install the gate on a server with Docker
 
+[Lire en français](install-docker.fr.md)
+
 **At the end** you will have Filarr Gate running on a company server in a container that restarts on its own,
 its state kept in a volume, its API behind HTTPS (Caddy), its management UI reachable from the server only, and you
 will know how to update it and back it up.

@@ -1,7 +1,8 @@
 /**
  * Ce que la documentation lit dans le CODE (jamais tapé à la main) : les codes que l'API locale
  * peut rendre et leurs statuts HTTP, les états de la liaison, les états des synchros, les codes
- * de Filarr des vecteurs de la révision 3, et les variables d'environnement que le code connaît.
+ * de Filarr des vecteurs de la révision 3, le texte d'accord de la boîte hébergée, et les variables
+ * d'environnement que le code connaît.
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -89,6 +90,19 @@ export function vectorCodes(): { rows: VectorCode[]; asleep: Record<string, stri
     codes: { rows: VectorCode[]; asleepRemedyByReason: Record<string, string[] | null> };
   };
   return { rows: v.codes.rows, asleep: v.codes.asleepRemedyByReason };
+}
+
+export interface ConsentText {
+  text: string;
+  hash: string;
+}
+
+/** Le texte d'accord de la boîte hébergée (`hebergement-v1`), en français et en anglais, tel que les vecteurs `gate-heberge-1` le donnent. */
+export function consentTexts(): { version: string; fr: ConsentText; en: ConsentText } {
+  const v = JSON.parse(read(join(ROOT, 'test', 'vectors', 'gate-heberge-1.vectors.json'))) as {
+    consent: { version: string; fr: ConsentText; en: ConsentText };
+  };
+  return v.consent;
 }
 
 /** Chaque nom `FILARR_GATE_*` que le code connaît (avec `FILARR_GATE_EXTDB_<ID>` en motif). */

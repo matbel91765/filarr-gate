@@ -1,5 +1,7 @@
 # The contracts this version implements
 
+[Lire en français](contracts.fr.md)
+
 Filarr's apps (desktop, web, mobile), its server and Filarr Gate share frozen contracts. The gate is a reader of some
 and the origin of others. Where this documentation and a contract disagree, the contract wins, and the difference is a
 bug to report.
@@ -23,7 +25,7 @@ The test suite replays the vectors shared with Filarr (`test/vectors/`), byte fo
 | `api-base-1.vectors.json` | Filarr | token, proof, sealed keys, manifest, slugs |
 | `db-store-1.vectors.json` | Filarr | the store's keys per generation, blocks, heads |
 | `boite-noire-v2-serveur.vectors.json` | Filarr's server | the revision 3 codes and remedies, `bumpDue`, the body of each wake-up |
-| `gate-heberge-1.vectors.json` | Filarr and the gate | wake-ups (`A_notify`, header, window), the settings package |
+| `gate-heberge-1.vectors.json` | Filarr and the gate | wake-ups (`A_notify`, header, window), the settings package, the consent text and its fingerprint |
 | `source-externe-1.vectors.json` | **the gate** | identity, `mergeCell`, queue, `planPass`, definitions, seals |
 | `gate-fichiers-1.vectors.json` | **the gate** | the fixed manifest, `boxSig`, the outcome, the filter |
 | `gate-settings-1.vectors.json` | **the gate** | a fixed sealed package and what it opens to |

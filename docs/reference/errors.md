@@ -2,6 +2,8 @@
 
 # Error codes and states
 
+[Lire en français](errors.fr.md)
+
 Every refusal of the local API is JSON: `{ "error": "<message>", "code": "<code>", … }`. **Match on `code`**: it is stable; `error` is a message for people (in French for now) and may change. A `429` carries `Retry-After` (seconds).
 
 For the steps to follow by symptom, see [troubleshooting.md](../troubleshooting.md).

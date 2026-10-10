@@ -1,5 +1,7 @@
 # Troubleshooting
 
+[Lire en français](troubleshooting.fr.md)
+
 Three tools tell you almost everything:
 
 ```sh

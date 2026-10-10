@@ -1,5 +1,7 @@
 # Webhooks
 
+[Lire en français](webhooks.fr.md)
+
 Tutorial: [receive changes by webhook](../tutorials/webhooks.md), with receivers in Node and Python.
 
 ## A delivery

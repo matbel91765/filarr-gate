@@ -54,12 +54,12 @@ curl -s -H "Authorization: Bearer gk_…" "http://127.0.0.1:8443/v1/clients?limi
 
 ## Quatre façons de la faire tourner
 
-| | comment | tutoriel (en anglais) |
+| | comment | tutoriel |
 |---|---|---|
-| **dans votre code** | `npm install @filarr/gate`, puis `openGate({ token })` : lignes, vues, SQL, changements en direct, écriture, dépôt de fichiers | [bibliothèque](docs/tutorials/library.md) |
-| **sur une machine** | `npx filarr-gate init --token …` puis `npx filarr-gate` (depuis un clone : `node packages/cli/dist/cli.js`) | [votre ordinateur](docs/tutorials/install-local.md) |
-| **dans Docker** | `docker compose up -d` avec [examples/docker](examples/docker) : la boîte derrière Caddy, l'état dans un volume | [un serveur](docs/tutorials/install-docker.md) |
-| **sur votre compte Cloudflare** | le bouton Deploy, ou `npx wrangler deploy` ; le jeton est un secret de VOTRE Worker | [Cloudflare](docs/tutorials/install-cloudflare.md) |
+| **dans votre code** | `npm install @filarr/gate`, puis `openGate({ token })` : lignes, vues, SQL, changements en direct, écriture, dépôt de fichiers | [bibliothèque](docs/tutorials/library.fr.md) |
+| **sur une machine** | `npx filarr-gate init --token …` puis `npx filarr-gate` (depuis un clone : `node packages/cli/dist/cli.js`) | [votre ordinateur](docs/tutorials/install-local.fr.md) |
+| **dans Docker** | `docker compose up -d` avec [examples/docker](examples/docker) : la boîte derrière Caddy, l'état dans un volume | [un serveur](docs/tutorials/install-docker.fr.md) |
+| **sur votre compte Cloudflare** | le bouton Deploy, ou `npx wrangler deploy` ; le jeton est un secret de VOTRE Worker | [Cloudflare](docs/tutorials/install-cloudflare.fr.md) |
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/matbel91765/filarr-gate)
 
@@ -95,20 +95,24 @@ const actifs = await gate.base('clients').view('clients-actifs').rows();
 
 ## Documentation
 
-- **Tutoriels** (en anglais pour l'instant) : [installer](docs/tutorials/install-local.md) ([Docker](docs/tutorials/install-docker.md),
-  [Cloudflare](docs/tutorials/install-cloudflare.md)) · [ouvrir une base à une API](docs/tutorials/open-a-database.md)
-  · [appeler l'API en curl, JavaScript, Python](docs/tutorials/first-calls.md) · [webhooks](docs/tutorials/webhooks.md)
-  · [synchroniser D1](docs/tutorials/sync-d1.md) et [PostgreSQL](docs/tutorials/sync-postgres.md) ·
-  [recevoir des fichiers](docs/tutorials/receive-files.md) · [révoquer](docs/tutorials/revoke.md) ·
-  [boîte hébergée et retour](docs/tutorials/hosted-and-back.md) (bientôt) · [dépannage](docs/troubleshooting.md)
-- **Cas d'usage**, complets et éprouvés : [examples/](examples)
-- **Référence** (en anglais) : [API](docs/reference/api.md) · [OpenAPI](docs/openapi/filarr-gate.v1.json) ·
-  [réglages](docs/reference/configuration.md) · [ligne de commande](docs/reference/cli.md) ·
-  [codes](docs/reference/errors.md) · [webhooks](docs/reference/webhooks.md) · [MCP](docs/reference/mcp.md) ·
-  [bibliothèque](docs/reference/library.md) · [connecteurs](docs/reference/sync-connectors.md) · [limites](docs/reference/limits.md)
-- **Sécurité** (en anglais pour l'instant) : [qui voit quoi, dans chaque mode](docs/security-and-trust.md) · [architecture](docs/architecture.md) ·
-  [signaler une faille](SECURITY.md)
-- Tout : [docs/](docs/README.md)
+Toute la documentation existe en français et en anglais : chaque page renvoie à l'autre langue en tête.
+
+- **Tutoriels** : [installer](docs/tutorials/install-local.fr.md) ([Docker](docs/tutorials/install-docker.fr.md),
+  [Cloudflare](docs/tutorials/install-cloudflare.fr.md)) · [ouvrir une base à une API](docs/tutorials/open-a-database.fr.md)
+  · [appeler l'API en curl, JavaScript, Python](docs/tutorials/first-calls.fr.md) · [la bibliothèque](docs/tutorials/library.fr.md)
+  · [webhooks](docs/tutorials/webhooks.fr.md) · [synchroniser D1](docs/tutorials/sync-d1.fr.md) et
+  [PostgreSQL](docs/tutorials/sync-postgres.fr.md) · [recevoir des fichiers](docs/tutorials/receive-files.fr.md) ·
+  [révoquer](docs/tutorials/revoke.fr.md) · [boîte hébergée et retour](docs/tutorials/hosted-and-back.fr.md) (bientôt) ·
+  [dépannage](docs/troubleshooting.fr.md)
+- **Cas d'usage**, complets et éprouvés : [examples/](examples) (décrits en anglais)
+- **Référence** : [API](docs/reference/api.fr.md) · [OpenAPI](docs/openapi/filarr-gate.v1.json) ·
+  [réglages](docs/reference/configuration.fr.md) · [ligne de commande](docs/reference/cli.fr.md) ·
+  [codes](docs/reference/errors.fr.md) · [webhooks](docs/reference/webhooks.fr.md) · [MCP](docs/reference/mcp.fr.md) ·
+  [bibliothèque](docs/reference/library.fr.md) · [connecteurs](docs/reference/sync-connectors.fr.md) ·
+  [limites](docs/reference/limits.fr.md) · [contrats](docs/reference/contracts.fr.md)
+- **Sécurité** : [qui voit quoi, dans chaque mode](docs/security-and-trust.fr.md) · [architecture](docs/architecture.fr.md) ·
+  [signaler une faille](SECURITY.md) (en anglais)
+- Tout : [docs/](docs/README.fr.md)
 
 ## La sécurité, en bref
 
@@ -127,7 +131,7 @@ const actifs = await gate.base('clients').view('clients-actifs').rows();
 npm ci
 npm test               # essais unitaires et d'intégration contre un Filarr en mémoire, les exemples, et docs:check
 npm run test:examples  # seulement les exemples de la documentation (ceux en Python et en bash sautés s'ils manquent)
-npm run docs           # régénère les pages de référence générées et les blocs de code recopiés d'examples/
+npm run docs           # régénère, en français et en anglais, les pages générées et les blocs de code recopiés d'examples/
 npm run typecheck
 npm run build
 npm run mock-filarr    # un Filarr en mémoire avec des bases de démonstration, pour essayer la boîte à la main
@@ -138,7 +142,7 @@ De bout en bout contre le vrai worker de Filarr, lancé en local par le banc de 
 
 Organisation : `packages/core` (le cœur portable de Filarr, recopié tel quel et relicencié Apache-2.0, plus les modules
 purs de la boîte), `packages/gate` (la bibliothèque), `packages/server` (la boîte sans moteur), `packages/cli` (Node,
-l'interface, Docker), `packages/cloudflare` (le Worker). Plan de publication : [docs/release.md](docs/release.md).
+l'interface, Docker), `packages/cloudflare` (le Worker). Plan de publication : [docs/release.fr.md](docs/release.fr.md).
 
 ## Licence
 

@@ -1,5 +1,7 @@
 # Release plan
 
+[Lire en français](release.fr.md)
+
 What a release publishes, in which order, and how anyone can check that what was published is what this repository
 builds. **Nothing here has been published yet**; the steps marked *decision* wait for the maintainer.
 

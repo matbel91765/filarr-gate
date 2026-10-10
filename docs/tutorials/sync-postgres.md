@@ -1,5 +1,7 @@
 # Mirror a PostgreSQL of your local network, then sync it both ways
 
+[Lire en français](sync-postgres.fr.md)
+
 > **Coming soon, on Filarr's side**, as for [D1](sync-d1.md): the gate runs this today, and the test suite runs every
 > gate-side and PostgreSQL step of this tutorial against a real, throwaway PostgreSQL, with the exact SQL of the
 > example and the limited role it creates. The Filarr screens that create the sync come with a coming version of the

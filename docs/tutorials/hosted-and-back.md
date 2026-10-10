@@ -1,5 +1,7 @@
 # Move to the hosted box, then come back home
 
+[Lire en français](hosted-and-back.fr.md)
+
 > **Coming soon.** The box hosted by Filarr is not open yet: it opens after an external security review, account by
 > account, and this page describes it as the frozen contract `gate-heberge-1` fixes it. What already works today is the
 > gate's half of the move: the settings package (`gate-settings-1`) that carries your app keys, webhooks and saved

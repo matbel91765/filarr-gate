@@ -92,6 +92,8 @@ const active = await gate.base('clients').view('clients-actifs').rows();
 
 ## Documentation
 
+Every page also exists in French, linked at the top of the page.
+
 - **Tutorials**: [install](docs/tutorials/install-local.md) ([Docker](docs/tutorials/install-docker.md),
   [Cloudflare](docs/tutorials/install-cloudflare.md)) · [open a database to an API](docs/tutorials/open-a-database.md) ·
   [call the API in curl, JavaScript, Python](docs/tutorials/first-calls.md) · [webhooks](docs/tutorials/webhooks.md) ·
@@ -124,7 +126,7 @@ const active = await gate.base('clients').view('clients-actifs').rows();
 npm ci
 npm test               # unit and integration tests against an in-memory Filarr, the examples, and docs:check
 npm run test:examples  # only the examples of the documentation (Python and bash ones skip when absent)
-npm run docs           # regenerate the generated reference pages and the code blocks copied from examples/
+npm run docs           # regenerate the generated pages (English and French) and the code blocks copied from examples/
 npm run typecheck
 npm run build
 npm run mock-filarr    # an in-memory Filarr with demo databases, for trying the gate by hand

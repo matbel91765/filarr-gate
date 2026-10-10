@@ -1,5 +1,7 @@
 # Limits
 
+[Lire en français](limits.fr.md)
+
 No number of a plan is written in this documentation: the plans and their limits live at Filarr, change there, and are
 read from there. This page says **what** is counted, **where** to read the figures, and **how the gate behaves** at each
 limit.

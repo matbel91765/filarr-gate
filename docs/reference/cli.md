@@ -2,6 +2,8 @@
 
 # Command line: `filarr-gate`
 
+[Lire en français](cli.fr.md)
+
 ```sh
 npx filarr-gate <command> [options]       # once published on npm
 node packages/cli/dist/cli.js <command>   # from a clone, after npm ci && npm run build
@@ -22,7 +24,7 @@ docker exec <container> filarr-gate <command>
 | `filarr-gate keys revoke ID\|PRÉFIXE` | Revoke a key by its id or the start of its prefix; it stops working at once. |
 | `filarr-gate sources list` | List the external syncs Filarr assigns to this gate, what blocks each one, and where its key comes from. |
 | `filarr-gate sources key DEF_ID (--secret VALEUR \| --stdin \| --clear)` | Give (or clear) the key of an external database; `--stdin` keeps it out of the shell history. Stored encrypted under a key derived from the token. |
-| `filarr-gate sources run DEF_ID [--ack-guard PASSAGE] [--initial source\|filarr]` | Run a sync pass now. `--ack-guard PASS` agrees to a stopped pass (safety stop), for that pass only; `--initial source|filarr` settles a first pass that hit too many conflicts. |
+| `filarr-gate sources run DEF_ID [--ack-guard PASSAGE] [--initial source\|filarr]` | Run a sync pass now. `--ack-guard PASS` agrees to a stopped pass (safety stop), for that pass only; `--initial source\|filarr` settles a first pass that hit too many conflicts. |
 | `filarr-gate sources pause DEF_ID \| sources resume DEF_ID` | Pause a sync on this gate (`sources resume` resumes it). The definition stays in Filarr. |
 | `filarr-gate files test` | Deposit a small test file into the linked deposit box. |
 | `filarr-gate files status ID` | The status of a deposit (`deposited`, `filed`, `rejected`, `expired`). |

@@ -1,5 +1,7 @@
 # Sync a Cloudflare D1 database, in every direction
 
+[Lire en français](sync-d1.fr.md)
+
 > **Coming soon, on Filarr's side.** The gate runs these syncs today, and every step of this tutorial that happens in
 > the gate or in D1 is run by the test suite (`test/examples-sync.test.ts`) against a D1 simulated on SQLite, D1's
 > own engine. The Filarr screens that create a sync ("···" on a database › "Feed from an external database…") come

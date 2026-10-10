@@ -1,5 +1,7 @@
 # The hosted service, and how to check it yourself
 
+[Lire en français](hosted.fr.md)
+
 > Coming soon: the box hosted by Filarr is not open. This page says what will be checkable, and what this repository
 > does not provide yet. What Filarr can see in that mode, and what protects it: [security and
 > trust](../security-and-trust.md#hosted-by-filarr). The move there and back: [tutorial](../tutorials/hosted-and-back.md).

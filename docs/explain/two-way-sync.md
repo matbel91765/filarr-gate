@@ -1,5 +1,7 @@
 # How the two-way sync decides, and why it converges
 
+[Lire en français](two-way-sync.fr.md)
+
 The tutorial shows it at work ([D1](../tutorials/sync-d1.md)); this page explains the rule, what it guarantees and
 what it does not. The rule is a pure function (`mergeCell`, `planPass` in `packages/core/src/engine/extsrc`), the same
 code the Filarr apps run, replayed by the shared vectors `source-externe-1`.

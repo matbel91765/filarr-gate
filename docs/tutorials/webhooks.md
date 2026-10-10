@@ -1,5 +1,7 @@
 # Receive changes by webhook
 
+[Lire en français](webhooks.fr.md)
+
 **At the end**, when a row changes in Filarr (or through the API), the gate decrypts it and posts it, signed, to your
 software; your receiver checks the signature and acts. You will have a receiver in Node and one in Python, a webhook
 that fires only when a condition becomes true, and you will know what happens when your receiver is down.

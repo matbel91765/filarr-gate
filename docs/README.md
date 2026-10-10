@@ -1,5 +1,7 @@
 # Filarr Gate documentation
 
+[Lire en français](README.fr.md)
+
 Filarr Gate serves the Filarr databases you choose as an API, from a copy it decrypts itself, on your side, without
 Filarr ever seeing your data. Start with the [README](../README.md) for the idea in two minutes.
 
@@ -50,4 +52,4 @@ enough to follow every tutorial.
 ## Explanations
 
 [Architecture](architecture.md) · [how the gate runs external syncs](external-databases.md) · [the two-way sync](explain/two-way-sync.md) · [moving a gate](explain/migration.md) ·
-[the hosted service](explain/hosted.md) · [release plan](release.md)
+[the hosted service](explain/hosted.md) · [the gate on Cloudflare](cloudflare.md) · [release plan](release.md)

@@ -1,5 +1,7 @@
 # Revoke an access, and react to a leak
 
+[Lire en français](revoke.fr.md)
+
 **At the end** you will know which of the five gestures to use (revoke an app key, pause, replace the token, remove a
 database, revoke the access), what each one protects, what a gate that was offline keeps, and how to check in the logs
 that it worked.

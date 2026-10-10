@@ -1,5 +1,7 @@
 # External database connectors
 
+[Lire en français](sync-connectors.fr.md)
+
 A sync is **defined in Filarr** ("···" on a database › "Feed from an external database…", coming with a coming
 version of the app) and **run by the runner it names**. This page lists what the gate needs for each connector when it
 is the runner. Tutorials: [D1](../tutorials/sync-d1.md), [PostgreSQL](../tutorials/sync-postgres.md). The rule of the

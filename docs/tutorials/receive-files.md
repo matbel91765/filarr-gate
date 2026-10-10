@@ -1,5 +1,7 @@
 # Receive files from your software into a Filarr folder
 
+[Lire en français](receive-files.fr.md)
+
 > **Coming soon, on Filarr's side.** The gate's file slot works today: every gate-side step below is run by the test
 > suite, including the refusal of an executable before anything leaves. Linking a deposit box to an access, and the
 > placement rules, come with a coming version of the Filarr app, and the feature opens account by account. The

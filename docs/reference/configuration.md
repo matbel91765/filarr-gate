@@ -2,6 +2,8 @@
 
 # Configuration
 
+[Lire en français](configuration.fr.md)
+
 A setting comes from, in this order (the first one found wins):
 
 1. an **environment variable** (on Cloudflare: a Worker variable or secret);

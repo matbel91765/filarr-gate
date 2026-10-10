@@ -1,5 +1,7 @@
 # The library `@filarr/gate`
 
+[Lire en français](library.fr.md)
+
 Tutorial: [read a Filarr database in your Node program](../tutorials/library.md). The public types are in
 `packages/gate/src/types.ts` and are the only ones a program sees.
 

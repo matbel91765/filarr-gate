@@ -1,5 +1,7 @@
 # Filarr Gate on your Cloudflare account
 
+[Lire en français](cloudflare.fr.md)
+
 The same black box as the Node version, in a **Worker** and one **Durable Object** of YOUR account. Filarr never holds
 the token: it is a secret of your Worker.
 

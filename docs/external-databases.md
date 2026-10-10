@@ -1,5 +1,7 @@
 # External databases
 
+[Lire en français](external-databases.fr.md)
+
 A Filarr database can be fed from, or published to, another database (contract `source-externe-1`). The sync is
 **defined in Filarr** ("···" on a database › "Feed from an external database…") and **run by the runner it names**:
 a device, or this gate. A gate runs the definitions that name its access, with the keys you give it here; those keys

@@ -1,5 +1,7 @@
 # Install the gate on your Cloudflare account
 
+[Lire en français](install-cloudflare.fr.md)
+
 **At the end** you will have Filarr Gate running as a Worker on YOUR Cloudflare account: its API at
 `https://filarr-gate.<your-account>.workers.dev` (or your own domain), its management UI under `/admin/`, the token
 a secret of your Worker that neither Filarr nor anyone else can read, and, if your Filarr offers it, Filarr waking it

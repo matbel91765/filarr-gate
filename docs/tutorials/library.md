@@ -1,5 +1,7 @@
 # Read a Filarr database in your Node program
 
+[Lire en français](library.fr.md)
+
 **At the end** your own program opens the databases of an access with `@filarr/gate`, reads rows, views and SQL,
 receives each change made in Filarr as it happens, writes rows, and stops cleanly: no HTTP server, no app key, the
 gate inside your process.

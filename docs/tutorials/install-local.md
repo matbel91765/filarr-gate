@@ -1,5 +1,7 @@
 # Install the gate on your computer
 
+[Lire en français](install-local.fr.md)
+
 **At the end** you will have Filarr Gate running on your computer, its management UI open, an app key, and a first
 answer from the local API with `curl`. It takes about ten minutes.
 

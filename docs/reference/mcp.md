@@ -1,5 +1,7 @@
 # MCP: an AI assistant that reads your databases
 
+[Lire en français](mcp.fr.md)
+
 The gate is a Model Context Protocol server: an assistant (Claude Desktop, an IDE, an agent) can list your opened
 databases, read a view, a row, or run a read-only SQL query, with the rights of one app key. Nothing is written
 through MCP. Example: [examples/mcp-assistant](../../examples/mcp-assistant), run by the test suite (over HTTP, and

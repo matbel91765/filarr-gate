@@ -1,5 +1,7 @@
 # Moving a gate: the settings package
 
+[Lire en français](migration.fr.md)
+
 When an access changes gates (a new server, from your gate to the hosted box and back), the new gate gets a **new
 identity** (a new token for the same access), and the old gate hands it its settings in a **settings package**
 (`gate-settings-1`), sealed so that only the new token can open it.

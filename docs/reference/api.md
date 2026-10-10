@@ -1,5 +1,7 @@
 # The local API
 
+[Lire en français](api.fr.md)
+
 Every gate serves this API from its decrypted copy of the databases opened to its access. The routes common to every
 gate are described in OpenAPI 3.1 in [../openapi/filarr-gate.v1.json](../openapi/filarr-gate.v1.json) (checked route by
 route against a running gate by the test suite); each gate serves its EXACT description at `/openapi.json`, with its

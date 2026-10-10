@@ -1,13 +1,18 @@
 /**
  * La documentation ne ment pas :
  *  - ce qui est GÉNÉRÉ (réglages, ligne de commande, codes, OpenAPI générique, tables du
- *    dépannage) est à jour, les blocs de code recopiés d'examples/ sont identiques, les liens
- *    mènent quelque part, chaque variable FILARR_GATE_* existe dans le code, aucun quota de palier
- *    n'est écrit en chiffres (`npm run docs:check`, rejoué ici) ;
+ *    dépannage), en anglais et en français, est à jour, les blocs de code recopiés d'examples/ sont
+ *    identiques, chaque page a son jumeau dans l'autre langue, les liens mènent quelque part et
+ *    restent dans la langue de la page, chaque variable FILARR_GATE_* existe dans le code, aucun
+ *    quota de palier n'est écrit en chiffres (`npm run docs:check`, rejoué ici) ;
+ *  - le texte d'accord de la boîte hébergée (`hebergement-v1`) est recopié MOT POUR MOT dans la page
+ *    sécurité et confiance de chaque langue : son empreinte est celle que fixe le contrat
+ *    `gate-heberge-1` (§ 3.2), recalculée ici sur la page elle-même ;
  *  - l'OpenAPI générique est éprouvée route par route contre une boîte en marche : chaque
  *    opération décrite répond, avec un statut décrit.
  */
 
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -26,6 +31,27 @@ describe('npm run docs:check', () => {
     expect(changed, 'lancez `npm run docs`').toEqual([]);
     expect(problems).toEqual([]);
   }, 60_000);
+});
+
+describe('le texte d’accord hebergement-v1, mot pour mot', () => {
+  const vectors = JSON.parse(readFileSync(join(__dirname, 'vectors', 'gate-heberge-1.vectors.json'), 'utf8')) as {
+    consent: { version: string; fr: { hash: string }; en: { hash: string } };
+  };
+
+  it.each([
+    ['fr', 'security-and-trust.fr.md'],
+    ['en', 'security-and-trust.md'],
+  ] as const)('(%s) docs/%s le recopie à l’empreinte du contrat', (lang, page) => {
+    const text = readFileSync(join(__dirname, '..', 'docs', page), 'utf8').replace(/\r\n/g, '\n');
+    const marker = `<!-- consent: ${vectors.consent.version} ${lang} -->\n\`\`\`text\n`;
+    const start = text.indexOf(marker);
+    expect(start, `le bloc « consent: ${vectors.consent.version} ${lang} » manque`).toBeGreaterThanOrEqual(0);
+    const block = text.slice(start + marker.length, text.indexOf('\n```', start + marker.length));
+    // Onze lignes, {{box}} non remplacé, NFC, jointes par des sauts de ligne, sans saut final (contrat § 3.2)
+    expect(block.split('\n')).toHaveLength(11);
+    expect(block).toContain('{{box}}');
+    expect(createHash('sha256').update(block.normalize('NFC'), 'utf8').digest('hex')).toBe(vectors.consent[lang].hash);
+  });
 });
 
 describe('docs/openapi/filarr-gate.v1.json, contre une boîte en marche', () => {

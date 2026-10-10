@@ -1,5 +1,7 @@
 # Call the API: curl, JavaScript, Python
 
+[Lire en français](first-calls.fr.md)
+
 **At the end** you will list rows with filters, a sort and pages, read a view, run SQL, create, change and delete a
 row safely, and handle a refusal and a `429`, in the three languages side by side. Every block below is copied from
 [examples/first-calls](../../examples/first-calls), which the test suite runs against a gate before each release:

@@ -1,5 +1,7 @@
 # Open a database to an API
 
+[Lire en français](open-a-database.fr.md)
+
 **At the end** you will have, in Filarr, an **access** that opens one or more databases to your software, its
 **token** saved, and the gate showing those databases at stable addresses such as `/v1/clients` and
 `/v1/clients/clients-actifs`.
