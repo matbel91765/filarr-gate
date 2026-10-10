@@ -408,6 +408,8 @@ export class AdminApi {
     return {
       enabled: g.sync !== null,
       creator: g.replicator.creator.status,
+      // L'instance de ce processus au bail (P1) : deux boîtes lancées avec le même jeton s'y distinguent
+      instance: g.sync?.instance ?? null,
       sources: (g.sync?.list() ?? []).map((s) => ({
         defId: s.def.id,
         rev: s.def.rev,

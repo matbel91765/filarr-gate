@@ -49,6 +49,12 @@ export interface SelfResponse {
   manifests?: unknown;
   limits?: Record<string, unknown>;
   usage?: Record<string, unknown>;
+  /**
+   * Précision « export sans flux » (api-base-1 rév. 3, 2026-10-10) : la cible d'un export de
+   * réglages attendu de CETTE boîte (migration vers une autre boîte), `null` sinon ; absente d'un
+   * serveur d'avant.
+   */
+  pendingExport?: { encPublicKey: string; bindSig: string; expiresAt: string } | null;
 }
 
 export interface OpenedGrant {

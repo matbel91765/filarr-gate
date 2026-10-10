@@ -11,6 +11,7 @@ import { Journal } from '../../server/src/journal';
 import { setLogLevel } from '../../server/src/log';
 import { ENV_NAMES, coerce, resolveSettings, type SettingKey, type Settings, type SettingSource } from '../../server/src/settings';
 import { StateStore } from '../../server/src/state';
+import { INSTANCE_RE, newInstance } from '../../server/src/sync/runner';
 import { envNameFor } from '../../server/src/sync/secrets';
 import cliPackage from '../../cli/package.json';
 import { doBlobs, doJournalSink, doKvStore, doStateBackend, readState, type DoStorage } from './storage';
@@ -135,6 +136,24 @@ class CloudflareHost implements GateHost {
   }
 }
 
+/**
+ * L'instance de l'exécutant des synchros (`source-externe-1`, précision P1). Sous Node, chaque
+ * processus tire la sienne au démarrage. Ici l'objet est UNIQUE (un nom fixe, un seul au monde
+ * pour ce Worker) et Cloudflare le recharge à chaque réveil après l'avoir évincé : tirée à chaque
+ * chargement, elle ferait de chaque réveil un « autre processus », refusé par son propre bail
+ * jusqu'à l'échéance. Elle est donc tirée UNE fois et gardée dans le stockage de l'objet. Un
+ * second déploiement du même jeton (autre Worker, autre compte) a son propre objet, donc la sienne.
+ */
+export async function syncInstance(storage: DoStorage): Promise<string> {
+  const kept = await storage.get<string>(SYNC_INSTANCE_KEY);
+  if (typeof kept === 'string' && INSTANCE_RE.test(kept)) return kept;
+  const fresh = newInstance();
+  await storage.put(SYNC_INSTANCE_KEY, fresh);
+  return fresh;
+}
+
+const SYNC_INSTANCE_KEY = 'sync-instance';
+
 export class CloudflareGate extends GateCore {
   /** La première copie (ou l'échec définitif) : les alarmes l'attendent. */
   started: Promise<void> = Promise.resolve();
@@ -147,7 +166,8 @@ export class CloudflareGate extends GateCore {
     state: StateStore,
     private readonly sink: ReturnType<typeof doJournalSink>,
     private readonly stateBackend: ReturnType<typeof doStateBackend>,
-    vars: Record<string, string | undefined>
+    vars: Record<string, string | undefined>,
+    instance: string
   ) {
     const s = host.settings();
     super({
@@ -164,6 +184,7 @@ export class CloudflareGate extends GateCore {
         tcp: false,
         externalSecret: (defId) => vars[envNameFor(defId)] || null,
         timers: false,
+        instance,
       },
     });
     this.cf = host;
@@ -176,7 +197,7 @@ export class CloudflareGate extends GateCore {
     const backend = doStateBackend(ctx.storage);
     const state = new StateStore(backend, await readState(ctx.storage));
     const host = new CloudflareHost(ctx.storage, env, vars, state.data.settings);
-    const gate = new CloudflareGate(ctx, host, state, doJournalSink(ctx.storage), backend, vars);
+    const gate = new CloudflareGate(ctx, host, state, doJournalSink(ctx.storage), backend, vars, await syncInstance(ctx.storage));
     const fromEnv = env.FILARR_GATE_TOKEN?.trim() || null;
     const token = fromEnv ?? (await ctx.storage.get<string>('token')) ?? null;
     gate.started = gate

@@ -278,6 +278,15 @@ describe('la migration et le paquet de réglages (gate-heberge-1 § 8.4, § 8.6)
 
     const newToken = await mock.migrateStart(accessId);
     await until(() => mock.accesses.get(accessId)!.pending?.exportSealed != null, 5000, 'export déposé');
+    // Le flux ET `self.pendingExport` disent la même chose : un seul dépôt, même si `self` la
+    // montre encore (relue dans les deux minutes)
+    const pending = mock.accesses.get(accessId)!.pending!;
+    const deposited = pending.exportSealed;
+    pending.exportSealed = null;
+    await old.replicator.refreshSelf();
+    await new Promise((r) => setTimeout(r, 100));
+    expect(mock.requests.filter((r) => r.method === 'PUT' && r.path === '/api-access/self/export')).toHaveLength(1);
+    pending.exportSealed = deposited;
 
     // La nouvelle boîte présente l'identité en attente : `self` et `self/import` seulement
     const fresh = await startGate(newToken);
@@ -295,6 +304,46 @@ describe('la migration et le paquet de réglages (gate-heberge-1 § 8.4, § 8.6)
     await until(() => fresh.replicator.bySlug('clients')?.mirror.status === 'ready', 5000, 'nouvelle prête');
     const res = await fetch(`http://127.0.0.1:${fresh.apiPort}/v1/clients`, { headers: { Authorization: `Bearer ${appKey.key}` } });
     expect(res.status).toBe(200);
+  });
+
+  it('« export sans flux » : une boîte qui n’a pas de flux lit la cible dans `self.pendingExport` au réveil `export`, et dépose une seule fois', async () => {
+    const { token, accessId } = await accessWith();
+    const old = await startGate(token);
+    // Sans flux (variante Cloudflare, palier sans flux) : seuls les réveils poussés la préviennent
+    await old.replicator.stop();
+    mock.accesses.get(accessId)!.notifyUrl = `http://127.0.0.1:${old.apiPort}/_filarr/notify`;
+    old.keys.create({ name: 'site', scopes: [{ target: 'all', read: true }] });
+    await mock.migrateStart(accessId);
+    await until(() => mock.accesses.get(accessId)!.pending?.exportSealed != null, 5000, 'export déposé sans flux');
+    // Le réveil n'a porté que `{a, t}` ; la cible venait de `self`
+    const wake = mock.notifications.find((n) => JSON.parse(n.body).t === 'export');
+    expect(Object.keys(JSON.parse(wake!.body)).sort()).toEqual(['a', 'at', 't']);
+    expect(old.journal.list().some((e) => e.what === 'export des réglages demandé (migration, lu dans self)')).toBe(true);
+    // Déposé : `self` ne la montre plus, une relecture ne redépose pas
+    await old.replicator.refreshSelf();
+    expect(mock.requests.filter((r) => r.method === 'PUT' && r.path === '/api-access/self/export')).toHaveLength(1);
+  });
+
+  it('« export sans flux », ni flux ni réveil : la prochaine relecture de `self` (relève, redémarrage) suffit', async () => {
+    const { token, accessId } = await accessWith();
+    const old = await startGate(token);
+    await old.replicator.stop();
+    await mock.migrateStart(accessId);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(mock.accesses.get(accessId)!.pending!.exportSealed).toBeNull();
+    await old.replicator.refreshSelf();
+    await until(() => mock.accesses.get(accessId)!.pending?.exportSealed != null, 5000, 'export déposé à la relecture');
+  });
+
+  it('« export sans flux », serveur d’avant (sans `pendingExport`) : le réveil le dit au journal, rien n’est déposé', async () => {
+    mock.hidePendingExport = true;
+    const { token, accessId } = await accessWith();
+    const old = await startGate(token);
+    await old.replicator.stop();
+    mock.accesses.get(accessId)!.notifyUrl = `http://127.0.0.1:${old.apiPort}/_filarr/notify`;
+    await mock.migrateStart(accessId);
+    await until(() => old.journal.list().some((e) => e.what.startsWith('réveil export : aucun export n’attend cette boîte')), 5000, 'réveil noté');
+    expect(mock.accesses.get(accessId)!.pending!.exportSealed).toBeNull();
   });
 
   it('une identité en attente que le créateur n’a pas liée (bindSig d’une autre clé) : rien n’est exporté', async () => {

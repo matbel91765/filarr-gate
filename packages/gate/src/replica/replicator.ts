@@ -71,6 +71,8 @@ export interface GateBase {
 const PER_STORE_429: ReadonlySet<string> = new Set(['api_poll_interval', 'api_quota_sync', 'api_quota_bytes']);
 /** Requêtes du mois épuisées : une relève par magasin et par 900 s (contrat § 6). */
 const SLOW_POLL_MS = 900_000;
+/** Une même identité en attente n'est redemandée à l'export qu'après deux minutes. */
+const EXPORT_ASK_EVERY_MS = 120_000;
 
 // Codes de fermeture du flux (worker, `apiMeter.ts`), et 4308 de la révision 3
 const CLOSE_REVOKED = 4301;
@@ -193,6 +195,8 @@ export class Replicator extends Emitter {
   startedAt: string | null = null;
   /** Le dernier réveil poussé accepté. */
   lastWakeAt: string | null = null;
+  /** Le dernier export demandé (identité en attente, heure) : le flux et `self` disent la même chose. */
+  private exportAsked: { key: string; at: number } | null = null;
 
   private abort: AbortController | null = null;
   private loop: Promise<void> | null = null;
@@ -272,6 +276,7 @@ export class Replicator extends Emitter {
     this.selfDirty = true;
     this.streamRefusedUntil = 0;
     this.notBefore = 0;
+    this.exportAsked = null;
     this.setLink('connecting');
     const signal = this.abort.signal;
     try {
@@ -462,7 +467,29 @@ export class Replicator extends Emitter {
     if (pendingFlag) this.setLink('pending', 'Identité en attente d’une migration : seuls l’accès et le paquet de réglages répondent');
     else if (this.access?.paused === true) this.setLink('paused', 'Accès mis en pause dans Filarr');
     else if (WAITING.has(this.link)) this.setLink('connecting');
+    // « Export sans flux » (api-base-1 rév. 3, précision du 2026-10-10) : une migration attend
+    // l'export de cette boîte ; la cible se lit ici, pour la boîte qui n'a pas de flux (le réveil
+    // `export` ne porte que `{a, t}`) comme pour celle qui l'a raté
+    const pe = self.pendingExport;
+    if (isObj(pe) && typeof pe.encPublicKey === 'string' && typeof pe.bindSig === 'string') {
+      this.askExport({ encPublicKey: pe.encPublicKey, bindSig: pe.bindSig }, 'self');
+    }
     this.emit('self', self);
+  }
+
+  /**
+   * Demande l'export des réglages vers une identité en attente (gate-heberge-1 § 8.4). Le flux
+   * (`export`), le réveil et `self.pendingExport` disent souvent la même chose à quelques secondes
+   * d'écart : une seule demande par identité dans les deux minutes. Plus tard, une identité
+   * toujours montrée par le serveur (il la cache dès le paquet déposé) est redemandée : un export
+   * qui a échoué se refait.
+   */
+  private askExport(target: ExportRequest, from: 'flux' | 'self'): void {
+    const now = Date.now();
+    if (this.exportAsked?.key === target.encPublicKey && now - this.exportAsked.at < EXPORT_ASK_EVERY_MS) return;
+    this.exportAsked = { key: target.encPublicKey, at: now };
+    this.journal(`export des réglages demandé (migration, ${from === 'flux' ? 'par le flux' : 'lu dans self'})`, 'export');
+    this.emit('export', target);
   }
 
   /** Rattrape chaque magasin (un à un : le débit vers Filarr reste sage). */
@@ -837,8 +864,7 @@ export class Replicator extends Emitter {
           break;
         case 'export':
           if (typeof msg.encPublicKey === 'string' && typeof msg.bindSig === 'string') {
-            this.journal('export des réglages demandé (migration)', 'export');
-            this.emit('export', { encPublicKey: msg.encPublicKey, bindSig: msg.bindSig } satisfies ExportRequest);
+            this.askExport({ encPublicKey: msg.encPublicKey, bindSig: msg.bindSig }, 'flux');
           }
           break;
         case 'hosting':
@@ -923,15 +949,10 @@ export class Replicator extends Emitter {
           if (body.storeId) this.emit('ext-run', { storeId: body.storeId, defId: null, ack: null });
           break;
         case 'export': {
-          // Sans flux, l'identité en attente se lit dans `self` si le serveur l'y met
+          // Le réveil ne porte que `{a, t}` : la cible se lit dans `self.pendingExport`, que la
+          // relecture applique
           await this.refreshSelf();
-          const self = this.rawSelf ?? {};
-          const pending = isObj(self.export) ? self.export : isObj(self.pendingExport) ? self.pendingExport : null;
-          if (pending && typeof pending.encPublicKey === 'string' && typeof pending.bindSig === 'string') {
-            this.emit('export', { encPublicKey: pending.encPublicKey, bindSig: pending.bindSig } satisfies ExportRequest);
-          } else {
-            this.journal('export demandé par un réveil, mais l’identité en attente n’est lisible que sur le flux', 'export');
-          }
+          if (!isObj(this.rawSelf?.pendingExport)) this.journal('réveil export : aucun export n’attend cette boîte (déjà déposé, ou serveur d’avant)', 'export');
           break;
         }
         case 'hosting':

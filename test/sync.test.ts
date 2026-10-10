@@ -253,16 +253,84 @@ describe('ce qui empêche une synchro de tourner', () => {
     expect(g2.sync!.get(DEF_ID)!.blocked).toBe('extdb_tier');
   });
 
-  it('deux boîtes avec le même jeton : le bail empêche les passages ensemble', async () => {
+  it('deux boîtes avec le même jeton (P1) : chacune son instance ; la seconde voit le bail tenu, le dit au journal sans planter, et passe une fois la première arrêtée', async () => {
     await mock.appSetExtSource(storeId, def());
     const a = await startGate();
     const b = await startGate();
     await until(() => a.sync!.list().length === 1 && b.sync!.list().length === 1, 5000, 'définitions');
-    // Le même jeton : les deux boîtes ont le même exécutant `a:<accessId>` ; le bail est par définition
-    await a.sync!.runPass(DEF_ID);
-    const ext = mock.extOf(storeId);
-    ext.leases.set(DEF_ID, { runnerId: 'a:autre-instance', until: Date.now() + 60_000 });
+    // Le même jeton : le même exécutant `a:<accessId>` ; deux processus, deux instances tirées au démarrage
+    expect(a.sync!.instance).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(b.sync!.instance).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(a.sync!.instance).not.toBe(b.sync!.instance);
+    expect(await a.sync!.runPass(DEF_ID)).toMatchObject({ state: 'ok' });
+    const calls = d1.calls;
     const st = await b.sync!.runPass(DEF_ID);
     expect(st).toMatchObject({ state: 'waiting', code: 'extdb_lease_held' });
+    // Rien lu dans la source, rien écrit nulle part ; le journal le dit, avec l'échéance du bail
+    expect(d1.calls).toBe(calls);
+    const note = b.journal.list().find((e) => e.code === 'extdb_lease_held');
+    expect(note?.note).toMatch(/une autre instance de cette boîte noire exécute déjà cette synchro \(bail tenu jusqu’à \d{4}-/);
+    // Les demandes de bail portent l'instance de chaque processus
+    expect(mock.leaseRequests.map((r) => r.instance)).toEqual([a.sync!.instance, b.sync!.instance]);
+    // La première s'arrête proprement : elle rend son bail (DELETE ?instance=), la seconde passe
+    await a.stop();
+    expect(mock.extOf(storeId).leases.has(DEF_ID)).toBe(false);
+    const again = await b.sync!.runPass(DEF_ID);
+    expect(again, JSON.stringify({ code: again?.code, q: again?.question })).toMatchObject({ state: 'ok' });
+    expect(mock.extOf(storeId).leases.get(DEF_ID)).toMatchObject({ runnerId: runner(), instance: b.sync!.instance });
+  });
+
+  it('P1 : à l’arrêt, un processus ne rend que SON bail, jamais celui d’une autre instance', async () => {
+    await mock.appSetExtSource(storeId, def());
+    const a = await startGate();
+    await until(() => a.sync!.list().length === 1, 5000, 'définition');
+    await a.sync!.runPass(DEF_ID);
+    // Une autre instance (même exécutant) prend le bail après échéance ; l'arrêt de `a` n'y touche pas
+    mock.extOf(storeId).leases.set(DEF_ID, { runnerId: runner(), instance: 'autre-processus-000001', until: Date.now() + 60_000 });
+    await a.stop();
+    expect(mock.extOf(storeId).leases.get(DEF_ID)).toMatchObject({ instance: 'autre-processus-000001' });
+  });
+
+  it('une relecture des définitions PENDANT un passage ne laisse pas la synchro « en cours » pour toujours', async () => {
+    await mock.appSetExtSource(storeId, def());
+    let gate: Gate | null = null;
+    let rescanned = false;
+    // La relecture tombe au milieu du passage (comme un changement du magasin reçu par le flux)
+    const handler = d1.handler;
+    const fetchDuring = routeFetch({
+      'api.cloudflare.com': async (req) => {
+        if (!rescanned && gate) {
+          rescanned = true;
+          await gate.sync!.scan();
+        }
+        return handler(req);
+      },
+    });
+    gate = new Gate({
+      env: { FILARR_GATE_STATE_DIR: tempDir(), FILARR_GATE_API_URL: mock.url, FILARR_GATE_TOKEN: token, FILARR_GATE_PORT: '0', FILARR_GATE_ADMIN_PORT: '0', FILARR_GATE_CACHE: 'memory', FILARR_GATE_WRITE: 'true' },
+      sync: { blobs: memoryBlobs(), tcp: false, fetch: fetchDuring, externalSecret: () => d1.token, timers: false, jitter: false },
+    });
+    gates.push(gate);
+    await gate.start();
+    await until(() => gate!.sync!.list().length === 1, 5000, 'définition');
+    expect(await gate.sync!.runPass(DEF_ID)).toMatchObject({ state: 'ok' });
+    expect(rescanned).toBe(true);
+    expect(gate.sync!.get(DEF_ID)!.running).toBe(false);
+    // Le passage suivant tourne vraiment (il relit la source), et l'état retenu est le sien
+    const calls = d1.calls;
+    const next = await gate.sync!.runPass(DEF_ID);
+    expect(d1.calls).toBeGreaterThan(calls);
+    expect(gate.sync!.get(DEF_ID)!.status).toBe(next);
+  });
+
+  it('P3 : une relation entrante est refusée à la validation (`unsupported_column`), rien n’est lu ni importé', async () => {
+    const map = [...(def().map as Array<Record<string, unknown>>), { col: 'client_parent', prop: 'p_parent', dir: 'in', type: 'relation' }];
+    await mock.appSetExtSource(storeId, def({ map }));
+    const gate = await startGate();
+    await until(() => gate.sync!.list().length === 1, 5000, 'définition');
+    expect(gate.sync!.get(DEF_ID)).toMatchObject({ blocked: 'extdb_def_invalid', detail: 'unsupported_column' });
+    expect(await gate.sync!.runPass(DEF_ID)).toMatchObject({ state: 'waiting', code: 'extdb_def_invalid' });
+    expect(d1.calls).toBe(0);
+    expect(await mock.appRows(storeId)).toEqual([]);
   });
 });

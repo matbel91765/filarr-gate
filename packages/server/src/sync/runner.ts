@@ -61,6 +61,7 @@ import { positionBetween } from '../../../core/src/engine/store/fracIndex';
 import type { StoreKeys } from '../../../core/src/engine/store/crypto';
 import { curves, storeCrypto } from '../../../gate/src/crypto/providers';
 import { FilarrError, RateLimitError, UnreachableError } from '../../../gate/src/replica/http';
+import { randomToken } from '../../../gate/src/util/bytes';
 import type { GateBase } from '../../../gate/src/replica/replicator';
 import type { GateCore } from '../core';
 import { ConnectorError, openConnector, type Connector } from './connectors';
@@ -98,7 +99,21 @@ export interface SyncHostOptions {
   jitter?: boolean;
   /** Pour les essais : l'attente entre deux appels d'un service limité. */
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * L'INSTANCE de cet exécutant (`source-externe-1`, précision P1) : 16 à 64 caractères
+   * `[A-Za-z0-9_-]`. Absente : tirée au hasard ici, au démarrage du processus — deux conteneurs
+   * lancés avec le même jeton partagent `a:<accessId>`, et c'est elle qui les distingue au bail.
+   * Un hôte UNIQUE par construction (l'objet durable de la variante Cloudflare, qui s'endort et
+   * se réveille sans cesser d'être le même exécutant) la garde dans son stockage et la passe ici.
+   */
+  instance?: string;
 }
+
+/** L'instance d'un exécutant (P1). */
+export const INSTANCE_RE = /^[A-Za-z0-9_-]{16,64}$/;
+
+/** Une instance neuve : 128 bits, en base64url (22 caractères). */
+export const newInstance = (): string => randomToken(16);
 
 /** Ce que la boîte sait d'une définition qui la désigne. */
 export interface SourceInfo {
@@ -156,11 +171,16 @@ export class SyncRunner {
   private readonly onChangeAt = new Map<string, number>();
   private readonly ownSeq = new Map<string, number>();
   private stopped = false;
+  /** L'instance de ce processus, envoyée avec chaque bail (P1). */
+  readonly instance: string;
+  /** Les baux que CETTE instance tient (définition → magasin), rendus à l'arrêt. */
+  private readonly held = new Map<string, string>();
 
   constructor(
     private readonly core: GateCore,
     private readonly host: SyncHostOptions
   ) {
+    this.instance = host.instance && INSTANCE_RE.test(host.instance) ? host.instance : newInstance();
     this.secrets = new SecretStore(core, host.externalSecret ?? (() => null));
     const r = core.replicator;
     r.on('bases', () => void this.scan());
@@ -295,10 +315,27 @@ export class SyncRunner {
     }
   }
 
-  stop(): void {
+  /**
+   * Arrête la planification et REND les baux de cette instance (P1) : un processus arrêté
+   * proprement ne laisse pas ses synchros bloquées jusqu'à l'échéance du bail (le processus
+   * suivant, ou `filarr-gate sources run`, est une AUTRE instance). Un passage en cours garde le
+   * sien : le rendre laisserait une autre instance écrire pendant ses dernières écritures ; il
+   * échoira. Cinq secondes au plus : Filarr injoignable ne retient pas l'arrêt.
+   */
+  async stop(): Promise<void> {
     this.stopped = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    const leases = [...this.held].filter(([defId]) => !this.sources.get(defId)?.running);
+    if (leases.length === 0) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      Promise.all(leases.map(([defId, storeId]) => this.releaseLease({ storeId, def: { id: defId } }))),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, 5000);
+      }),
+    ]);
+    if (timer !== undefined) clearTimeout(timer);
   }
 
   /** Un passage tourne ou attend son tour. */
@@ -342,21 +379,33 @@ export class SyncRunner {
     return this.core.replicator.bases.get(storeId);
   }
 
-  private async lease(s: SourceInfo): Promise<boolean> {
+  /**
+   * Prendre ou renouveler le bail (§ 6.8), au nom de CETTE instance (P1). Tenu ailleurs — un autre
+   * exécutant, ou un autre processus lancé avec le même jeton — : `{ ok: false }`, avec l'échéance
+   * que Filarr donne.
+   */
+  private async lease(s: SourceInfo): Promise<{ ok: true } | { ok: false; until: string | null }> {
     const client = this.core.replicator.client!;
     const every = EVERY_MS[s.def.schedule?.every ?? '1h'] ?? 3_600_000;
     const ttlS = Math.min(3600, Math.max(120, Math.round((2 * every) / 1000)));
     try {
-      await client.json('POST', `dbstore/${s.storeId}/ext-lease`, { defId: s.def.id, runnerId: this.runnerId(), ttlS });
-      return true;
+      await client.json('POST', `dbstore/${s.storeId}/ext-lease`, { defId: s.def.id, runnerId: this.runnerId(), instance: this.instance, ttlS });
+      this.held.set(s.def.id, s.storeId);
+      return { ok: true };
     } catch (err) {
-      if (err instanceof FilarrError && err.code === 'extdb_lease_held') return false;
+      if (err instanceof FilarrError && err.code === 'extdb_lease_held') {
+        this.held.delete(s.def.id);
+        return { ok: false, until: typeof err.body.until === 'string' ? err.body.until : null };
+      }
       throw err;
     }
   }
 
-  private async releaseLease(s: SourceInfo): Promise<void> {
-    await this.core.replicator.client?.json('DELETE', `dbstore/${s.storeId}/ext-lease/${encodeURIComponent(s.def.id)}`).catch(() => undefined);
+  /** Rendre le bail de CETTE instance (Filarr ignore la demande d'une autre). */
+  private async releaseLease(s: { storeId: string; def: { id: string } }): Promise<void> {
+    this.held.delete(s.def.id);
+    const path = `dbstore/${s.storeId}/ext-lease/${encodeURIComponent(s.def.id)}?instance=${encodeURIComponent(this.instance)}`;
+    await this.core.replicator.client?.json('DELETE', path).catch(() => undefined);
   }
 
   /** Les clés d'un magasin que la boîte tient, la courante d'abord. */
@@ -461,7 +510,13 @@ export class SyncRunner {
       [s.blocked, s.detail] = await this.blockReason(s.def, base);
       s.keySource = this.secrets.source(defId);
       if (s.blocked) return await this.finish(s, base, null, { state: s.blocked === 'paused' ? 'paused' : 'waiting', code: s.blocked === 'paused' ? null : s.blocked, detail: s.detail }, passId);
-      if (!(await this.lease(s))) return await this.finish(s, base, null, { state: 'waiting', code: 'extdb_lease_held', detail: 'une autre instance de cette boîte noire exécute déjà cette synchro' }, passId);
+      // Le bail : tenu par une autre instance (un second processus lancé avec ce jeton), on attend
+      // sans rien lire ni écrire, et le journal le dit (§ 6.8, P1)
+      const lease = await this.lease(s);
+      if (!lease.ok) {
+        const detail = `une autre instance de cette boîte noire exécute déjà cette synchro${lease.until ? ` (bail tenu jusqu’à ${lease.until})` : ''} ; cette instance : ${this.instance.slice(0, 6)}…`;
+        return await this.finish(s, base, null, { state: 'waiting', code: 'extdb_lease_held', detail }, passId);
+      }
       const decisions = await this.fetchDecisions(s, base);
       await base.mirror.sync();
       const filarr = this.filarrRows(base);
@@ -591,6 +646,14 @@ export class SyncRunner {
     } finally {
       await connector?.close().catch(() => undefined);
       s.running = false;
+      // Une relecture des définitions pendant le passage (`scan`, à chaque changement d'un magasin,
+      // notre propre validation comprise) a remplacé la fiche en recopiant `running: true` : sans
+      // ceci, la synchro resterait « en cours » et ne repasserait plus jamais
+      const current = this.sources.get(defId);
+      if (current && current !== s) {
+        current.running = false;
+        current.status = s.status;
+      }
       this.running -= 1;
     }
   }

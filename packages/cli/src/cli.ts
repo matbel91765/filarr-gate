@@ -377,8 +377,11 @@ async function sources(sub: string | undefined, args: string[], flags: Flags): P
       return g!.sync.runPass(defId, { ack: Object.keys(ack).length ? ack : null });
     });
     const s = status as { state?: string; code?: string | null; question?: unknown } | null;
-    print(flags, status, `Passage : ${s?.state ?? '—'}${s?.code ? ` (${s.code})` : ''}${s?.question ? `\nQuestion : ${JSON.stringify(s.question)}` : ''}`);
-    if (s?.state === 'error') process.exitCode = 1;
+    // Bail tenu par une autre instance (P1) : ce passage n'a rien lu ni écrit
+    const held = s?.code === 'extdb_lease_held';
+    const why = held ? '\nUne autre instance de cette boîte noire (un autre processus lancé avec ce jeton) exécute déjà cette synchro : rien n’a été lu ni écrit. Réessayez à l’échéance du bail, ou arrêtez l’autre processus.' : '';
+    print(flags, status, `Passage : ${s?.state ?? '—'}${s?.code ? ` (${s.code})` : ''}${why}${s?.question ? `\nQuestion : ${JSON.stringify(s.question)}` : ''}`);
+    if (s?.state === 'error' || held) process.exitCode = 1;
     return;
   }
   if (sub === 'pause' || sub === 'resume') {

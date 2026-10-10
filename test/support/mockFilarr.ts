@@ -134,7 +134,7 @@ interface MockAccess {
   notifyUrl: string | null;
   files: { requestId: string; publicKey: string; boxSig: string } | null;
   /** Identité en attente d'une migration (gate-heberge-1 § 8.4). */
-  pending: { authHash: string; aPub: string; bindSig: string; exportSealed: string | null; seenAt: string | null } | null;
+  pending: { authHash: string; aPub: string; bindSig: string; exportSealed: string | null; seenAt: string | null; expiresAt: string } | null;
   /** Boîte hébergée (marque `hosting` dans `self`). */
   hosted: boolean;
 }
@@ -196,7 +196,8 @@ type MeterKind = 'self' | 'stream' | 'head' | 'changes' | 'slots' | 'stage' | 'c
 interface MockExt {
   statuses: Map<string, { rev: number; e: number; g: number; sealed: string; updatedAt: string }>;
   queues: Map<string, { rev: number; e: number; g: number; sealed: string; updatedAt: string }>;
-  leases: Map<string, { runnerId: string; until: number }>;
+  /** Le bail : exécutant ET instance (précision P1 ; `""` sans instance). */
+  leases: Map<string, { runnerId: string; instance: string; until: number }>;
   mailbox: Map<string, Array<{ seq: number; sealed: string; defId: string }>>;
   seq: number;
 }
@@ -476,7 +477,7 @@ export class MockFilarr {
   async migrateStart(accessId: string, opts: AccessOptions = {}): Promise<string> {
     const access = this.accesses.get(accessId)!;
     const proof = await this.newProof(fromBase64Url(accessId), opts);
-    access.pending = { authHash: proof.authHash, aPub: proof.aPub, bindSig: proof.bindSig, exportSealed: null, seenAt: null };
+    access.pending = { authHash: proof.authHash, aPub: proof.aPub, bindSig: proof.bindSig, exportSealed: null, seenAt: null, expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString() };
     this.signal(access, { t: 'export', encPublicKey: proof.aPub, bindSig: proof.bindSig });
     return proof.token;
   }
@@ -624,9 +625,10 @@ export class MockFilarr {
       if (msg !== null) s.send(JSON.stringify(msg));
       if (close) s.close(close.code, close.reason);
     }
-    // Révision 3 : le même événement en réveil poussé, sans contenu (sauf `export`, qui ne part qu'au flux)
+    // Révision 3 : le même événement en réveil poussé, SANS contenu (`export` ne porte que `{a, t}` :
+    // la cible se lit dans `self.pendingExport`, précision « export sans flux »)
     const m = msg as Record<string, unknown> | null;
-    if (m && typeof m.t === 'string' && m.t !== 'export') void this.pushNotify(access, m);
+    if (m && typeof m.t === 'string') void this.pushNotify(access, m);
   }
 
   // ==================== L'automate du magasin (`dbStoreObject.ts`) ====================
@@ -764,6 +766,10 @@ export class MockFilarr {
   // ==================== Les synchros externes (`source-externe-1` § 12.1) ====================
 
   readonly ext = new Map<string, MockExt>();
+  /** Simule un serveur d'avant la précision « export sans flux » : `pendingExport` toujours `null`. */
+  hidePendingExport = false;
+  /** Chaque demande de bail reçue (magasin, définition, instance), pour les essais. */
+  readonly leaseRequests: Array<{ storeId: string; defId: string; instance: string }> = [];
 
   extOf(storeId: string): MockExt {
     let e = this.ext.get(storeId);
@@ -809,16 +815,25 @@ export class MockFilarr {
     if (action === 'ext-lease' && method === 'POST') {
       const defId = String(body.defId);
       if (body.runnerId !== own) return refuse(403, 'runner_forbidden', {}, headers);
+      // Précision P1 : l'instance du processus ; absente (client d'avant) = ""
+      const instance = body.instance ?? '';
+      if (body.instance != null && (typeof body.instance !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(body.instance))) return refuse(400, 'bad_request', {}, headers);
+      this.leaseRequests.push({ storeId, defId, instance: String(instance) });
       const cur = ext.leases.get(defId);
-      if (cur && cur.runnerId !== own && cur.until > Date.now()) return refuse(409, 'extdb_lease_held', { runnerId: cur.runnerId, until: new Date(cur.until).toISOString(), remedy: ['wait'] }, headers);
+      if (cur && (cur.runnerId !== own || cur.instance !== instance) && cur.until > Date.now()) {
+        return refuse(409, 'extdb_lease_held', { runnerId: cur.runnerId, until: new Date(cur.until).toISOString(), remedy: ['wait'] }, headers);
+      }
       const until = Date.now() + Math.min(3600, Math.max(120, Number(body.ttlS) || 120)) * 1000;
-      ext.leases.set(defId, { runnerId: own, until });
+      ext.leases.set(defId, { runnerId: own, instance: String(instance), until });
       return ok({ until: new Date(until).toISOString() });
     }
     if (action === 'ext-lease' && method === 'DELETE' && runnerId) {
+      // `runnerId` est ici la définition (`…/ext-lease/:defId?instance=`)
+      const instance = new URL(req.url ?? '/', 'http://x').searchParams.get('instance') ?? '';
       const cur = ext.leases.get(runnerId);
-      if (cur?.runnerId === own) ext.leases.delete(runnerId);
-      return ok({ ok: true });
+      const released = cur?.runnerId === own && cur.instance === instance;
+      if (released) ext.leases.delete(runnerId);
+      return ok({ released });
     }
     if (action === 'ext-resolve' && runnerId && runnerId === own) {
       const box = ext.mailbox.get(runnerId) ?? [];
@@ -1158,6 +1173,11 @@ export class MockFilarr {
                     }
                   : null,
                 hosting: access.hosted ? { hostName: 'essai-0000' } : null,
+                // « Export sans flux » : la cible d'un export attendu de cette boîte, jusqu'au dépôt
+                pendingExport:
+                  access.pending && access.pending.exportSealed === null && !this.hidePendingExport
+                    ? { encPublicKey: access.pending.aPub, bindSig: access.pending.bindSig, expiresAt: access.pending.expiresAt }
+                    : null,
               }
             : {}),
           access: {

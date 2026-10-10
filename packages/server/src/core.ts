@@ -363,7 +363,8 @@ export class GateCore {
 
   async stop(): Promise<void> {
     if (this.pruneTimer) clearInterval(this.pruneTimer);
-    this.sync?.stop();
+    // Avant la réplique : l'exécutant rend ses baux par le client de Filarr (P1)
+    await this.sync?.stop();
     this.webhooks.stop();
     await this.replicator.stop();
     this.state.saveNow();
