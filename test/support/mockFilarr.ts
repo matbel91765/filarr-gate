@@ -198,7 +198,7 @@ interface MockExt {
   queues: Map<string, { rev: number; e: number; g: number; sealed: string; updatedAt: string }>;
   /** Le bail : exécutant ET instance (précision P1 ; `""` sans instance). */
   leases: Map<string, { runnerId: string; instance: string; until: number }>;
-  mailbox: Map<string, Array<{ seq: number; sealed: string; defId: string }>>;
+  mailbox: Map<string, Array<{ seq: number; sealed: string; defId: string; at: string }>>;
   seq: number;
 }
 
@@ -768,6 +768,10 @@ export class MockFilarr {
   readonly ext = new Map<string, MockExt>();
   /** Simule un serveur d'avant la précision « export sans flux » : `pendingExport` toujours `null`. */
   hidePendingExport = false;
+  /** Décisions rendues par page de la boîte aux lettres (500 au worker ; plus petit pour éprouver `next`). */
+  mailboxPage = 500;
+  /** Le curseur `after` de chaque lecture de la boîte aux lettres, pour les essais. */
+  readonly mailboxReads: number[] = [];
   /** Chaque demande de bail reçue (magasin, définition, instance), pour les essais. */
   readonly leaseRequests: Array<{ storeId: string; defId: string; instance: string }> = [];
 
@@ -838,11 +842,18 @@ export class MockFilarr {
     if (action === 'ext-resolve' && runnerId && runnerId === own) {
       const box = ext.mailbox.get(runnerId) ?? [];
       const q = new URL(req.url ?? '/', 'http://x').searchParams;
-      if (method === 'GET') return ok({ items: box.filter((d) => d.seq > Number(q.get('after') ?? 0)).slice(0, 500).map(({ seq, sealed }) => ({ seq, sealed })) });
+      // Précision P6 : la forme du worker, `{ decisions, next }`, 500 par page dans l'ordre de dépôt
+      if (method === 'GET') {
+        const rest = box.filter((d) => d.seq > Number(q.get('after') ?? 0));
+        const page = rest.slice(0, this.mailboxPage);
+        this.mailboxReads.push(Number(q.get('after') ?? 0));
+        return ok({ decisions: page.map(({ seq, defId, sealed, at }) => ({ seq, defId, sealed, at })), next: rest.length > page.length && page.length > 0 ? page.at(-1)!.seq : null });
+      }
       if (method === 'DELETE') {
         const upTo = Number(q.get('upTo') ?? 0);
-        ext.mailbox.set(runnerId, box.filter((d) => d.seq > upTo));
-        return ok({ ok: true });
+        const kept = box.filter((d) => d.seq > upTo);
+        ext.mailbox.set(runnerId, kept);
+        return ok({ removed: box.length - kept.length });
       }
     }
     return refuse(404, 'not_found', {}, headers);
@@ -889,7 +900,7 @@ export class MockFilarr {
     const box = ext.mailbox.get(runnerId) ?? [];
     for (const d of decisions) {
       ext.seq += 1;
-      box.push({ seq: ext.seq, defId, sealed: await sealJson(c, key, { id: d.id, choice: d.choice, by, at: new Date().toISOString() }, resolveAad(storeId, runnerId)) });
+      box.push({ seq: ext.seq, defId, at: new Date().toISOString(), sealed: await sealJson(c, key, { id: d.id, choice: d.choice, by, at: new Date().toISOString() }, resolveAad(storeId, runnerId)) });
     }
     ext.mailbox.set(runnerId, box);
     // Le dépôt déclenche un passage (`ext-run`)

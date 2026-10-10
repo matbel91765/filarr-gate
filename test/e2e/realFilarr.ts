@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { computeCreatorTag, deriveAccessKeys3 } from '../../packages/core/src/engine/gate/access3';
 import { boxSigMessage } from '../../packages/core/src/engine/gate/files';
-import { openJson, signDef, statusAad, statusKey, type ExtSourceDef, type SyncStatus } from '../../packages/core/src/engine/extsrc';
+import { openJson, queueAad, resolveAad, sealJson, signDef, statusAad, statusKey, type ExtSourceDef, type QueueEntry, type SyncStatus } from '../../packages/core/src/engine/extsrc';
 import {
   accessAuthHash,
   assignSlugs,
@@ -239,6 +239,30 @@ export class RealFilarr {
     if (!st) return null;
     const k = await storeKeys(c, this.fek, storeId, st.e, st.g);
     return openJson<SyncStatus>(c, await statusKey(c, k.kDb, storeId), st.sealed, statusAad(storeId, runnerId, st.rev));
+  }
+
+  /** La file « me demander » publiée par l'exécutant (§ 6.12), ouverte comme l'appli l'ouvre, sous `K_xs`. */
+  async appReadQueue(storeId: string, runnerId: string): Promise<QueueEntry[]> {
+    const q = await this.call<{ rev: number; e: number | null; g: number | null; sealed: string | null }>('GET', `/dbstore/${storeId}/ext-queue/${encodeURIComponent(runnerId)}`, undefined, CAPS);
+    if (!q.sealed || q.e === null || q.g === null) return [];
+    const k = await storeKeys(c, this.fek, storeId, q.e, q.g);
+    return (await openJson<{ entries: QueueEntry[] }>(c, await statusKey(c, k.kDb, storeId), q.sealed, queueAad(storeId, runnerId, q.rev))).entries;
+  }
+
+  /**
+   * Trancher dans l'appli (`POST /dbstore/:id/ext-resolve`) : décisions scellées sous `K_xs` de la
+   * génération courante ; le worker les range dans la boîte aux lettres de l'exécutant et lui relaie
+   * un `ext-run`. Rend le numéro de dépôt.
+   */
+  async appDecide(storeId: string, runnerId: string, defId: string, decisions: Array<{ id: string; choice: 'filarr' | 'source' | 'delete' | 'keep' }>): Promise<number> {
+    const head = await this.transport(storeId).head();
+    const k = await storeKeys(c, this.fek, storeId, 0, head.g ?? 0);
+    const kxs = await statusKey(c, k.kDb, storeId);
+    const items = [];
+    for (const d of decisions) {
+      items.push({ sealed: await sealJson(c, kxs, { id: d.id, choice: d.choice, by: { userId: this.userId, device: 'Banc Filarr Gate' }, at: new Date().toISOString() }, resolveAad(storeId, runnerId)) });
+    }
+    return (await this.call<{ seq: number }>('POST', `/dbstore/${storeId}/ext-resolve`, { defId, runnerId, items }, CAPS)).seq;
   }
 
   /**

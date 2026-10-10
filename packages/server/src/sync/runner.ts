@@ -451,13 +451,22 @@ export class SyncRunner {
     await this.host.blobs.put(this.blobName(s), new TextEncoder().encode(JSON.stringify({ v: 1, e: k.epoch, g: k.generation, sealed })));
   }
 
+  /**
+   * La boîte aux lettres des décisions (§ 6.12), dans l'ordre du serveur : `{ decisions, next }`
+   * (précision P6 — la forme du worker fait foi ; `next` : où reprendre, `null` à la dernière page).
+   * Dix pages de 500 au plus par passage, le reste au suivant.
+   */
   private async fetchDecisions(s: SourceInfo, base: GateBase): Promise<Decision[]> {
     const client = this.core.replicator.client!;
     const out: Decision[] = [];
     let after = s.record.resolvedUpTo;
     for (let page = 0; page < 10; page += 1) {
-      const res = await client.json<{ items?: Array<{ seq: number; sealed: string }> }>('GET', `dbstore/${s.storeId}/ext-resolve/${encodeURIComponent(this.runnerId())}?after=${after}`);
-      const items = res.items ?? [];
+      const res = await client.json<{ decisions?: Array<{ seq: number; sealed: string }>; next?: number | null }>(
+        'GET',
+        `dbstore/${s.storeId}/ext-resolve/${encodeURIComponent(this.runnerId())}?after=${after}`
+      );
+      const items = Array.isArray(res.decisions) ? res.decisions : [];
+      const from = after;
       for (const it of items) {
         after = Math.max(after, it.seq);
         for (const k of this.keysOf(base)) {
@@ -471,7 +480,9 @@ export class SyncRunner {
           }
         }
       }
-      if (items.length < 500) break;
+      // La dernière page (`next: null`), ou un curseur qui n'avance pas : on s'arrête
+      if (typeof res.next !== 'number' || res.next <= from) break;
+      after = Math.max(after, res.next);
     }
     return out;
   }

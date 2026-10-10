@@ -245,6 +245,72 @@ describe.skipIf(!on)('de bout en bout contre le worker local de Filarr', () => {
     expect(await b.sync!.runPass(def.id)).toMatchObject({ state: 'ok' });
   }, 120_000);
 
+  it('P6 : une décision « me demander » prise dans l’appli arrive à la boîte par la boîte aux lettres du worker (`{ decisions, next }`, `ext-run` relayé) et s’applique', async () => {
+    const d1 = new D1Sim();
+    d1.exec('CREATE TABLE clients (id INTEGER PRIMARY KEY, nom TEXT)');
+    d1.exec("INSERT INTO clients VALUES (1, 'Acme'), (2, 'Globex')");
+    const store = await filarr.createStore({
+      dbId: 'db-decisions-p6-e2e',
+      title: 'Clients D1',
+      properties: [
+        { id: 'p_id', name: 'Id', type: 'number' },
+        { id: 'p_nom', name: 'Nom', type: 'text' },
+      ],
+      rows: [],
+    });
+    const access = await filarr.createAccess('Décisions', store, 'rw');
+    const runnerId = `a:${access.accessId}`;
+    const def = await filarr.appSetExtSource(store, {
+      v: 1,
+      id: 'xs_P6P6P6P6P6P6P6P6P6P6P6',
+      rev: 1,
+      name: 'Clients (D1)',
+      connector: 'd1',
+      conn: { account: 'compte-banc', database: 'base-banc' },
+      host: 'api.cloudflare.com',
+      from: { table: 'clients' },
+      key: { cols: ['id'], gen: 'source' },
+      marker: null,
+      mode: 'both',
+      map: [
+        { col: 'id', prop: 'p_id', dir: 'in', type: 'number' },
+        { col: 'nom', prop: 'p_nom', dir: 'both', type: 'text', conflict: 'ask' },
+      ],
+      conflict: 'source',
+      rowConflict: 'keep',
+      onGone: 'mark',
+      onFilarrDelete: 'ignore',
+      guard: { pct: 50, min: 5 },
+      runner: { kind: 'gate', accessId: access.accessId, name: 'Banc' },
+      schedule: { every: 'manual' },
+    } as never);
+    const gate = new Gate({
+      env: { FILARR_GATE_STATE_DIR: tempDir(), FILARR_GATE_API_URL: WORKER, FILARR_GATE_TOKEN: access.token, FILARR_GATE_PORT: '0', FILARR_GATE_ADMIN_PORT: '0', FILARR_GATE_CACHE: 'memory', FILARR_GATE_WRITE: 'true' },
+      sync: { timers: false, fetch: routeFetch({ 'api.cloudflare.com': d1.handler }), externalSecret: () => d1.token },
+    });
+    gates.push(gate);
+    await gate.start();
+    await until(() => gate.replicator.link === 'live', 20_000, 'flux en direct');
+    await gate.sync!.scan();
+    expect(await gate.sync!.runPass(def.id)).toMatchObject({ state: 'ok' });
+    await until(async () => (await filarr.appRows(store)).some((r) => r.cells.p_nom === 'Acme'), 20_000, 'lignes importées');
+    // Le même nom changé des deux côtés : la cellule entre dans la file, rien n'est écrit
+    const acme = (await filarr.appRows(store)).find((r) => r.cells.p_nom === 'Acme')!;
+    await filarr.appEdit(store, [{ r: acme.id, f: 'p_nom', v: 'Acme (Filarr)' }]);
+    d1.exec("UPDATE clients SET nom = 'Acme (D1)' WHERE id = 1");
+    await until(() => gate.replicator.bases.get(store)?.mirror.rowById(acme.id)?.cells.p_nom === 'Acme (Filarr)', 20_000, 'geste reçu par la boîte');
+    expect(await gate.sync!.runPass(def.id)).toMatchObject({ state: 'ok', code: 'extdb_conflicts_pending', queue: { n: 1 } });
+    // L'appli lit la file publiée sur le worker et tranche « garder la valeur de Filarr »
+    const entries = await filarr.appReadQueue(store, runnerId);
+    expect(entries).toMatchObject([{ col: 'nom', source: { v: 'Acme (D1)' }, filarr: { v: 'Acme (Filarr)' } }]);
+    const seq = await filarr.appDecide(store, runnerId, def.id, [{ id: entries[0]!.id, choice: 'filarr' }]);
+    // Le worker relaie un `ext-run` au flux de la boîte ; elle relève la décision et l'applique à la source
+    await until(() => d1.exec('SELECT nom FROM clients WHERE id = 1').results[0]!.nom === 'Acme (Filarr)', 20_000, 'décision appliquée dans la source');
+    await until(() => gate.sync!.get(def.id)!.record.resolvedUpTo >= seq, 20_000, 'décision acquittée');
+    await until(async () => (await filarr.appReadStatus(store, runnerId))?.queue.n === 0, 20_000, 'file vidée dans l’état publié');
+    expect((await filarr.appReadStatus(store, runnerId))!.journal.some((j) => j.kind === 'resolved' && j.by?.userId === filarr.userId)).toBe(true);
+  }, 120_000);
+
   it.skipIf(!D1 || !WORKER_DIR)('la fente à fichiers : boîte de dépôt signée, dépôt scellé reçu par le worker, que la boîte de l’appli ouvre', async () => {
     const box = filarr.createDepositBox();
     const access = await filarr.createAccess('Fichiers du banc', clients, 'r', { files: box });

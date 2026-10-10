@@ -202,6 +202,29 @@ describe('miroir et deux sens contre D1', () => {
     expect(mock.extOf(storeId).mailbox.get(runner())).toEqual([]);
   });
 
+  it('la boîte aux lettres (P6) : `{ decisions, next }` lue page après page, dans l’ordre du serveur, jusqu’à `next: null`', async () => {
+    await mock.appSetExtSource(storeId, def({ conflict: 'ask' }));
+    const gate = await startGate();
+    await until(() => gate.sync!.list().length === 1, 5000, 'définition');
+    await gate.sync!.runPass(DEF_ID);
+    const rows = await rowsByNom();
+    await mock.appEdit(storeId, [{ r: rows.Acme!.id, f: 'p_nom', v: 'Acme (Filarr)' }]);
+    d1.exec("UPDATE clients SET nom = 'Acme (D1)', maj_le = '2026-10-10T11:00:00Z' WHERE id = 1");
+    await until(() => gate.replicator.bases.get(storeId)!.mirror.rowById(rows.Acme!.id)?.cells.p_nom === 'Acme (Filarr)', 5000, 'geste');
+    expect(await gate.sync!.runPass(DEF_ID)).toMatchObject({ queue: { n: 1 } });
+    const { queue } = await mock.appReadStatus(storeId, runner());
+    // Une décision par page : la vraie arrive en troisième, derrière deux décisions sur des entrées inconnues
+    mock.mailboxPage = 1;
+    mock.mailboxReads.length = 0;
+    await mock.appDecide(storeId, runner(), DEF_ID, [
+      { id: 'q-inconnue-1', choice: 'source' },
+      { id: 'q-inconnue-2', choice: 'source' },
+      { id: queue!.entries[0]!.id, choice: 'filarr' },
+    ]);
+    await until(() => d1.exec('SELECT nom FROM clients WHERE id = 1').results[0]!.nom === 'Acme (Filarr)', 5000, 'décision de la troisième page appliquée');
+    expect(mock.mailboxReads.slice(0, 3)).toEqual([0, 1, 2]);
+  });
+
   it('garde-fou : trop de lignes disparues d’un coup, arrêt avant toute écriture ; l’accord d’un membre vaut pour ce passage', async () => {
     // Sans repère, chaque passage lit la table entière : seule une lecture entière voit les disparitions
     await mock.appSetExtSource(storeId, def({ marker: null }));
