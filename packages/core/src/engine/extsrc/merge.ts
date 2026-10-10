@@ -137,6 +137,12 @@ function resolveConflict(c: 'E' | 'G', input: CellInput, conflictIsNew: boolean)
   };
 }
 
+/** Une entrée de file réévaluée : remise en file (`requeued`, au journal aussi) ou retirée. */
+function requeue(re: CellOutput): Pick<CellOutput, 'queue' | 'journal'> {
+  if (re.queue.op !== 'put') return { queue: { op: 'remove' }, journal: re.journal };
+  return { queue: { op: 'put', kind: 'requeued' }, journal: re.journal.map((j) => (j.kind === 'queued' ? { ...j, kind: 'requeued' as const } : j)) };
+}
+
 /** La règle d'une cellule. */
 export function mergeCell(input: CellInput): CellOutput {
   const q = input.q;
@@ -172,8 +178,8 @@ export function mergeCell(input: CellInput): CellOutput {
     }
     // Périmée (ou sans objet pour une cellule) : réévaluée comme une cellule neuve
     const re = fresh({ ...input, q: null, d: null }, true);
-    const queue: QueueAction = re.queue.op === 'put' ? { op: 'put', kind: 'requeued' } : { op: 'remove' };
-    return { ...re, queue, journal: [{ kind: 'resolution_stale', by: input.d.by }, ...re.journal], decision: 'stale' };
+    const again = requeue(re);
+    return { ...re, queue: again.queue, journal: [{ kind: 'resolution_stale', by: input.d.by }, ...again.journal], decision: 'stale' };
   }
 
   // La colonne a quitté `ask` avec « trancher les conflits en attente par la nouvelle règle »
@@ -187,7 +193,7 @@ export function mergeCell(input: CellInput): CellOutput {
       };
     }
     const re = fresh({ ...input, q: null }, true);
-    return { ...re, queue: re.queue.op === 'put' ? { op: 'put', kind: 'requeued' } : { op: 'remove' } };
+    return { ...re, ...requeue(re) };
   }
 
   // Pas de décision : l'entrée reste tant que rien ne bouge (I8)
@@ -202,5 +208,5 @@ export function mergeCell(input: CellInput): CellOutput {
   }
   // Colonne repassée en automatique : un conflit NOUVEAU suit la nouvelle politique
   const re = fresh({ ...input, q: null }, true);
-  return { ...re, queue: re.queue.op === 'put' ? { op: 'put', kind: 'requeued' } : { op: 'remove' } };
+  return { ...re, ...requeue(re) };
 }

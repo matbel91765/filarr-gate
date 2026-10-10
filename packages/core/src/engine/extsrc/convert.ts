@@ -160,3 +160,34 @@ export function toSource(value: unknown, prop: PropSpec): unknown {
   if (NUMBER.has(t)) return typeof value === 'number' && Number.isFinite(value) ? value : null;
   return value;
 }
+
+/** Le minimum d'un schéma que la réécriture touche ; tout le reste (champs inconnus compris) passe tel quel. */
+export interface SchemaLike {
+  properties: Array<{ id: string; options?: unknown[]; [extra: string]: unknown }>;
+  t: string;
+  [extra: string]: unknown;
+}
+
+/**
+ * Le schéma avec les options créées par un passage (§ 4, libellé inconnu), ou
+ * `null` s'il n'y a rien à ajouter (`t` : l'heure du registre, ou de quoi la tirer seulement si le
+ * schéma change). Seules les `options` des propriétés visées
+ * changent, et l'heure du registre (`t`) : `managedBy`, `extra.extSource` et tout
+ * champ inconnu restent à l'octet près (précision 3.10 de db-store-1).
+ */
+export function withMintedOptions<S extends SchemaLike>(schema: S, minted: readonly OptionMint[], t: string | (() => string)): S | null {
+  let changed = false;
+  const properties = schema.properties.map((p) => {
+    const have = new Set((p.options ?? []).map((o) => (o as { id?: unknown }).id));
+    const add: OptionSpec[] = [];
+    for (const m of minted) {
+      if (m.propId !== p.id || have.has(m.option.id)) continue;
+      have.add(m.option.id);
+      add.push({ id: m.option.id, label: m.option.label, color: 'gray' });
+    }
+    if (add.length === 0) return p;
+    changed = true;
+    return { ...p, options: [...(p.options ?? []), ...add] };
+  });
+  return changed ? { ...schema, properties, t: typeof t === 'function' ? t() : t } : null;
+}

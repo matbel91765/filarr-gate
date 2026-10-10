@@ -250,5 +250,110 @@
     "from": ".filarr-parity/contracts/db-store-1.vectors.json",
     "commit": null,
     "rewritten": 0
+  },
+  {
+    "file": "packages/core/src/engine/extsrc/types.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/extsrc/def.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/extsrc/identity.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/extsrc/convert.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/extsrc/merge.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/extsrc/plan.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/extsrc/seal.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/extsrc/index.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/gate/access3.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/gate/files.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "packages/core/src/engine/gate/settings.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "test/helpers/extsrcVectors.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "test/helpers/gateFilesVectors.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "test/vectors/source-externe-1.vectors.json",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "test/vectors/gate-fichiers-1.vectors.json",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
   }
 ]

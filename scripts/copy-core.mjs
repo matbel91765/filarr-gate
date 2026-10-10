@@ -87,5 +87,9 @@ for (const name of ['api-base-1.vectors.json', 'db-store-1.vectors.json']) {
   writeFileSync(join(process.cwd(), 'test', 'vectors', name), readFileSync(join(CONTRACTS, name)));
   manifest.push({ file: `test/vectors/${name}`, from: `.filarr-parity/contracts/${name}`, commit: null, rewritten: 0 });
 }
+// Ce dont filarr-gate est l'ORIGINE (révision 3 d'api-base-1, gate-fichiers-1, source-externe-1) : jamais
+// réécrit par cette recopie ; la provenance le garde. filarg le recopiera d'ici (lot B2).
+const ORIGIN = JSON.parse(readFileSync(join(out, 'PROVENANCE.json'), 'utf8')).filter((e) => e.from === 'filarr-gate');
+manifest.push(...ORIGIN);
 writeFileSync(join(out, 'PROVENANCE.json'), JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 console.log(manifest.map((m) => `${m.commit}  ${m.from}${m.rewritten ? ` (imports réécrits : ${m.rewritten})` : ''}`).join('\n'));

@@ -42,12 +42,14 @@ import {
   validateDef,
   valueHash,
   verifyDefSignature,
+  withMintedOptions,
   type Decision,
   type ExtSourceDef,
   type FilarrRow,
   type PassPlan,
   type PropSpec,
   type QueueEntry,
+  type SchemaLike,
   type Shadow,
   type SourceRow,
   type SyncJournalEntry,
@@ -619,16 +621,7 @@ export class SyncRunner {
         ops,
         ...(minted.length > 0
           ? {
-              schema: (schema: StoreSchema): StoreSchema | null => {
-                let changed = false;
-                const properties = schema.properties.map((p) => {
-                  const add = minted.filter((m) => m.propId === p.id && !(p.options ?? []).some((o) => o.id === m.option.id));
-                  if (add.length === 0) return p;
-                  changed = true;
-                  return { ...p, options: [...(p.options ?? []), ...add.map((m) => ({ id: m.option.id, label: m.option.label, color: 'gray' }))] } as typeof p;
-                });
-                return changed ? { ...schema, properties, t: mirror.tick() } : null;
-              },
+              schema: (schema: StoreSchema): StoreSchema | null => withMintedOptions(schema as StoreSchema & SchemaLike, minted, () => mirror.tick()),
             }
           : {}),
       };

@@ -1,0 +1,45 @@
+{
+  "contrat": "gate-fichiers-1",
+  "origine": "filarr-gate (packages/core/src/engine/gate/files.ts), à défaut d’une implémentation dans filarg",
+  "lecture": "Familles 4, 5, 6 du § 14 et le filtre du § 3. Clés et IV en hexadécimal ; clés publiques de boîte en base64url, clé de signature du créateur en base64 standard ; scellés en base64 standard (éphémère ‖ IV ‖ AES-256-GCM) ; morceaux de 16777216 octets, chacun IV ‖ chiffré ‖ étiquette, en base64url.",
+  "boite": {
+    "privateKeyHex": "2121212121212121212121212121212121212121212121212121212121212121",
+    "publicKey": "fTSkgV-muYJTXmCvO9m0lVaBYIDxZB_4HSt8iugmikQ"
+  },
+  "manifeste": {
+    "fixed": {"fileKeyHex":"4141414141414141414141414141414141414141414141414141414141414141","manifestIvHex":"515151515151515151515151","chunkIvsHex":["616161616161616161616161"],"ephemeralPrivHex":"7171717171717171717171717171717171717171717171717171717171717171","sealIvHex":"818181818181818181818181"},
+    "contentUtf8": "Facture 2291 — 1 250,00 €\n",
+    "meta": {"fileName":"facture-2291.pdf","mimeType":"application/pdf","path":"Factures/2026","tags":["fournisseur","urgent"],"source":"erp","accessName":"ERP Atelier","depositedAt":"2026-10-10T12:00:00.000Z"},
+    "manifestJson": "{\"fileName\":\"facture-2291.pdf\",\"mimeType\":\"application/pdf\",\"size\":30,\"totalChunks\":1,\"channel\":\"gate\",\"sha256\":\"982b7782e2e365bde2435439de8671b2575530d525e0b0212b9c60b643d5d959\",\"path\":\"Factures/2026\",\"tags\":[\"fournisseur\",\"urgent\"],\"source\":\"erp\",\"accessName\":\"ERP Atelier\",\"depositedAt\":\"2026-10-10T12:00:00.000Z\"}",
+    "deposit": {"sealedFileKey":"q08ZeZj8xWzG7WjB2TGvm7Ui7AB0PhgfczCRXfSqMXaBgYGBgYGBgYGBgYF0R7O075O17roEa35FmJlY/rg3DC74Zh5nn4XGlVh2WvYka5gHAQuA7VqJGqDb988=","encryptedManifest":"ooqK+xh3zn7+ju4mqMp0bcG+OwolRShxe2yAIWvrD2eiiOXL0m0StBZg/vWIX4KIT9ngvbEz16WCAlSpJtcNo3AQWixiQ2Vk1vIoBg5bZ4gYNxdYI2AwFSCAdAbcH/hOYDwoMxDsWfn2cC1AMoD1OPkYz9Y/AemMHbviyojL1H5zyQfCUyNKsQJvgNheYLY49KuK3Hj+jtC4uvivNsCSL+rtBDh0rnCUg4OtYh1gMazaj6nYpgo9fd1brEgPA4SIN2cAS0nsIl9Yu5D/jnG8CSFW+Etr37MDioscUQD7hPgklTy3JmdkxsC2theF1lK1uVyHsvucEyvWH0g5SFY9rH+wp8vX7gNwNEcdTa41z2Ir/aGVefQN7TgGKAbc3qj03s9elhbmU+yQJ1b9Pk3LBS1AjCPJJfgrjojQvO0LzInRcfl7x4CswOVXHJBP","encryptedManifestIv":"UVFRUVFRUVFRUVFR","totalChunks":1,"sizeBytes":30,"chunks":["YWFhYWFhYWFhYWFhVP7OzfD1uNTgdCpkHEPw_q3XkHOlIQM1h8udlxLddT8gtF4z1bPKSXUvHUxShA"]},
+    "minimal": {"meta":{"fileName":"note.txt","mimeType":"text/plain","depositedAt":"2026-10-10T12:00:00.000Z"},"manifestJson":"{\"fileName\":\"note.txt\",\"mimeType\":\"text/plain\",\"size\":1,\"totalChunks\":1,\"channel\":\"gate\",\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"depositedAt\":\"2026-10-10T12:00:00.000Z\"}"},
+    "requiredFields": ["fileName","mimeType","size","totalChunks"]
+  },
+  "boxSig": {
+    "creatorSigningKeyHex": "3131313131313131313131313131313131313131313131313131313131313131",
+    "creatorPublicKey": "SAdaWX5yGhVuLgeZ3lzAxTJNxufq8c3UYlCGjsUyFd0=",
+    "accessId": "acc_AAAAAAAAAAAAAAAAAAAAAA",
+    "requestId": "req_BBBBBBBBBBBBBBBBBBBBBB",
+    "message": "filarr/gate/v1|box|acc_AAAAAAAAAAAAAAAAAAAAAA|req_BBBBBBBBBBBBBBBBBBBBBB|fTSkgV-muYJTXmCvO9m0lVaBYIDxZB_4HSt8iugmikQ",
+    "boxSig": "cwbYXmqxX3zQhp-0M1_KAaNmtAykXtnBy9HDVEo_i_Z5k5pYH8iijA3AI2TP8dsh45JGII9GGJHUWEmJ3iJXCg",
+    "otherBoxPublicKey": "D6poTtKIZ7l_Smot7l34zpdOdrcBjj8iocTPJnhXDyA",
+    "verifyOther": false
+  },
+  "outcome": {
+    "ephemeralPrivHex": "9191919191919191919191919191919191919191919191919191919191919191",
+    "ivHex": "a1a1a1a1a1a1a1a1a1a1a1a1",
+    "plain": {"v":1,"result":"filed","folder":"Factures/2026","name":"facture-2291.pdf","rule":"r_factures","by":"PC-Atelier","filedAt":"2026-10-10T12:00:05.000Z","sha256Verified":true},
+    "sealed": "B5H1kun98E1E1+DiNQC2zPA1vmlmdkdYmWfmthKhMVChoaGhoaGhoaGhoaG0jDNc6oe0L539lJjvQVpOGA9he37QI+AkLGjdBDBMAGROoiVeZ42LN6ojkO0lxkXwVoiPe/HNXiMzKhDYvfsEZEr2cnWfaYATxLvSmRg2ul8S3hXhiRrZqZOXOBvB5dTbF/j8wbHyP1D0wuVPevJi6OXy9d1jvxgX+t5QYg5bpey6cyL/bZxJg2Cnpyhk7ARvXSHYX7o+/FJdtH1W8meqKY9wCZb0brQk/w1oG6hmIuHzz3c5pTskHhIKjw=="
+  },
+  "filtre": [
+    {"name":"rapport.pdf","headHex":"255044462d312e37","size":8,"refusal":null},
+    {"name":"outil.exe","headHex":"010203","size":3,"refusal":{"code":"file_type_refused","reason":"extension","detail":".exe"}},
+    {"name":"Setup.MSI","headHex":"01","size":1,"refusal":{"code":"file_type_refused","reason":"extension","detail":".msi"}},
+    {"name":"archive.tar.gz","headHex":"1f8b","size":2,"refusal":null},
+    {"name":"rapport.pdf","headHex":"4d5a9000","size":4,"refusal":{"code":"file_type_refused","reason":"signature","detail":"MZ"}},
+    {"name":"image.png","headHex":"7f454c46","size":4,"refusal":{"code":"file_type_refused","reason":"signature","detail":"ELF"}},
+    {"name":"binaire","headHex":"cffaedfe","size":4,"refusal":{"code":"file_type_refused","reason":"signature","detail":"Mach-O"}},
+    {"name":"script.txt","headHex":"23212f62696e2f73680a","size":10,"refusal":{"code":"file_type_refused","reason":"signature","detail":"#!"}},
+    {"name":"gros.pdf","headHex":"25504446","size":104857601,"refusal":{"code":"file_too_large","limit":104857600}}
+  ]
+}

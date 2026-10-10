@@ -1,7 +1,9 @@
 /**
- * Les vecteurs dorés des deux contrats, rejoués par la copie du cœur que porte la
- * boîte noire. Les fichiers sont ceux de `.filarr-parity/contracts/`, à l'octet
- * près ; les rejoueurs sont ceux de filarg (`test/helpers`), recopiés.
+ * Les vecteurs dorés, rejoués par la copie du cœur que porte la boîte noire.
+ * db-store-1 et api-base-1 : les fichiers sont ceux de `.filarr-parity/contracts/`,
+ * à l'octet près, et leurs rejoueurs ceux de filarg (`test/helpers`), recopiés.
+ * source-externe-1 et gate-fichiers-1 : la boîte noire en est l'ORIGINE (rien dans
+ * filarg à ce jour) ; `scripts/build-vectors.ts` les écrit.
  */
 
 import { readFileSync } from 'node:fs';
@@ -16,6 +18,8 @@ import {
   replayApiAccessVectors,
   type ApiAccessVectors,
 } from './helpers/apiAccessVectors';
+import { buildExtsrcVectors, formatVectors, replayExtsrcVectors, type ExtsrcVectors } from './helpers/extsrcVectors';
+import { buildGateFilesVectors, replayGateFilesVectors, type GateFilesVectors } from './helpers/gateFilesVectors';
 
 const dir = join(__dirname, 'vectors');
 const storeFixture = (): StoreVectors =>
@@ -83,6 +87,65 @@ describe('api-base-1 (révision 2)', () => {
       const v = apiFixture();
       mutate(v);
       expect((await replayApiAccessVectors(storeCrypto, curves, v)).length, what).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ==================== Vecteurs dont la boîte noire est l'origine ====================
+
+const extsrcFixture = (): ExtsrcVectors => JSON.parse(readFileSync(join(dir, 'source-externe-1.vectors.json'), 'utf8')) as ExtsrcVectors;
+const filesFixture = (): GateFilesVectors => JSON.parse(readFileSync(join(dir, 'gate-fichiers-1.vectors.json'), 'utf8')) as GateFilesVectors;
+
+describe('source-externe-1 (familles 1, 3, 3 bis, 4 à 8)', () => {
+  it('le fichier est exactement ce que le cœur produit, au format du dépôt', async () => {
+    const built = await buildExtsrcVectors(storeCrypto, curves);
+    expect(formatVectors(built)).toBe(readFileSync(join(dir, 'source-externe-1.vectors.json'), 'utf8').replace(/\r\n/g, '\n'));
+  });
+
+  it.each(providers)('se rejoue sans écart sous %s', async (_name, provider) => {
+    expect(await replayExtsrcVectors(provider, curves, extsrcFixture())).toEqual([]);
+  });
+
+  it('le rejeu voit chaque altération', async () => {
+    const tampered: Array<[string, (v: ExtsrcVectors) => void]> = [
+      ['identité', (v) => (v.identite.sourceIdentity[1]!.identity = 'postgres|db.lan:5433|erp|public.cmd')],
+      ['mergeCell', (v) => ((v.mergeCell[3]!.output as { case: string }).case = 'Z')],
+      ['planPass', (v) => ((v.planPass[0]!.output as { created: string[] }).created.pop())],
+      ['file pleine', (v) => ((v.planPass.find((p) => p.name.startsWith('file pleine'))!.output as { overflow: number }).overflow = 0)],
+      ['définition', (v) => v.definitions.validate[1]!.codes.push('bad_name')],
+      ['signature', (v) => (v.definitions.signature.signed = { ...v.definitions.signature.signed, name: 'Autre' })],
+      ['scellé', (v) => (v.sceaux.status.sealed = v.sceaux.status.sealed.replace(/^./, (ch) => (ch === 'A' ? 'B' : 'A')))],
+      ['schéma', (v) => (v.schema.headJson = v.schema.headJson.replace('"managedBy":{', '"managedBy":{"x":1,'))],
+    ];
+    for (const [what, mutate] of tampered) {
+      const v = extsrcFixture();
+      mutate(v);
+      expect((await replayExtsrcVectors(storeCrypto, curves, v)).length, what).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('gate-fichiers-1 (familles 4, 5, 6 et filtre)', () => {
+  it('le fichier est exactement ce que le cœur produit, au format du dépôt', async () => {
+    expect(formatVectors(await buildGateFilesVectors(storeCrypto, curves))).toBe(readFileSync(join(dir, 'gate-fichiers-1.vectors.json'), 'utf8').replace(/\r\n/g, '\n'));
+  });
+
+  it.each(providers)('se rejoue sans écart sous %s', async (_name, provider) => {
+    expect(await replayGateFilesVectors(provider, curves, filesFixture())).toEqual([]);
+  });
+
+  it('le rejeu voit chaque altération', async () => {
+    const tampered: Array<[string, (v: GateFilesVectors) => void]> = [
+      ['manifeste', (v) => (v.manifeste.manifestJson = v.manifeste.manifestJson.replace('"channel":"gate"', '"channel":"web"'))],
+      ['K_file', (v) => (v.manifeste.fixed.fileKeyHex = v.manifeste.fixed.fileKeyHex.replace(/^./, '5'))],
+      ['boxSig', (v) => (v.boxSig.accessId = `${v.boxSig.accessId}x`)],
+      ['outcome', (v) => (v.outcome.plain = { ...v.outcome.plain, folder: 'Ailleurs' })],
+      ['filtre', (v) => (v.filtre[1]!.refusal = null)],
+    ];
+    for (const [what, mutate] of tampered) {
+      const v = filesFixture();
+      mutate(v);
+      expect((await replayGateFilesVectors(storeCrypto, curves, v)).length, what).toBeGreaterThan(0);
     }
   });
 });
