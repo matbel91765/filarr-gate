@@ -1,0 +1,33 @@
+{
+  "contrat": "gate-heberge-1",
+  "famille": 6,
+  "lecture": "Paquet gate-settings-1 : `sealed` = sealToPublicKey(JSON du clair, A_pub du jeton), éphémère et IV imposés (base64 standard : éphémère ‖ IV ‖ AES-256-GCM). On l’ouvre avec A_enc du jeton ; les champs inconnus restent. `bindSig` = Ed25519(clé du créateur, \"filarr/api/v1|bind|\" + accessId + \"|\" + A_pub). Refus : une identité liée par une autre clé (le scellement n’a pas lieu), un paquet d’un autre accès (l’ouverture lève).",
+  "token": "flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y",
+  "accessId": "jpWco6qxuL_GzdTb4unw9w",
+  "encPublicKey": "9Or8Fog80muo9ExE8Amj4HLcbdY+t/yecyynFuGtjgM=",
+  "creatorSigningKeyHex": "3131313131313131313131313131313131313131313131313131313131313131",
+  "creatorPublicKey": "SAdaWX5yGhVuLgeZ3lzAxTJNxufq8c3UYlCGjsUyFd0=",
+  "bindSig": "XP5oOCYvWvnOb3GmWStuLdc/srV1ta0LFeA4p7l8j0pEh4KUyjY/tipEX7pVwLC7Kjt8mXKfb4tFu59+GEPtDA==",
+  "fixed": {
+    "ephemeralPrivHex": "4141414141414141414141414141414141414141414141414141414141414141",
+    "ivHex": "515151515151515151515151"
+  },
+  "plain": {
+    "v": 1,
+    "kind": "filarr-gate/settings",
+    "accessId": "jpWco6qxuL_GzdTb4unw9w",
+    "createdAt": "2026-10-10T12:00:00.000Z",
+    "appKeys": [{"id":"0f6d1c2e-5b7a-4c1e-9d3f-2a8b7c6d5e4f","name":"ERP","hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","scopes":[{"target":"all","read":true},{"target":"files","deposit":true}],"ratePerMinute":600,"ips":["10.0.4.0/24"],"expiresAt":null,"createdAt":"2026-10-01T08:00:00.000Z","prefix":"gk_erp_ab…","sql":true,"mcp":false,"paused":false,"champFutur":{"garde":"moi"}}],
+    "webhooks": [{"id":"6c1f0a9e-2d3b-4e5f-8a7b-1c2d3e4f5a6b","url":"https://erp.exemple.fr/hooks/filarr","secret":"whsec_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","events":["row.created","row.updated"],"base":"AAAAAAAAAAAAAAAAAAAAAA","view":null,"where":"statut = 'Client'","becomes":true,"resolve":["p_commandes"],"active":true,"name":"Nouveaux clients"}],
+    "queries": [{"name":"Chiffre par ville","sql":"SELECT ville, SUM(ca) FROM clients GROUP BY ville","id":"q1","slug":"chiffre-par-ville"}],
+    "extdb": [{"def":"xs_AAAAAAAAAAAAAAAAAAAAAA","rev":3,"shadow":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"}],
+    "files": {"filter":{"deny":[".exe",".bat"],"maxBytes":10485760,"inconnu":1}},
+    "settings": {"cors":["https://erp.exemple.fr"],"write":true},
+    "racineFuture": {"v":2,"liste":[1,2,3]}
+  },
+  "sealed": "ehpOcJvwhaxJSroEabmx7aCrH3ixaqu3n/7akGI+hSJRUVFRUVFRUVFRUVFMeQHAZoqyPLW+iO2lgKBjFSPQhyReIEZTXAjIPyGCjW/kjhe+9Bhon41MHdCbLAN+YW8f+hOdMPMXU0BxOMQav3aCyjr8YnYBHAbOIJU/IOhTII2cwAnDjzBykZnTc4iH0lGct5wGqKuoU/DPuwX0jT90BvOuBXd34dpNsc86DcdqvlNS9PLdZ1a0BM7r8ZGnRqyQmZ9C4vq2BSFei5vmAiYZF42SDSuJxAxmf/Ewj2adx2GqSgm3szlaQ85XOAPsZgmy28ZbkPSS5YbpzH/mZD1UxdNIWJL0z0PS5uI286s44nRjCP26obOrY3ktrPBQONWsQ+QfP8w7FxQ2+bcD3filMl8SDxQvaAyAY7+B9s3hky5bahNUNsRQg2xetRHDTvZkGtsRyXTNbmU2kZmf7yww8eYcaAlqGFCQsckFBbIXebtXCaznV/V4xOd2n/Ga7fG1aaa0gfzsuf/EOe4CH4WudXLl2ubifbYYrYBEC4oRdnOSTWGInYfsKki8GkSSohlhSd+ZpizvW6OoK5GmjTd/DZ9N+ta8cmkpxs0XDxfWgCXUOFyNpkW1YujRkERqkfVX3B4DNHQgZPvOVDNu7rBs1kQO5MGynrhTZ2KLWjv+/pJqf/OMmyNZcB2TQiykh+wFvz9KNPBb0fyNUlowUhb2gVfyPdMYwStl3JDBvuvQOHehZ29+zx+x2MCBO/FrcJ89Udl5qBTTVxS27qyruAuJXbsu1y0kOL3krhgdH18S/Kck5v+9JvWusAq9jL2js6QNEfOtrb8KOkwC1NoMYSp9QtYgTWanW3oPcHjE2lkiqw8STMj9z+NvGDVoLyyDFjnUA+V9RMtlm1fxqDwT7K32OuP3Hqu/bALk2CY0hewxJMs4cvZG1w/rzX4q78d1HCaZpGqy1swSn2pL1KJnsTLk6uXm3GtnKaNEg1vepk0hJ3fdsUB/9DBVk7a80cotd818Upbw3bRnbm+BtdDawdlM4y3U+SeNfQaIXBVz6Hoexjn5r6ilgWoWRDvUHQ0AzFJNSnV7uxbKkuaQOAAOs5MawkVk4JntE4ARnqfQFKvw/yJp3ld/WCUekkYzfGGQ4rjZMXxhYUzW5Y1gNwADnWD8YW3EWP7Oc0k0TapaKD9TGCyzoRULpjGctaaPK4LNdRCgbUU8klNzanXSYURKXp3db8jWzGAKoehWyA1YvVV0Q8lAtzb7heBeBuribPCunYmNtFx91CsJ4E+KPsaZdzVhouE3Pi5kCw25VgDy9iKiYnmZx+dB5s5iLgjIoim72fBXoB9jRUemc4w21xOa/XFYHLE2LBrVMC8PY5rh1is3lcVJ/WkCinp8zoWeAdoAAmCjMutp8CUYTVBZ2yZlvYEgvHYLqLLHQBW/BSo4pQbE+nApqCpfWyvNYspV4xuFZuNVR2oEFxKomu6Lm+EYFFxOpLjrP5IX200nbZhkAQj0KE9OktR+cEtnq5SiFJlVgAiJI+2PxcOevC9N47lxp1UYZ2vVKNBuHQyttdZGSaJY4sKY+CeI8i1aCWqbsci+zRzhI+XxXT5fr80bO7duKRH45tPZzg0IJC+xkDzRGHZx58m2a5xdu2hmG9IKys6hzhcACF+5yZt9wlznV1jlzx0z6CzVUuon5Ysd8OdLrm6e+Wd8wdaTBHNC+9FFAcKv0V+6keE5drkiMWKIR7FynXnEOL2vCPbqqrK2o9aZcYHIjiSTo7BIqLm3VFfKBg7fjwr7pXsd5nFdszsO+mWe",
+  "refused": {
+    "bindSigOtherKey": "Z3Q5ubpUpF/Ns0Gb5fZLMH5kNtkG4p16z+53JYcfG+4mhVe//DKgiQ068d2FD70mgz84bN6RBKnuCQW6UUPXBA==",
+    "otherAccess": "ehpOcJvwhaxJSroEabmx7aCrH3ixaqu3n/7akGI+hSJRUVFRUVFRUVFRUVFMeQHAZoqyPLW+iO2lgKBjFSPQhyReIEZTXAjIPyGCjW/kjhe+9Bhon41MHdCbLAN+SkocyznqFN8wWl5jFvILnBej9giEQHYBHAbOIJU/IOhTII2cwAnDjzBykZnTc4iH0lGct5wGqKuoU/DPuwX0jT90BvOuBXd34dpNsc86DcdqvlNS9PLdZ1a0BM7r8ZGnRqyQmZ9C4vq2BSFei5vmAiYZF42SDSuJxAxmf/Ewj2adx2GqSgm3szlaQ85XOAPsZgmy28ZbkPSS5YbpzH/mZD1UxdNIWJL0z0PS5uI286s44nRjCP26obOrY3ktrPBQONWsQ+QfP8w7FxQ2+bcD3filMl8SDxQvaAyAY7+B9s3hky5bahNUNsRQg2xetRHDTvZkGtsRyXTNbmU2kZmf7yww8eYcaAlqGFCQsckFBbIXebtXCaznV/V4xOd2n/Ga7fG1aaa0gfzsuf/EOe4CH4WudXLl2ubifbYYrYBEC4oRdnOSTWGInYfsKki8GkSSohlhSd+ZpizvW6OoK5GmjTd/DZ9N+ta8cmkpxs0XDxfWgCXUOFyNpkW1YujRkERqkfVX3B4DNHQgZPvOVDNu7rBs1kQO5MGynrhTZ2KLWjv+/pJqf/OMmyNZcB2TQiykh+wFvz9KNPBb0fyNUlowUhb2gVfyPdMYwStl3JDBvuvQOHehZ29+zx+x2MCBO/FrcJ89Udl5qBTTVxS27qyruAuJXbsu1y0kOL3krhgdH18S/Kck5v+9JvWusAq9jL2js6QNEfOtrb8KOkwC1NoMYSp9QtYgTWanW3oPcHjE2lkiqw8STMj9z+NvGDVoLyyDFjnUA+V9RMtlm1fxqDwT7K32OuP3Hqu/bALk2CY0hewxJMs4cvZG1w/rzX4q78d1HCaZpGqy1swSn2pL1KJnsTLk6uXm3GtnKaNEg1vepk0hJ3fdsUB/9DBVk7a80cotd818Upbw3bRnbm+BtdDawdlM4y3U+SeNfQaIXBVz6Hoexjn5r6ilgWoWRDvUHQ0AzFJNSnV7uxbKkuaQOAAOs5MawkVk4JntE4ARnqfQFKvw/yJp3ld/WCUekkYzfGGQ4rjZMXxhYUzW5Y1gNwADnWD8YW3EWP7Oc0k0TapaKD9TGCyzoRULpjGctaaPK4LNdRCgbUU8klNzanXSYURKXp3db8jWzGAKoehWyA1YvVV0Q8lAtzb7heBeBuribPCunYmNtFx91CsJ4E+KPsaZdzVhouE3Pi5kCw25VgDy9iKiYnmZx+dB5s5iLgjIoim72fBXoB9jRUemc4w21xOa/XFYHLE2LBrVMC8PY5rh1is3lcVJ/WkCinp8zoWeAdoAAmCjMutp8CUYTVBZ2yZlvYEgvHYLqLLHQBW/BSo4pQbE+nApqCpfWyvNYspV4xuFZuNVR2oEFxKomu6Lm+EYFFxOpLjrP5IX200nbZhkAQj0KE9OktR+cEtnq5SiFJlVgAiJI+2PxcOevC9N47lxp1UYZ2vVKNBuHQyttdZGSaJY4sKY+CeI8i1aCWqbsci+zRzhI+XxXT5fr80bO7duKRH45tPZzg0IJC+xkDzRGHZx58m2a5xdu2hmG9IKys6hzhcACF+5yZt9wlznV1jlzx0z6CzVUuon5Ysd8OdLrm6e+Wd8wdaTBHNC+9FFAcKv0V+6keE5drkiMWKIR7FynXnEOL2vCPbqqrK2o9aZcYHIjiSTo7BIqLm3VFfKBg4xMITnIM7dVI5eMaNOwqDz"
+  }
+}

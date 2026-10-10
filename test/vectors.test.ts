@@ -20,6 +20,7 @@ import {
 } from './helpers/apiAccessVectors';
 import { buildExtsrcVectors, formatVectors, replayExtsrcVectors, type ExtsrcVectors } from './helpers/extsrcVectors';
 import { buildGateFilesVectors, replayGateFilesVectors, type GateFilesVectors } from './helpers/gateFilesVectors';
+import { buildSettingsVectors, replaySettingsVectors, type SettingsVectors } from './helpers/settingsVectors';
 
 const dir = join(__dirname, 'vectors');
 const storeFixture = (): StoreVectors =>
@@ -146,6 +147,31 @@ describe('gate-fichiers-1 (familles 4, 5, 6 et filtre)', () => {
       const v = filesFixture();
       mutate(v);
       expect((await replayGateFilesVectors(storeCrypto, curves, v)).length, what).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('gate-heberge-1, famille 6 : le paquet gate-settings-1', () => {
+  const fixture = (): SettingsVectors => JSON.parse(readFileSync(join(dir, 'gate-settings-1.vectors.json'), 'utf8')) as SettingsVectors;
+
+  it('le fichier est exactement ce que le cœur produit, au format du dépôt', async () => {
+    expect(formatVectors(await buildSettingsVectors(storeCrypto, curves))).toBe(readFileSync(join(dir, 'gate-settings-1.vectors.json'), 'utf8').replace(/\r\n/g, '\n'));
+  });
+
+  it.each(providers)('se rejoue sans écart sous %s', async (_name, provider) => {
+    expect(await replaySettingsVectors(provider, curves, fixture())).toEqual([]);
+  });
+
+  it('le rejeu voit chaque altération', async () => {
+    const tampered: Array<[string, (v: SettingsVectors) => void]> = [
+      ['clair', (v) => (v.plain = { ...v.plain, settings: { ...v.plain.settings, write: false } })],
+      ['scellé', (v) => (v.sealed = v.sealed.replace(/^./, (ch) => (ch === 'A' ? 'B' : 'A')))],
+      ['bindSig', (v) => (v.bindSig = v.refused.bindSigOtherKey)],
+    ];
+    for (const [what, mutate] of tampered) {
+      const v = fixture();
+      mutate(v);
+      expect((await replaySettingsVectors(storeCrypto, curves, v)).length, what).toBeGreaterThan(0);
     }
   });
 });

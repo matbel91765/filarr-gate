@@ -117,7 +117,9 @@ export async function sealSettingsFor(
   curves: AccessCurves,
   settings: GateSettings,
   target: { accessId: string; encPublicKey: string; bindSig: string },
-  creatorSigningPublicKey: string
+  creatorSigningPublicKey: string,
+  /** L'éphémère et l'IV imposés : vecteurs seulement. */
+  fixed?: { ephemeralPriv: Uint8Array; iv: Uint8Array }
 ): Promise<string> {
   const ok = curves.ed25519Verify(
     fromBase64Std(target.bindSig),
@@ -125,7 +127,7 @@ export async function sealSettingsFor(
     fromBase64Std(creatorSigningPublicKey)
   );
   if (!ok) throw new Error('identité destinataire non liée par le créateur (bindSig refusée)');
-  const sealed = await sealToKey(c, curves, target.encPublicKey, utf8Encode(JSON.stringify(settings)));
+  const sealed = await sealToKey(c, curves, target.encPublicKey, utf8Encode(JSON.stringify(settings)), fixed);
   if (sealed.length > SETTINGS_MAX_BYTES * 1.4) throw new Error('paquet de réglages trop lourd (8 Mio au plus)');
   return sealed;
 }

@@ -367,5 +367,19 @@
     "commit": null,
     "rewritten": 0,
     "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "test/helpers/settingsVectors.ts",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
+  },
+  {
+    "file": "test/vectors/gate-settings-1.vectors.json",
+    "from": "filarr-gate",
+    "commit": null,
+    "rewritten": 0,
+    "note": "origine filarr-gate : à recopier par filarg (lot B2), rien à recopier d’ici vers là"
   }
 ]
