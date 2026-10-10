@@ -67,8 +67,10 @@ Tout cela est `.github/workflows/release.yml` ; la marche à suivre du mainteneu
 3. L'image, depuis le même flux de travail : étiquettes `<version>`, `<major>.<minor>`, `<major>` à partir de la 1.0
    et `latest` pour une étiquette de la branche par défaut seulement (jamais un correctif de maintenance), signée avec
    cosign (sans clé), avec sa provenance et son SBOM.
-4. La version publiée sur GitHub : notes, `SHA256SUMS`, les deux archives `.tgz` ; puis l'entrée « published » du
-   journal public des mises en service (branche `release-journal`).
+4. La version publiée sur GitHub : notes, `SHA256SUMS`, les deux archives `.tgz` et le module du service hébergé
+   (`filarr-gate-host-<version>.js`, construit deux fois et comparé comme les archives) ; puis l'entrée « published »
+   du journal public des mises en service (branche `release-journal`). Le service hébergé entre en service plus tard,
+   à la main, depuis ce module ([RELEASING.fr.md](RELEASING.fr.md#le-service-hébergé)).
 5. Vérifier : `npm view @filarr/gate dist.integrity` comparé à l'archive ; `npm audit signatures` ; `cosign verify` sur
    l'image ; le bouton Deploy sur un compte d'essai (jamais celui de production du mainteneur).
 

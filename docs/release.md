@@ -64,8 +64,10 @@ All of it is `.github/workflows/release.yml`; the step-by-step procedure for the
 3. The image, from the same workflow: tags `<version>`, `<major>.<minor>`, `<major>` from 1.0 on, and `latest`
    for a tag of the default branch only (never a maintenance fix),
    signed with cosign (keyless), with its provenance and SBOM.
-4. The GitHub release: notes, `SHA256SUMS`, the two `.tgz` archives; then the "published" entry of the public
-   release journal (branch `release-journal`).
+4. The GitHub release: notes, `SHA256SUMS`, the two `.tgz` archives and the hosted service's module
+   (`filarr-gate-host-<version>.js`, built twice and compared like the archives); then the "published" entry of the
+   public release journal (branch `release-journal`). The hosted service goes into service later, by hand, from that
+   module ([RELEASING.md](RELEASING.md#the-hosted-service)).
 5. Check: `npm view @filarr/gate dist.integrity` against the archive; `npm audit signatures`; `cosign verify` on the
    image; the Deploy button on a test account (never the maintainer's production one).
 

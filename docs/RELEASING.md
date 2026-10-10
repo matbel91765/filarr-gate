@@ -11,6 +11,8 @@ page is the procedure. Everything runs in GitHub Actions from a **signed tag**: 
   `.github/release-signers`, runs the tests again, builds twice and compares (`SHA256SUMS`), publishes `@filarr/gate`
   and `filarr-gate` on npm (provenance, trusted publishing), pushes the multi-architecture image (amd64, arm64) to
   GHCR, creates the GitHub release, and writes the "published" entry of the public release journal.
+- `.github/workflows/deploy-host.yml`: started by hand with a published tag, puts the hosted service into service,
+  seven days after publication at the earliest ([below](#the-hosted-service)).
 - `.github/release-signers`: who may sign a tag, and with which role.
 
 ## Once: before the first release
@@ -138,8 +140,8 @@ git push origin vX.Y.Z-security
 
 The two lines must be the last paragraph of the message. The package version stays `X.Y.Z`. If one condition is
 missing (the `release` key signed it, a line is missing, the advisory cannot be read), the chain publishes it as an
-ordinary release and says why in the run summary. Today the chain only checks and publishes: the hosted service's
-deployment does not exist yet.
+ordinary release and says why in the run summary. Publishing does not put the hosted service into service: that is
+[`deploy-host.yml`](#the-hosted-service), started by hand.
 
 ## Check what was published
 
@@ -159,5 +161,91 @@ git fetch origin release-journal && git show FETCH_HEAD:journal.jsonl | tail -1
   `npm audit signatures` checks the signatures and the attestations.
 - The last line of `journal.jsonl` (branch `release-journal`) is the "published" entry: version, tag, commit,
   `codeHash` (`sha256:` + SHA-256 of `SHA256SUMS`) and `publishedAt`, the time the chain received the tag, never the
-  date the tag carries. The hosted service's deployment, when it exists, will start from it (seven days later, except
-  for an accepted security fix).
+  date the tag carries. The hosted service's deployment starts from it (seven days later, except for an accepted
+  security fix).
+
+## The hosted service
+
+The hosted box runs as the Worker script `filarr-gate-host` (`packages/host`) in the Cloudflare account of Filarr's
+API, isolated by script. How it is mounted and what it guarantees: [the hosted service](explain/hosted.md). It goes
+into service **only** through `.github/workflows/deploy-host.yml`, from a signed tag published at least seven days
+earlier (except an accepted security fix): never from a laptop, and the Cloudflare deployment token exists only in that
+workflow.
+
+### Once: in Cloudflare (the account of the API, zone `filarr.com`)
+
+1. **People.** Keep the account's members to the minimum, two-factor authentication required for all. No API token
+   able to deploy Workers may exist outside the chain (check **My Profile › API Tokens** of every member).
+2. **Certificate.** **SSL/TLS › Edge Certificates › Order an advanced certificate**, hostname `*.gate.filarr.com`
+   (Advanced Certificate Manager, paid). The universal certificate covers `*.filarr.com`, not `*.gate.filarr.com`.
+3. **DNS.** A proxied record (orange cloud) named `*.gate`, for example `AAAA *.gate 100::`: the Worker route answers in
+   front of it, the address itself is never reached.
+4. **Zone rules for `*.gate.filarr.com`** (expression `http.host wildcard "*.gate.filarr.com"`), so that a program
+   calling a box receives JSON and never a challenge, and that no request is kept:
+   - **Security › WAF › Custom rules**: one rule, action **Skip** (all remaining custom rules, all managed rules, and
+     Super Bot Fight Mode rules when the plan has them), **Log matching requests unchecked**;
+   - **Rules › Configuration Rules**: Browser Integrity Check off, Security Level "Essentially Off", JavaScript
+     detections off where the plan exposes the setting, Email Obfuscation and Rocket Loader off;
+   - **Bot Fight Mode** (free plan) cannot be skipped by hostname: it must be off for the zone (or replaced by Super
+     Bot Fight Mode with the skip above);
+   - no Logpush job that covers these names, and no other Worker route on `*.gate.filarr.com/*`.
+   A daily read-only check of these rules and of the route belongs to Filarr's operations (contract § 10.3); it is not
+   in this repository.
+5. **The deployment token.** **My Profile › API Tokens › Create Token › Custom token**: *Account › Workers Scripts ›
+   Edit* on the API's account, *Zone › Workers Routes › Edit* on `filarr.com`, nothing else. Copy it once into GitHub
+   (next section) and nowhere else.
+6. **The service's keys**, from a clean clone of the default branch, logged in to that account (`npx wrangler login`):
+
+   ```sh
+   node scripts/host-keys.mjs
+   npx wrangler secret put FILARR_API_URL --name filarr-gate-host     # value: https://api.filarr.com
+   ```
+
+   `host-keys.mjs` draws `HOST_ENC` (X25519) and `HOST_SIG` (Ed25519) in memory, hands each private key to
+   `wrangler secret put … --name filarr-gate-host` through standard input (never on the command line, on disk or on
+   screen), then adds the public entry to `docs/hosted-keys.json` and prints it. Run it **once**. There is no copy of
+   the private keys: lost, they are replaced by a rotation. If the script does not exist yet in the account, wrangler
+   creates it empty when it stores the first secret; its code only ever arrives through the chain.
+7. **Then**: commit `docs/hosted-keys.json` to the default branch through a reviewed change (the service embeds this
+   list: the first deployable release must be tagged **after** this commit); give the printed list to Filarr's API
+   (variable `GATE_HOST_SIGN_KEYS`, with `GATE_HOST_DOMAIN = gate.filarr.com` and `GATE_HOST_CONTROL_URL =
+   https://ctl.gate.filarr.com`) and to Filarr's apps (`GATE_HOST_KEYS`).
+
+### Once: in GitHub
+
+- **Settings › Environments › New environment** `host-deploy`: deployment branches "Selected branches", rule `main`
+  only (the workflow also refuses to run from another branch). A required reviewer can be added as a last check before
+  each deployment.
+- In that environment: the secret `CLOUDFLARE_API_TOKEN` (the token of step 5) and the variable
+  `CLOUDFLARE_ACCOUNT_ID` (the account of the API, shown on its overview page). Nowhere else: no repository secret, no
+  other environment.
+- `ADVISORY_READ_TOKEN` (step 7 above) is also read by the deployment, to check a security advisory and read its
+  severity.
+
+### Each deployment
+
+1. A release made by `release.yml` that contains the service's module: its `SHA256SUMS` lists
+   `host/filarr-gate-host-X.Y.Z.js`. Releases made before the module existed (0.2.0) cannot be deployed.
+2. At least seven days after its `published` entry in `journal.jsonl` (branch `release-journal`).
+3. **Actions › Deploy hosted service › Run workflow**, from `main`, with the tag `vX.Y.Z`.
+
+The workflow checks the tag's signature against `release-signers` of the default branch (twice), finds the
+`published` entry of the tag, downloads the release's `SHA256SUMS` and the module, checks the module against it and the
+`codeHash` against the journal, refuses before seven days, runs the tests on the tagged commit and rebuilds the module
+byte for byte, deploys **that** file (`wrangler deploy --no-bundle`) with `HOST_CODE_HASH`, `HOST_BUILD_REF` and
+`HOST_DEPLOYED_AT`, reads back the announcement served at `https://ctl.gate.filarr.com/.well-known/filarr-gate-host.json`,
+and writes the `deployed` entry of the journal. Within five minutes, the service hands its version announcement to
+Filarr's API, which writes it in the log of every hosted access. Read the Cloudflare account's audit log after each
+deployment.
+
+**A security fix.** Tag `vX.Y.Z-security` as above (step "A security fix"), from a maintenance branch that starts at
+the commit of the last version in service, and run the same workflow with that tag as soon as `release.yml` has
+published it. The deployment goes ahead without delay only if the tag-check accepts the fix (key of role `security`,
+the two lines, existing advisory), a version is in service and the tagged commit descends from it, and the advisory's
+severity can be read; the journal then gets a `security` entry (published and deployed at the same moment, the
+advisory, its severity, "security fix, seven-day delay lifted") and every hosted access is told. One condition missing:
+it is an ordinary release, seven days.
+
+**Rotating the service's keys.** `node scripts/host-keys.mjs --rotate --id h2 --not-before <date at least 60 days
+later>` adds `HOST_ENC_h2` and `HOST_SIG_h2` and the new public entry; the new key enters a version of Filarr's apps
+at least 60 days before its `notBefore`. The old private keys stay: they open the tokens already sealed to them.

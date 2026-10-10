@@ -13,6 +13,8 @@ d'une **étiquette signée** : rien n'est publié depuis un poste.
   publie `@filarr/gate` et `filarr-gate` sur npm (provenance, publication de confiance), pousse l'image
   multi-architecture (amd64, arm64) sur GHCR, crée la publication GitHub, et écrit l'entrée « published » du journal
   public des mises en service.
+- `.github/workflows/deploy-host.yml` : lancé à la main avec une étiquette publiée, met le service hébergé en
+  service, sept jours après la publication au plus tôt ([plus bas](#le-service-hébergé)).
 - `.github/release-signers` : qui peut signer une étiquette, et avec quel rôle.
 
 ## Une fois : avant la première publication
@@ -145,8 +147,8 @@ git push origin vX.Y.Z-security
 
 Les deux lignes forment le dernier paragraphe du message. La version des paquets reste `X.Y.Z`. Si une condition
 manque (la clé `release` l'a signée, une ligne manque, l'avis est illisible), la chaîne la publie comme une version
-ordinaire et dit pourquoi dans le résumé du passage. Aujourd'hui, la chaîne ne fait que vérifier et publier : la mise
-en service du service hébergé n'existe pas encore.
+ordinaire et dit pourquoi dans le résumé du passage. Publier ne met pas le service hébergé en service : c'est
+[`deploy-host.yml`](#le-service-hébergé), lancé à la main.
 
 ## Vérifier ce qui est publié
 
@@ -166,5 +168,97 @@ git fetch origin release-journal && git show FETCH_HEAD:journal.jsonl | tail -1
   installe, `npm audit signatures` vérifie les signatures et les attestations.
 - La dernière ligne de `journal.jsonl` (branche `release-journal`) est l'entrée « published » : version, étiquette,
   commit, `codeHash` (`sha256:` + SHA-256 de `SHA256SUMS`) et `publishedAt`, l'heure à laquelle la chaîne a reçu
-  l'étiquette, jamais la date que porte l'étiquette. La mise en service du service hébergé, quand elle existera,
-  partira de là (sept jours plus tard, sauf pour un correctif de sécurité accepté).
+  l'étiquette, jamais la date que porte l'étiquette. La mise en service du service hébergé part de là (sept jours plus
+  tard, sauf pour un correctif de sécurité accepté).
+
+## Le service hébergé
+
+La boîte hébergée tourne dans le script Worker `filarr-gate-host` (`packages/host`), dans le compte Cloudflare de l'API
+de Filarr, isolé par script. Comment il est monté et ce qu'il garantit : [le service hébergé](explain/hosted.fr.md). Il
+n'entre en service **que** par `.github/workflows/deploy-host.yml`, depuis une étiquette signée publiée depuis sept
+jours au moins (sauf un correctif de sécurité accepté) : jamais depuis un poste, et le jeton de déploiement de
+Cloudflare n'existe que dans ce workflow.
+
+### Une fois : dans Cloudflare (le compte de l'API, zone `filarr.com`)
+
+1. **Les personnes.** Membres du compte réduits au minimum, double authentification exigée pour tous. Aucun jeton
+   d'API capable de déployer des Workers ne doit exister hors de la chaîne (vérifier **My Profile › API Tokens** de
+   chaque membre).
+2. **Le certificat.** **SSL/TLS › Edge Certificates › Order an advanced certificate**, nom `*.gate.filarr.com`
+   (Advanced Certificate Manager, payant). Le certificat universel couvre `*.filarr.com`, pas `*.gate.filarr.com`.
+3. **Le DNS.** Un enregistrement proxifié (nuage orange) nommé `*.gate`, par exemple `AAAA *.gate 100::` : la route du
+   Worker répond devant lui, l'adresse elle-même n'est jamais atteinte.
+4. **Les règles de zone pour `*.gate.filarr.com`** (expression `http.host wildcard "*.gate.filarr.com"`), pour qu'un
+   logiciel qui appelle une boîte reçoive du JSON et jamais un défi, et qu'aucune requête ne soit gardée :
+   - **Security › WAF › Custom rules** : une règle, action **Skip** (toutes les règles personnalisées restantes,
+     toutes les règles gérées, et les règles de Super Bot Fight Mode si le plan les a), **Log matching requests
+     décoché** ;
+   - **Rules › Configuration Rules** : Browser Integrity Check éteint, Security Level « Essentially Off », détection
+     JavaScript éteinte là où le plan expose le réglage, Email Obfuscation et Rocket Loader éteints ;
+   - **Bot Fight Mode** (plan gratuit) ne s'écarte pas par nom d'hôte : il doit être éteint pour la zone (ou remplacé
+     par Super Bot Fight Mode avec l'écart ci-dessus) ;
+   - aucune tâche Logpush qui couvre ces noms, et aucune autre route de Worker sur `*.gate.filarr.com/*`.
+   Le contrôle quotidien, en lecture seule, de ces règles et de la route relève de l'exploitation de Filarr (contrat
+   § 10.3) ; il n'est pas dans ce dépôt.
+5. **Le jeton de déploiement.** **My Profile › API Tokens › Create Token › Custom token** : *Account › Workers Scripts
+   › Edit* sur le compte de l'API, *Zone › Workers Routes › Edit* sur `filarr.com`, rien d'autre. Le recopier une fois
+   dans GitHub (section suivante), et nulle part ailleurs.
+6. **Les clés du service**, depuis un clone propre de la branche par défaut, connecté à ce compte
+   (`npx wrangler login`) :
+
+   ```sh
+   node scripts/host-keys.mjs
+   npx wrangler secret put FILARR_API_URL --name filarr-gate-host     # valeur : https://api.filarr.com
+   ```
+
+   `host-keys.mjs` tire `HOST_ENC` (X25519) et `HOST_SIG` (Ed25519) en mémoire, passe chaque clé privée à
+   `wrangler secret put … --name filarr-gate-host` par l'entrée standard (jamais sur la ligne de commande, sur le
+   disque ni à l'écran), puis ajoute l'entrée publique à `docs/hosted-keys.json` et l'affiche. À lancer **une fois**.
+   Il n'existe aucune copie des clés privées : perdues, elles se remplacent par une rotation. Si le script n'existe pas
+   encore dans le compte, wrangler le crée vide en rangeant le premier secret ; son code n'arrive jamais que par la
+   chaîne.
+7. **Ensuite** : faire entrer `docs/hosted-keys.json` dans la branche par défaut par un changement relu (le service
+   embarque cette liste : la première version à mettre en service doit être étiquetée **après** ce commit) ; donner la
+   liste affichée à l'API de Filarr (variable `GATE_HOST_SIGN_KEYS`, avec `GATE_HOST_DOMAIN = gate.filarr.com` et
+   `GATE_HOST_CONTROL_URL = https://ctl.gate.filarr.com`) et aux applis de Filarr (`GATE_HOST_KEYS`).
+
+### Une fois : dans GitHub
+
+- **Settings › Environments › New environment** `host-deploy` : branches de déploiement « Selected branches », règle
+  `main` seulement (le workflow refuse aussi de partir d'une autre branche). Une relecture obligatoire peut être
+  ajoutée, comme dernier contrôle avant chaque mise en service.
+- Dans cet environnement : le secret `CLOUDFLARE_API_TOKEN` (le jeton de l'étape 5) et la variable
+  `CLOUDFLARE_ACCOUNT_ID` (le compte de l'API, affiché sur sa page d'accueil). Nulle part ailleurs : aucun secret du
+  dépôt, aucun autre environnement.
+- `ADVISORY_READ_TOKEN` (étape 7 plus haut) est lu aussi par la mise en service, pour vérifier un avis de sécurité et
+  lire sa gravité.
+
+### À chaque mise en service
+
+1. Une version publiée par `release.yml` qui contient le module du service : son `SHA256SUMS` liste
+   `host/filarr-gate-host-X.Y.Z.js`. Les versions publiées avant que le module existe (0.2.0) ne se mettent pas en
+   service.
+2. Sept jours au moins après son entrée `published` dans `journal.jsonl` (branche `release-journal`).
+3. **Actions › Deploy hosted service › Run workflow**, depuis `main`, avec l'étiquette `vX.Y.Z`.
+
+Le workflow vérifie la signature de l'étiquette contre `release-signers` de la branche par défaut (deux fois), trouve
+l'entrée `published` de l'étiquette, télécharge le `SHA256SUMS` et le module de la version publiée, vérifie le module
+contre lui et le `codeHash` contre le journal, refuse avant sept jours, relance les essais sur le commit étiqueté et
+reconstruit le module octet pour octet, met en service **ce** fichier (`wrangler deploy --no-bundle`) avec
+`HOST_CODE_HASH`, `HOST_BUILD_REF` et `HOST_DEPLOYED_AT`, relit l'annonce servie à
+`https://ctl.gate.filarr.com/.well-known/filarr-gate-host.json`, et écrit l'entrée `deployed` du journal. Dans les cinq
+minutes, le service remet son annonce de version à l'API de Filarr, qui l'écrit au journal de chaque accès hébergé.
+Relire le journal d'audit du compte Cloudflare après chaque mise en service.
+
+**Un correctif de sécurité.** Étiqueter `vX.Y.Z-security` comme plus haut (étape « Un correctif de sécurité »), depuis
+une branche de maintenance qui part du commit de la dernière version en service, et lancer le même workflow avec cette
+étiquette dès que `release.yml` l'a publiée. La mise en service part sans délai seulement si le contrôle de
+l'étiquette accepte le correctif (clé de rôle `security`, les deux lignes, avis existant), qu'une version est en
+service et que le commit étiqueté en descend, et que la gravité de l'avis se lit ; le journal reçoit alors une entrée
+`security` (publiée et mise en service au même moment, l'avis, sa gravité, « correctif de sécurité, délai de sept jours
+levé ») et chaque accès hébergé en est averti. Une condition manque : c'est une version ordinaire, sept jours.
+
+**Changer les clés du service.** `node scripts/host-keys.mjs --rotate --id h2 --not-before <date 60 jours plus tard au
+moins>` ajoute `HOST_ENC_h2` et `HOST_SIG_h2` et la nouvelle entrée publique ; la nouvelle clé entre dans une version
+des applis de Filarr 60 jours au moins avant son `notBefore`. Les anciennes clés privées restent : elles ouvrent les
+jetons déjà scellés vers elles.
