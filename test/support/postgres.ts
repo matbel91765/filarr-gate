@@ -6,7 +6,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -44,7 +44,16 @@ export function startPostgres(port: number): TempPostgres | null {
   const password = `essai-${Math.random().toString(36).slice(2)}`;
   writeFileSync(join(dir, 'pw'), `${password}\n`);
   execFileSync(join(bin, `initdb${exe}`), ['-D', join(dir, 'data'), '-U', 'gate', '--auth=scram-sha-256', `--pwfile=${join(dir, 'pw')}`, '-E', 'UTF8', '--locale=C'], { stdio: 'ignore' });
-  execFileSync(join(bin, `pg_ctl${exe}`), ['-D', join(dir, 'data'), '-o', `-p ${port} -c listen_addresses=127.0.0.1`, '-l', join(dir, 'pg.log'), '-w', 'start'], { stdio: 'ignore' });
+  // Hors Windows, le socket Unix va dans le dossier jetable : le dossier par défaut des paquets Debian
+  // (/var/run/postgresql) n'est pas inscriptible par un utilisateur ordinaire, celui d'une chaîne d'intégration.
+  const socket = process.platform === 'win32' ? '' : ` -c unix_socket_directories=${dir}`;
+  try {
+    execFileSync(join(bin, `pg_ctl${exe}`), ['-D', join(dir, 'data'), '-o', `-p ${port} -c listen_addresses=127.0.0.1${socket}`, '-l', join(dir, 'pg.log'), '-w', 'start'], { stdio: 'ignore' });
+  } catch (e) {
+    const log = existsSync(join(dir, 'pg.log')) ? readFileSync(join(dir, 'pg.log'), 'utf8').slice(-2000) : '(pas de journal)';
+    throw new Error(`PostgreSQL de test : pg_ctl start a échoué.
+${log}`, { cause: e });
+  }
   return {
     host: '127.0.0.1',
     port,
