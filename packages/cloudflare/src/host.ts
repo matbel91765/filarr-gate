@@ -154,6 +154,11 @@ export async function syncInstance(storage: DoStorage): Promise<string> {
 
 const SYNC_INSTANCE_KEY = 'sync-instance';
 
+/** Ce qu'un hôte qui enveloppe la boîte (le service hébergé) peut ajouter. */
+export interface CloudflareGateOptions {
+  fetchImpl?: typeof fetch;
+}
+
 export class CloudflareGate extends GateCore {
   /** La première copie (ou l'échec définitif) : les alarmes l'attendent. */
   started: Promise<void> = Promise.resolve();
@@ -167,7 +172,8 @@ export class CloudflareGate extends GateCore {
     private readonly sink: ReturnType<typeof doJournalSink>,
     private readonly stateBackend: ReturnType<typeof doStateBackend>,
     vars: Record<string, string | undefined>,
-    instance: string
+    instance: string,
+    options: CloudflareGateOptions
   ) {
     const s = host.settings();
     super({
@@ -176,6 +182,7 @@ export class CloudflareGate extends GateCore {
       journal: new Journal(sink, s.journalDays),
       cache: new KvBlockCache(doKvStore(ctx.storage)),
       version: GATE_VERSION,
+      ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
       // Aucun flux : l'objet s'endort entre deux alarmes et se réveille aux réveils poussés
       streamOpener: null,
       live: false,
@@ -191,13 +198,17 @@ export class CloudflareGate extends GateCore {
     host.gate = this;
   }
 
-  static async open(ctx: DoContext, env: GateEnv): Promise<CloudflareGate> {
+  /**
+   * `options.fetchImpl` : les requêtes vers Filarr passent par lui (le service hébergé y ajoute
+   * sa signature `Filarr-Gate-Host`, gate-heberge-1 § 2.2) ; sinon le `fetch` du moteur.
+   */
+  static async open(ctx: DoContext, env: GateEnv, options: CloudflareGateOptions = {}): Promise<CloudflareGate> {
     const vars = stringsOf(env);
     setLogLevel((vars.FILARR_GATE_LOG_LEVEL as Parameters<typeof setLogLevel>[0]) || 'info');
     const backend = doStateBackend(ctx.storage);
     const state = new StateStore(backend, await readState(ctx.storage));
     const host = new CloudflareHost(ctx.storage, env, vars, state.data.settings);
-    const gate = new CloudflareGate(ctx, host, state, doJournalSink(ctx.storage), backend, vars, await syncInstance(ctx.storage));
+    const gate = new CloudflareGate(ctx, host, state, doJournalSink(ctx.storage), backend, vars, await syncInstance(ctx.storage), options);
     const fromEnv = env.FILARR_GATE_TOKEN?.trim() || null;
     const token = fromEnv ?? (await ctx.storage.get<string>('token')) ?? null;
     gate.started = gate

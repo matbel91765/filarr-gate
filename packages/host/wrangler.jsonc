@@ -1,0 +1,52 @@
+// LE SERVICE HÉBERGÉ DE FILARR GATE — contrat gate-heberge-1 § 2.0 (montage A), § 7.1, § 10.
+//
+// Un script du compte Cloudflare de l'API, ISOLÉ PAR SCRIPT : ses objets durables, ses secrets, et AUCUNE
+// liaison vers une ressource de l'API (ni D1, ni R2, ni KV, ni ses objets durables, ni liaison de service),
+// et réciproquement (§ 2.0.4). Gardes : test/hostConfig.test.ts.
+//
+// Mis en service UNIQUEMENT par .github/workflows/deploy-host.yml, depuis une étiquette signée publiée depuis
+// sept jours au moins (§ 10.1), avec le module construit et compté dans SHA256SUMS (scripts/host/build.mjs) :
+//   wrangler deploy dist/filarr-gate-host.js --no-bundle --config packages/host/wrangler.jsonc --var …
+// Jamais depuis un poste. Marche à suivre : docs/RELEASING.md, docs/explain/hosted.md.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "filarr-gate-host",
+  "main": "dist/filarr-gate-host.js",
+  "no_bundle": true,
+  "compatibility_date": "2026-09-01",
+  // Aucune autre porte que la route de la zone : ni *.workers.dev, ni adresses d'aperçu
+  "workers_dev": false,
+  "preview_urls": false,
+  // Le joker *.gate.filarr.com (enregistrement DNS « *.gate » proxifié, certificat avancé de la zone) ; les
+  // domaines personnalisés de Worker n'admettent pas de joker (§ 2.0.1)
+  "routes": [{ "pattern": "*.gate.filarr.com/*", "zone_name": "filarr.com" }],
+  // Les objets du service, à lui seul. La juridiction UE se choisit à la CRÉATION, dans le code :
+  // GATE_BOX.jurisdiction("eu"), GATE_DIRECTORY.jurisdiction("eu") (§ 10.2)
+  "durable_objects": {
+    "bindings": [
+      { "name": "GATE_BOX", "class_name": "GateBox" },
+      { "name": "GATE_DIRECTORY", "class_name": "GateDirectory" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GateBox", "GateDirectory"] }],
+  // L'annonce de version remise à l'API après une mise en service (§ 7.4), une seule fois
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": {
+    "GATE_HOST_DOMAIN": "gate.filarr.com",
+    "GATE_APP_ORIGIN": "https://app.filarr.com"
+  },
+  // Déclarés par leur NOM seulement ; les valeurs n'existent que chez Cloudflare (scripts/host-keys.mjs pour
+  // HOST_ENC et HOST_SIG, `wrangler secret put FILARR_API_URL` pour l'adresse de l'API). Les clés suivantes
+  // d'une rotation s'appellent HOST_ENC_<id> et HOST_SIG_<id>.
+  "secrets": { "required": ["HOST_ENC", "HOST_SIG", "FILARR_API_URL"] },
+  // AUCUNE TRACE (§ 10.3). Tout est éteint EXPLICITEMENT : l'absence du bloc laisserait le défaut du compte,
+  // que Cloudflare peut changer. Ni Workers Logs, ni traces, ni Logpush, ni consommateur de traces, ni cartes
+  // de source.
+  "observability": {
+    "enabled": false,
+    "logs": { "enabled": false, "invocation_logs": false },
+    "traces": { "enabled": false }
+  },
+  "logpush": false,
+  "upload_source_maps": false
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@filarr/gate-host",
+  "version": "0.2.0",
+  "private": true,
+  "description": "The Filarr-hosted service of Filarr Gate (contract gate-heberge-1): one Durable Object per hosted box, in the EU jurisdiction. Deployed only by the release chain (.github/workflows/deploy-host.yml).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "fflate": "^0.8.3"
+  },
+  "scripts": {
+    "build": "node ../../scripts/host/build.mjs",
+    "check": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -13,9 +13,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": []
   },
-  "files": ["packages/cloudflare/src/workers.d.ts", "packages/host/src/workers.d.ts"],
-  "include": ["packages/*/src/**/*", "test/**/*", "scripts/**/*.ts", "vitest.config.ts", "examples/**/*.ts"],
-  "exclude": ["node_modules", "**/dist", "packages/cli/ui", "packages/cloudflare", "packages/host"]
+  "include": ["src/**/*", "../cloudflare/src/workers.d.ts"]
 }
