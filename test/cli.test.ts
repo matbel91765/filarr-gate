@@ -151,6 +151,19 @@ describe('filarr-gate (ligne de commande)', () => {
       await until(async () => (await fetch(`http://127.0.0.1:${port}/health`).catch(() => null))?.status === 200, 20_000, 'boîte en marche');
       expect((await gate(dir, ['health'])).code).toBe(0);
 
+      // Sur la machine de la boîte (docker exec…), sans mot de passe : le canal du répertoire d'état
+      const local = await gate(dir, ['keys', 'create', '--name', 'locale', '--json']);
+      expect(local.code, local.err + local.out).toBe(0);
+      expect((await fetch(`http://127.0.0.1:${port}/v1/clients`, { headers: { Authorization: `Bearer ${local.json.key}` } })).status).toBe(200);
+      const doctor = await gate(dir, ['doctor', '--json']);
+      expect(doctor.json.ok, JSON.stringify(doctor.json)).toBe(true);
+      const refused = await gate(dir, ['init', '--token', token]);
+      expect(refused.code).toBe(1);
+      expect(refused.err).toContain('tourne sur ce répertoire');
+      // Le secret du canal ne sert que depuis cette machine, et jamais sans lui
+      const noSecret = await fetch(`http://127.0.0.1:${adminPort}/admin/api/keys`, { headers: { 'X-Gate-Cli': 'faux' } });
+      expect(noSecret.status).toBe(401);
+
       const remote = ['--remote', `http://127.0.0.1:${adminPort}`, '--admin-password', PASSWORD, '--json'];
       const created = await gate(dir, ['keys', 'create', '--name', 'compta', ...remote]);
       expect(created.code, created.err + created.out).toBe(0);
@@ -158,7 +171,7 @@ describe('filarr-gate (ligne de commande)', () => {
       const rows = await fetch(`http://127.0.0.1:${port}/v1/clients`, { headers: { Authorization: `Bearer ${created.json.key}` } });
       expect(rows.status).toBe(200);
 
-      expect((await gate(dir, ['keys', 'list', ...remote])).json).toEqual([expect.objectContaining({ name: 'compta' })]);
+      expect((await gate(dir, ['keys', 'list', ...remote])).json).toEqual([expect.objectContaining({ name: 'locale' }), expect.objectContaining({ name: 'compta' })]);
       expect((await gate(dir, ['sources', 'list', ...remote])).json).toEqual([]);
       const deposit = await gate(dir, ['files', 'test', ...remote]);
       expect(deposit.json).toMatchObject({ status: 'deposited' });

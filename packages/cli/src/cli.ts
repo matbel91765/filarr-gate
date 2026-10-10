@@ -2,18 +2,18 @@
 /**
  * `filarr-gate` — la ligne de commande de la boîte noire (voir `HELP`).
  *
- * Deux façons d'agir sur une boîte :
- *  - sur CETTE machine (d'office) : la commande ouvre l'état, démarre la réplique
- *    le temps du geste (sans ouvrir de port ni lancer de synchro planifiée), puis
- *    s'arrête ;
- *  - sur une boîte EN MARCHE (`--remote http://127.0.0.1:8787`, mot de passe
- *    d'administration par `--admin-password` ou `FILARR_GATE_ADMIN_PASSWORD`) :
- *    la commande passe par son interface de gestion, et la boîte voit le geste tout
- *    de suite (une clé créée sert sans redémarrer).
+ * Trois façons d'agir sur une boîte :
+ *  - une boîte EN MARCHE sur ce répertoire d'état (`cli.json`) : la commande passe
+ *    par son interface de gestion avec le secret de ce canal (depuis cette machine
+ *    seulement), et la boîte voit le geste tout de suite ;
+ *  - une boîte d'une autre machine (`--remote http://hôte:8787`, mot de passe
+ *    d'administration par `--admin-password` ou `FILARR_GATE_ADMIN_PASSWORD`) ;
+ *  - sinon la commande ouvre l'état, démarre la réplique le temps du geste (sans
+ *    ouvrir de port ni lancer de synchro planifiée), puis s'arrête.
  * `--json` : une sortie JSON lisible par un programme, partout.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { createInterface } from 'node:readline';
@@ -23,6 +23,7 @@ import { setLogLevel, log } from '../../server/src/log';
 import { exportForToken, importSealed } from '../../server/src/migration';
 import { StateStore, type KeyScope } from '../../server/src/state';
 import { envNameFor } from '../../server/src/sync/secrets';
+import { runDoctor, type DoctorCheck } from '../../server/src/doctor';
 import { coerce, defaultStateDir, ENV_NAMES, loadConfig, type SettingKey } from './config';
 import { Gate } from './gate';
 import { StateDir, writeSecret } from './node';
@@ -86,8 +87,12 @@ Assistants IA
 
 Options communes
   --json                           sortie JSON
-  --remote URL                     agir sur une boîte en marche par son interface de gestion
+  --remote URL                     agir sur une boîte d'une AUTRE machine par son interface de gestion
                                    (avec --admin-password, ou FILARR_GATE_ADMIN_PASSWORD)
+
+Sur la machine d'une boîte en marche (docker exec compris), les commandes passent par elle,
+sans mot de passe : la boîte range dans son répertoire d'état (0600) le secret de ce canal.
+Sinon, la commande ouvre la boîte le temps du geste, sans port ni synchro planifiée.
 
 Répertoire d'état : FILARR_GATE_STATE_DIR (d'office ${defaultStateDir()}).
 Variables : FILARR_GATE_TOKEN, FILARR_GATE_ADMIN_PASSWORD, ${Object.values(ENV_NAMES).filter((n) => n !== 'FILARR_GATE_TOKEN').join(', ')},
@@ -112,36 +117,53 @@ const print = (flags: Flags, data: unknown, text: string): void => {
 
 class Remote {
   private cookie: string | null = null;
+  /** `password` : par la connexion de l'interface ; `secret` : le canal de la ligne de commande (cette machine). */
   constructor(
     private readonly base: string,
-    private readonly password: string
+    private readonly auth: { password: string } | { secret: string }
   ) {}
 
-  private async login(): Promise<void> {
-    const res = await fetch(new URL('/admin/api/login', this.base), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Gate-Admin': '1' }, body: JSON.stringify({ password: this.password }) });
+  private async login(password: string): Promise<void> {
+    const res = await fetch(new URL('/admin/api/login', this.base), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Gate-Admin': '1' }, body: JSON.stringify({ password }) });
     if (!res.ok) throw new CliError(`connexion refusée par ${this.base} (${res.status})`);
     this.cookie = (res.headers.get('set-cookie') ?? '').split(';')[0] ?? null;
   }
 
   async call<T = Record<string, unknown>>(method: string, path: string, body?: unknown): Promise<T> {
-    if (!this.cookie) await this.login();
-    const res = await fetch(new URL(`/admin/api${path}`, this.base), {
-      method,
-      headers: { Cookie: this.cookie ?? '', ...(method !== 'GET' ? { 'X-Gate-Admin': '1', 'Content-Type': 'application/json' } : {}) },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    });
+    if ('password' in this.auth && !this.cookie) await this.login(this.auth.password);
+    let res: Response;
+    try {
+      res = await fetch(new URL(`/admin/api${path}`, this.base), {
+        method,
+        headers: {
+          ...('secret' in this.auth ? { 'X-Gate-Cli': this.auth.secret } : { Cookie: this.cookie ?? '' }),
+          ...(method !== 'GET' ? { 'X-Gate-Admin': '1', 'Content-Type': 'application/json' } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      });
+    } catch (err) {
+      throw new CliError(`boîte noire injoignable (${this.base}) : ${(err as Error).message}`);
+    }
     const parsed = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) throw new CliError(String(parsed.error ?? `${res.status}`), 1, String(parsed.code ?? 'error'));
     return parsed as T;
   }
 }
 
+/**
+ * Par où agir : `--remote URL` (avec le mot de passe d'administration) ; sinon la boîte
+ * qui tourne sur CE répertoire d'état, par le canal de la ligne de commande ; sinon
+ * rien (la commande ouvre la boîte le temps du geste).
+ */
 function remoteOf(flags: Flags): Remote | null {
   const url = typeof flags.remote === 'string' ? flags.remote : process.env.FILARR_GATE_ADMIN_URL;
-  if (!url) return null;
-  const password = typeof flags['admin-password'] === 'string' ? flags['admin-password'] : process.env.FILARR_GATE_ADMIN_PASSWORD;
-  if (!password) throw new CliError('--admin-password (ou FILARR_GATE_ADMIN_PASSWORD) attendu avec --remote');
-  return new Remote(url, password);
+  if (url) {
+    const password = typeof flags['admin-password'] === 'string' ? flags['admin-password'] : process.env.FILARR_GATE_ADMIN_PASSWORD;
+    if (!password) throw new CliError('--admin-password (ou FILARR_GATE_ADMIN_PASSWORD) attendu avec --remote');
+    return new Remote(url, { password });
+  }
+  const running = new StateDir(defaultStateDir()).readCliChannel();
+  return running ? new Remote(running.admin, { secret: running.secret }) : null;
 }
 
 // ==================== Cette machine : la boîte le temps d'un geste ====================
@@ -196,6 +218,8 @@ async function init(flags: Flags): Promise<void> {
   const token = typeof flags.token === 'string' ? flags.token : process.env.FILARR_GATE_TOKEN;
   if (!token || !parseAccessToken(token)) throw new CliError('--token flr_live_… attendu (un jeton Filarr valide)', 2);
   const { files, state } = openState();
+  const running = files.readCliChannel();
+  if (running) throw new CliError(`une boîte noire tourne sur ce répertoire (processus ${running.pid}) : arrêtez-la avant init, ou remplacez le jeton dans son interface (${running.admin}/admin/)`);
   const map: Record<string, SettingKey> = { host: 'host', port: 'port', 'admin-host': 'adminHost', 'admin-port': 'adminPort', 'api-url': 'apiUrl', write: 'write' };
   for (const [flag, key] of Object.entries(map)) {
     if (flags[flag] !== undefined) (state.data.settings as Record<string, unknown>)[key] = coerce(key, flags[flag] === true ? 'true' : flags[flag]);
@@ -414,56 +438,20 @@ async function importCmd(args: string[], flags: Flags): Promise<void> {
   print(flags, out, `Réglages importés : ${JSON.stringify(out)}`);
 }
 
-interface Check {
-  name: string;
-  result: 'ok' | 'warn' | 'fail';
-  detail: string;
-}
-
 async function doctor(flags: Flags): Promise<void> {
-  const checks: Check[] = [];
-  const add = (name: string, result: Check['result'], detail: string) => checks.push({ name, result, detail });
-  const cfg = loadConfig(savedSettings());
-  // Horloge et Filarr : les réveils refusent 5 minutes d'écart, les registres datent les écritures
-  try {
-    const started = Date.now();
-    const res = await fetch(new URL('public/api-limits', cfg.settings.apiUrl.endsWith('/') ? cfg.settings.apiUrl : `${cfg.settings.apiUrl}/`), { signal: AbortSignal.timeout(10_000) });
-    const ms = Date.now() - started;
-    add('filarr', res.ok ? 'ok' : 'warn', `${cfg.settings.apiUrl} répond ${res.status} en ${ms} ms`);
-    const date = res.headers.get('date');
-    if (date) {
-      const skew = Math.round((Date.parse(date) - Date.now()) / 1000);
-      add('horloge', Math.abs(skew) > 240 ? 'fail' : Math.abs(skew) > 30 ? 'warn' : 'ok', `écart avec Filarr : ${skew} s${Math.abs(skew) > 240 ? ' (les réveils seront refusés au-delà de 300 s)' : ''}`);
-    }
-  } catch (err) {
-    add('filarr', 'fail', `${cfg.settings.apiUrl} injoignable : ${(err as Error).message}`);
-  }
-  const { files } = openState();
-  const token = cfg.tokenFromEnv ?? files.readToken();
-  if (!token) add('jeton', 'fail', 'aucun jeton : filarr-gate init --token flr_live_…');
-  else if (!parseAccessToken(token)) add('jeton', 'fail', 'le jeton rangé n’est pas un jeton Filarr');
+  const remote = remoteOf(flags);
+  let checks: DoctorCheck[];
+  if (remote) checks = (await remote.call<{ checks: DoctorCheck[] }>('GET', '/doctor')).checks;
   else {
-    await withGate(async (g) => {
-      const r = g.replicator;
-      add('jeton', ['live', 'polling', 'connecting'].includes(r.link) ? 'ok' : ['revoked', 'expired', 'unknown_access'].includes(r.link) ? 'fail' : 'warn', `liaison : ${r.link}${r.linkDetail ? ` (${r.linkDetail})` : ''} · ${r.identity?.hint ?? ''}`);
-      add('créateur', r.creator.status === 'authenticated' ? 'ok' : r.creator.status === 'refused' ? 'fail' : 'warn', `clé du créateur : ${r.creator.status}${r.creator.reason ? ` (${r.creator.reason})` : ''}`);
-      for (const b of r.bases.values()) {
-        const st = b.mirror.status;
-        add(`base ${b.manifest?.slug ?? b.storeId}`, st === 'ready' ? 'ok' : st === 'missing_key' || st === 'unverified' ? 'fail' : 'warn', `${st}${b.mirror.problem ? ` : ${b.mirror.problem.message}` : ''} · ${b.mirror.rows.length} lignes`);
-      }
-      if (r.refused.length) add('scellés', 'fail', `${r.refused.length} scellé(s) refusé(s) : ${r.refused.map((x) => `${x.what} ${x.storeId} (${x.reason})`).join(' ; ')}`);
-      const q = r.client?.quota;
-      for (const name of ['sync', 'bytes', 'writes'] as const) {
-        const c = q?.[name];
-        if (c && c.max > 0) {
-          const pct = Math.round((c.used / c.max) * 100);
-          add(`quota ${name}`, pct >= 100 ? 'fail' : pct >= 80 ? 'warn' : 'ok', `${c.used} / ${c.max} (${pct} %)`);
-        }
-      }
-      if (r.files) add('fichiers', r.files.signed ? 'ok' : 'fail', r.files.signed ? `boîte de dépôt liée et signée · ${r.files.pending.n} en attente` : 'boîte de dépôt NON signée par le créateur : les dépôts sont refusés');
-      for (const s of g.sync?.list() ?? []) add(`synchro ${s.def.name}`, s.blocked ? (s.blocked === 'paused' ? 'warn' : 'fail') : 'ok', s.blocked ? `${s.blocked}${s.detail ? ` : ${s.detail}` : ''}` : `prête · ${s.def.connector} · ${s.def.host}`);
-      if (g.settings.write && r.access?.write === false) add('écriture', 'warn', 'l’écriture est allumée ici mais Filarr ne l’ouvre pas à cet accès');
-    }).catch((err) => add('boîte', 'fail', (err as Error).message));
+    const cfg = loadConfig(savedSettings());
+    const token = cfg.tokenFromEnv ?? openState().files.readToken();
+    if (token && !parseAccessToken(token)) checks = [{ name: 'jeton', result: 'fail', detail: 'le jeton rangé n’est pas un jeton Filarr' }];
+    else if (!token) {
+      // Sans jeton : Filarr et l'horloge quand même
+      setLogLevel('warn');
+      const gate = new Gate({ listen: false, sync: { timers: false } });
+      checks = await runDoctor(gate);
+    } else checks = await withGate((g) => runDoctor(g));
   }
   const bad = checks.some((c) => c.result === 'fail');
   print(flags, { ok: !bad, checks }, checks.map((c) => `${c.result === 'ok' ? 'ok  ' : c.result === 'warn' ? 'warn' : 'FAIL'}  ${c.name.padEnd(22)} ${c.detail}`).join('\n'));

@@ -32,8 +32,17 @@ export function writeSecret(path: string, content: string | Uint8Array): void {
  * - `token` : le jeton Filarr, 0600, jamais journalisé (absent s'il vient de l'environnement) ;
  * - `state.json` (0600) : l'état (voir `server/src/state.ts`) ;
  * - `blocks/` : le cache des blocs CHIFFRÉS ; `journal/` : le journal local ;
- * - `sync/` : les ombres des synchros externes, CHIFFRÉES.
+ * - `sync/` : les ombres des synchros externes, CHIFFRÉES ;
+ * - `cli.json` (0600), le temps qu'une boîte tourne : son processus, l'adresse de son
+ *   interface et le secret du canal de la ligne de commande.
  */
+export interface CliChannel {
+  v: 1;
+  pid: number;
+  admin: string;
+  secret: string;
+}
+
 export class StateDir {
   constructor(readonly dir: string) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -77,6 +86,34 @@ export class StateDir {
 
   deleteToken(): void {
     rmSync(join(this.dir, 'token'), { force: true });
+  }
+
+  /** Annonce la boîte qui tourne sur ce répertoire, pour la ligne de commande. */
+  writeCliChannel(channel: CliChannel): void {
+    writeSecret(join(this.dir, 'cli.json'), `${JSON.stringify(channel)}
+`);
+  }
+
+  /** La boîte qui tourne sur ce répertoire, si son processus vit encore. */
+  readCliChannel(): CliChannel | null {
+    try {
+      const c = JSON.parse(readFileSync(join(this.dir, 'cli.json'), 'utf8')) as CliChannel;
+      if (c.v !== 1 || !Number.isInteger(c.pid) || typeof c.admin !== 'string' || typeof c.secret !== 'string') return null;
+      if (c.pid !== process.pid) process.kill(c.pid, 0);
+      return c;
+    } catch (err) {
+      // EPERM : le processus existe (un autre utilisateur) ; tout le reste : pas de boîte
+      return (err as NodeJS.ErrnoException).code === 'EPERM' ? (JSON.parse(readFileSync(join(this.dir, 'cli.json'), 'utf8')) as CliChannel) : null;
+    }
+  }
+
+  removeCliChannel(pid: number): void {
+    try {
+      const c = JSON.parse(readFileSync(join(this.dir, 'cli.json'), 'utf8')) as CliChannel;
+      if (c.pid === pid) rmSync(join(this.dir, 'cli.json'), { force: true });
+    } catch {
+      /* rien à retirer */
+    }
   }
 
   /** Oublie cette machine (l'état se réécrit neuf ensuite). */

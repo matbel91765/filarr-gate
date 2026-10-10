@@ -24,6 +24,7 @@ import { envNameFor } from '../../server/src/sync/secrets';
 import { coerce, ENV_NAMES, loadConfig, type LoadedConfig, type SettingKey, type Settings } from './config';
 import { fileBlobs, fileJournalSink, nodeListener, serveUiFile, StateDir, uiRoot } from './node';
 import { GATE_VERSION } from './version';
+import { randomToken } from '../../gate/src/util/bytes';
 
 export interface GateOptions {
   env?: NodeJS.ProcessEnv;
@@ -242,6 +243,11 @@ export class Gate extends GateCore {
       const adminServer = createHttp(nodeListener((req, conn) => this.admin.handle(req, conn)));
       this.adminHttp = await this.listenOn(adminServer, this.settings.adminPort, this.settings.adminHost);
       log.info(`Interface de gestion : ${this.adminUrl()}`);
+      // Le canal de la ligne de commande : `filarr-gate keys …` sur cette machine passe par la boîte en marche
+      const s = this.settings;
+      const local = s.adminHost === '0.0.0.0' || s.adminHost === '::' || s.adminHost === 'localhost' ? '127.0.0.1' : s.adminHost;
+      this.cliSecret = randomToken(32);
+      this.stateFiles.writeCliChannel({ v: 1, pid: process.pid, admin: `http://${local.includes(':') ? `[${local}]` : local}:${this.adminPort}`, secret: this.cliSecret });
     }
     const token = this.loaded.tokenFromEnv ?? this.stateFiles.readToken();
     await super.start(token, this.loaded.tokenFromEnv ? 'env' : token ? 'state' : null);
@@ -260,6 +266,8 @@ export class Gate extends GateCore {
   }
 
   override async stop(): Promise<void> {
+    if (this.cliSecret) this.stateFiles.removeCliChannel(process.pid);
+    this.cliSecret = null;
     await super.stop();
     if (this.apiHttp) await this.closeServer(this.apiHttp);
     if (this.adminHttp) await this.closeServer(this.adminHttp);

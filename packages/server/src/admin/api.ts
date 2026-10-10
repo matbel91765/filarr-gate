@@ -28,6 +28,7 @@ import { StateStore, type KeyScope, type SavedQuery, type WebhookEvent } from '.
 import { log } from '../log';
 import { exportForToken, importSealed } from '../migration';
 import { envNameFor } from '../sync/secrets';
+import { runDoctor } from '../doctor';
 
 const SESSION_COOKIE = 'gate_admin';
 const SESSION_MS = 12 * 3_600_000;
@@ -69,6 +70,13 @@ export class AdminApi {
     }
     this.sessions.set(m[1]!, Date.now() + SESSION_MS);
     return m[1]!;
+  }
+
+  /** Le canal de la ligne de commande : le secret du répertoire d'état, depuis cette machine seulement. */
+  private cliAuthed(request: Request, conn: ConnInfo): boolean {
+    const secret = this.gate.cliSecret;
+    const given = request.headers.get('x-gate-cli');
+    return secret !== null && given !== null && isLoopback(conn.remoteAddress ?? '') && timingSafeEqualStr(given, secret);
   }
 
   private openSession(out: Record<string, string>): void {
@@ -124,7 +132,7 @@ export class AdminApi {
     const send = (status: number, body: unknown, headers: Record<string, string> = {}): Response => json(status, body, { ...extra, ...headers });
     const path = url.pathname.slice('/admin/api'.length).replace(/\/+$/, '') || '/';
     const g = this.gate;
-    const authed = this.session(request) !== null;
+    const authed = this.session(request) !== null || this.cliAuthed(request, conn);
     // Écriture : en-tête maison (contre une page d'un autre site)
     if (method !== 'GET' && request.headers.get('x-gate-admin') !== '1') throw new ApiError(403, 'csrf', 'En-tête X-Gate-Admin manquant');
 
@@ -364,6 +372,11 @@ export class AdminApi {
         g.sync.pause(defId, body?.paused !== false);
         return send(200, this.sourcesView());
       }
+    }
+
+    if (path === '/doctor' && method === 'GET') {
+      const checks = await runDoctor(g);
+      return send(200, { ok: !checks.some((c) => c.result === 'fail'), checks });
     }
 
     // ---------- Révision 3 : la fente à fichiers (gate-fichiers-1) ----------

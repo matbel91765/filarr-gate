@@ -104,6 +104,12 @@ export class GateCore {
   tokenSource: 'env' | 'state' | null = null;
   /** Code à usage unique, demandé pour la mise en route depuis une autre machine que celle-ci. */
   readonly setupCode = randomCode();
+  /**
+   * Le secret du canal de la ligne de commande : posé par l'hôte qui écoute (rangé 0600 dans le
+   * répertoire d'état), il ouvre l'interface de gestion à `filarr-gate keys …` lancé sur CETTE
+   * machine par qui peut lire ce répertoire (qui tient déjà le jeton). `null` : canal fermé.
+   */
+  cliSecret: string | null = null;
   private pruneTimer: ReturnType<typeof setInterval> | null = null;
   /** Les ombres des synchros externes, pour le paquet de réglages (posé par l'exécutant des synchros). */
   syncShadows?: () => GateSettings['extdb'];
