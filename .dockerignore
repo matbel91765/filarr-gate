@@ -1,10 +1,15 @@
 node_modules
+**/node_modules
 dist
+**/dist
 .git
 .env
 .env.*
+.dev.vars
+.wrangler
 *.log
 data
 test
+examples
 coverage
 .DS_Store

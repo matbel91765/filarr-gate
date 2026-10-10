@@ -52,7 +52,7 @@ function gate(stateDir: string, args: string[], env: Record<string, string> = {}
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [cli, ...args], {
       cwd: repo,
-      env: { ...process.env, FILARR_GATE_STATE_DIR: stateDir, FILARR_GATE_CACHE: 'memory', FILARR_GATE_LOG_LEVEL: 'warn', FILARR_GATE_TOKEN: '', FILARR_GATE_ADMIN_PASSWORD: '', ...env },
+      env: { ...process.env, FILARR_GATE_STATE_DIR: stateDir, FILARR_GATE_API_URL: mock.url, FILARR_GATE_CACHE: 'memory', FILARR_GATE_LOG_LEVEL: 'warn', FILARR_GATE_TOKEN: '', FILARR_GATE_ADMIN_PASSWORD: '', ...env },
     });
     let out = '';
     let err = '';
@@ -147,7 +147,7 @@ describe('filarr-gate (ligne de commande)', () => {
     await gate(dir, ['init', '--token', token, '--port', String(port), '--admin-port', String(adminPort), '--api-url', mock.url, '--admin-password', PASSWORD]);
     let server: ChildProcess | null = null;
     try {
-      server = spawn(process.execPath, [cli, 'serve'], { cwd: repo, env: { ...process.env, FILARR_GATE_STATE_DIR: dir, FILARR_GATE_CACHE: 'memory', FILARR_GATE_LOG_LEVEL: 'warn', FILARR_GATE_TOKEN: '' }, stdio: 'ignore' });
+      server = spawn(process.execPath, [cli, 'serve'], { cwd: repo, env: { ...process.env, FILARR_GATE_STATE_DIR: dir, FILARR_GATE_API_URL: mock.url, FILARR_GATE_CACHE: 'memory', FILARR_GATE_LOG_LEVEL: 'warn', FILARR_GATE_TOKEN: '' }, stdio: 'ignore' });
       await until(async () => (await fetch(`http://127.0.0.1:${port}/health`).catch(() => null))?.status === 200, 20_000, 'boîte en marche');
       expect((await gate(dir, ['health'])).code).toBe(0);
 

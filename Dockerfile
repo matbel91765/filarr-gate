@@ -1,40 +1,49 @@
-# Filarr Gate — image Docker (utilisateur non root, sonde de santé sur /health).
+# Filarr Gate — image Docker (utilisateur non root, état dans /data, sonde de santé sur /health).
 #
 #   docker build -t filarr-gate .
 #   docker run -d --name filarr-gate \
 #     -e FILARR_GATE_TOKEN=flr_live_… \
-#     -p 8443:8443 -p 127.0.0.1:8787:8787 \
-#     -v filarr-gate:/var/lib/filarr-gate \
+#     -p 8443:8443 -v filarr-gate:/data \
 #     filarr-gate
+#   docker exec filarr-gate filarr-gate keys create --name ERP      # une clé, montrée une fois
 #
-# L'interface de gestion (8787) se publie sur 127.0.0.1 de l'hôte : qui y entre lit
-# les données en clair. Sa première mise en route demande le code affiché par
-# `docker logs filarr-gate`.
+# Le volume /data garde l'état (clés, webhooks, réglages), le cache CHIFFRÉ des blocs,
+# le journal et les ombres chiffrées des synchros : sans lui, tout repart de zéro.
+# L'interface de gestion (8787) n'est publiée que si vous l'ajoutez, sur 127.0.0.1 de
+# l'hôte (`-p 127.0.0.1:8787:8787`) : qui y entre lit les données en clair.
 
 FROM node:22-alpine AS build
-WORKDIR /app
+WORKDIR /src
 COPY package.json package-lock.json .npmrc ./
+COPY packages/core/package.json packages/core/
+COPY packages/gate/package.json packages/gate/
+COPY packages/server/package.json packages/server/
+COPY packages/cli/package.json packages/cli/
+COPY packages/cloudflare/package.json packages/cloudflare/
 RUN npm ci --no-audit --no-fund
-COPY tsconfig.json vitest.config.ts ./
-COPY scripts ./scripts
-COPY src ./src
-COPY ui ./ui
-RUN npm run build && npm prune --omit=dev --no-audit --no-fund
+COPY tsconfig.json ./
+COPY packages ./packages
+RUN npm run build -w filarr-gate && npm prune --omit=dev --no-audit --no-fund
 
 FROM node:22-alpine
+LABEL org.opencontainers.image.title="Filarr Gate" \
+      org.opencontainers.image.description="Serve a Filarr database as an API, without Filarr ever seeing your data." \
+      org.opencontainers.image.source="https://github.com/matbel91765/filarr-gate" \
+      org.opencontainers.image.licenses="Apache-2.0"
 ENV NODE_ENV=production \
-    FILARR_GATE_STATE_DIR=/var/lib/filarr-gate \
+    FILARR_GATE_STATE_DIR=/data \
     FILARR_GATE_HOST=0.0.0.0 \
     FILARR_GATE_ADMIN_HOST=0.0.0.0
 WORKDIR /app
-RUN mkdir -p /var/lib/filarr-gate && chown node:node /var/lib/filarr-gate
-COPY --from=build --chown=node:node /app/package.json ./package.json
-COPY --from=build --chown=node:node /app/node_modules ./node_modules
-COPY --from=build --chown=node:node /app/dist ./dist
+RUN mkdir -p /data && chown node:node /data
+COPY --from=build --chown=node:node /src/node_modules ./node_modules
+COPY --from=build --chown=node:node /src/packages/cli/package.json ./package.json
+COPY --from=build --chown=node:node /src/packages/cli/dist ./dist
 COPY --chown=node:node LICENSE NOTICE README.md ./
+RUN chmod 755 /app/dist/cli.js && ln -s /app/dist/cli.js /usr/local/bin/filarr-gate
 USER node
-VOLUME ["/var/lib/filarr-gate"]
+VOLUME ["/data"]
 EXPOSE 8443 8787
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["node", "dist/cli.js", "health"]
-ENTRYPOINT ["node", "dist/cli.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD ["filarr-gate", "health"]
+ENTRYPOINT ["filarr-gate"]
 CMD ["serve"]
