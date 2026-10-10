@@ -1,4 +1,4 @@
-// Recopié de filarg src/renderer/components/notes/extensions/inlineDatabase/viewEngine.ts @ 7864b9e2 — relicencié Apache-2.0 par le titulaire des droits.
+// Recopié de filarg src/renderer/components/notes/extensions/inlineDatabase/viewEngine.ts @ 3ed08c9e — relicencié Apache-2.0 par le titulaire des droits.
 /**
  * viewEngine — Filarr Notes / bases inline
  *
@@ -145,7 +145,7 @@ function isEmptyCellForRow(
  * « Filtres 1 » sur une vue qui montre tout, exactement le mensonge qu'on venait
  * de retirer par la porte des colonnes absentes.
  *
- * Mesuré, pas supposé, et signalé par `filarr-mobile-b1` sous la forme « deux
+ * Mesuré, pas supposé, et signalé par l'appli mobile sous la forme « deux
  * endroits qui décident séparément finissent par ne plus dire la même chose ».
  * La fenêtre est étroite — `sanitizeViews` écarte ces filtres au commit suivant
  * — mais elle existe entre la relecture d'un document écrit par une autre
@@ -966,7 +966,7 @@ export function activeSortCount(view: DbView, properties: DbProperty[]): number 
 }
 
 /**
- * ── RÈGLE GELÉE le 2026-09-09 avec `filarr-mobile-b1` ───────────────────────
+ * ── RÈGLE GELÉE le 2026-09-09 avec l'appli mobile ───────────────────────────
  *
  * **Une référence orpheline se CONSERVE toujours ; ce qui varie, c'est si on
  * l'APPLIQUE.**

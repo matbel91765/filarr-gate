@@ -1,4 +1,4 @@
-// Recopié de filarg src/renderer/components/notes/extensions/inlineDatabase/types.ts @ e3502763 — relicencié Apache-2.0 par le titulaire des droits.
+// Recopié de filarg src/renderer/components/notes/extensions/inlineDatabase/types.ts @ 3ed08c9e — relicencié Apache-2.0 par le titulaire des droits.
 /**
  * Inline Database — Filarr Notes
  *
@@ -252,6 +252,14 @@ export interface DbProperty {
    * la synchronisation (cf. `autoDate.ts`).
    */
   autoDate?: DbAutoDate;
+  /**
+   * Reflet d'une base EXTERNE qui alimente la colonne (contrat `source-externe-1`,
+   * § 10.1) : `{ src, dir, col }`. Lu par `engine/extsrc/readers.ts` (verrou si
+   * `dir === "in"`), jamais interprété ici. Volontairement HORS de `CHAMPS_COLONNE` :
+   * la relecture le garde comme tout champ inconnu, tel quel, sous-champs compris
+   * (précision 3.10).
+   */
+  managedBy?: unknown;
 }
 
 /** Règle d'une date posée d'office (cf. `DbProperty.autoDate`). */
@@ -732,6 +740,25 @@ export interface DatabaseViewProps {
    * d'un champ d'une ligne (les retours à la ligne sont aplatis par le navigateur).
    */
   onPasteLines?: (text: string) => void;
+  /**
+   * BASE ALIMENTÉE PAR UNE BASE EXTERNE (contrat `source-externe-1`, § 10) : les
+   * colonnes tenues par la source (cadenas, non éditables), celles qui lui sont
+   * synchronisées (pastille), et si les lignes viennent d'elle. Absent : base
+   * ordinaire. La garde du bloc refuse de toute façon une écriture verrouillée ;
+   * ceci sert à le MONTRER avant le geste.
+   */
+  ext?: ExtViewReader;
+}
+
+/** Ce qu'une vue doit montrer d'une base alimentée (cf. `DatabaseViewProps.ext`). */
+export interface ExtViewReader {
+  locked: ReadonlySet<string>;
+  synced: ReadonlySet<string>;
+  rowsManaged: boolean;
+  /** Le nom court de la source (« D1 »), celui des phrases « vient de… ». */
+  sourceName: string;
+  /** Une cellule verrouillée a été visée : le bloc dit pourquoi elle ne s'édite pas. */
+  onLockedTouch?: (propertyId: string) => void;
 }
 
 /** Une base qu'une relation peut viser, telle que l'éditeur de propriété la propose */
@@ -1218,7 +1245,7 @@ function parseIdList(raw: unknown): string[] | undefined {
  * ou `board` par une surface plus récente était effacé à la relecture, puis
  * republié sans lui.
  *
- * `filarr-mobile-b1` a montré que la limite n'était PAS symétrique, contrairement
+ * L'appli mobile a montré que la limite n'était PAS symétrique, contrairement
  * à ce que je lui avais écrit : chez lui `timeline` traverse intact parce qu'il
  * ne le déconstruit pas du tout. La limite ne mord que sur les objets qu'on
  * DÉCONSTRUIT — et c'est nous qui déconstruisons ceux-là. Un champ qu'il

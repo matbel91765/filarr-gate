@@ -2,7 +2,7 @@
   {
     "file": "packages/core/src/types.ts",
     "from": "src/renderer/components/notes/extensions/inlineDatabase/types.ts",
-    "commit": "e3502763",
+    "commit": "3ed08c9e",
     "rewritten": 3
   },
   {
@@ -62,7 +62,7 @@
   {
     "file": "packages/core/src/viewEngine.ts",
     "from": "src/renderer/components/notes/extensions/inlineDatabase/viewEngine.ts",
-    "commit": "7864b9e2",
+    "commit": "3ed08c9e",
     "rewritten": 0
   },
   {
