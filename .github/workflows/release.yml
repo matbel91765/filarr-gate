@@ -1,0 +1,326 @@
+# Chaîne de publication de Filarr Gate — contrat gate-heberge-1 § 7.4 et § 10.1 ; marche à suivre : docs/RELEASING.md.
+#
+# Déclencheur : une étiquette annotée vX.Y.Z (publication ordinaire) ou vX.Y.Z-security (correctif de sécurité),
+# SIGNÉE en SSH par git (gpg.format ssh) avec une clé déclarée dans .github/release-signers :
+#   rôle release  → publication ordinaire ;
+#   rôle security → correctif de sécurité, si le dernier paragraphe du message porte
+#                   « Filarr-Release-Kind: security » et « Filarr-Advisory: GHSA-… » et que l'avis existe ;
+#                   une seule condition manque : publication ordinaire.
+# Une étiquette légère, non signée, signée par une clé inconnue ou au nom hors de vX.Y.Z[-security] est REFUSÉE :
+# rien n'est construit ni publié.
+#
+# Ce que fait la chaîne : vérifier → essais → construire deux fois et comparer (SHA256SUMS) → npm (provenance,
+# publication de confiance OIDC) → image multi-architecture sur GHCR → publication GitHub → entrée « published »
+# du journal public des mises en service (branche release-journal, fichier journal.jsonl).
+#
+# Correctif de sécurité (vX.Y.Z-security) : la chaîne ne fait QUE vérifier et publier, comme une version
+# ordinaire. La mise en service du service hébergé n'existe pas encore : quand elle viendra, ce sera un travail
+# à part, qui attendra sept jours après l'entrée « published », sauf pour un correctif accepté (kind=security).
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+env:
+  # Nom de l'image sur GHCR : À CHOISIR avant la première publication (ghcr.io/filarr/gate ou
+  # ghcr.io/matbel91765/filarr-gate), en minuscules. Tant qu'il vaut ghcr.io/OWNER/NAME, l'image n'est pas publiée.
+  IMAGE: ghcr.io/OWNER/NAME
+  NODE_VERSION: '22'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Signature de l'étiquette
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      kind: ${{ steps.check.outputs.kind }}
+      commit: ${{ steps.check.outputs.commit }}
+      advisory: ${{ steps.check.outputs.advisory }}
+      security_refused: ${{ steps.check.outputs.security_refused }}
+      received_at: ${{ steps.received.outputs.at }}
+    steps:
+      - name: Heure de réception de l'étiquette (date de publication du journal, jamais celle de l'étiquette)
+        id: received
+        run: echo "at=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" >> "$GITHUB_OUTPUT"
+      - name: Nom de l'étiquette
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-security)?$ ]] \
+            || { echo "::error::étiquette « $GITHUB_REF_NAME » : vX.Y.Z ou vX.Y.Z-security attendu"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Objet d'étiquette annotée (une étiquette légère n'a pas de signature)
+        run: |
+          git fetch --force --no-tags origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          if [ "$(git cat-file -t "refs/tags/$GITHUB_REF_NAME")" != tag ]; then
+            echo "::error::étiquette légère : git tag -s exigé"; exit 1
+          fi
+          git cat-file tag "refs/tags/$GITHUB_REF_NAME" > "$RUNNER_TEMP/tag.raw"
+      - name: Signataires et vérificateur lus sur la branche par défaut (jamais dans l'arbre étiqueté)
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH"
+          git show "FETCH_HEAD:.github/release-signers" > "$RUNNER_TEMP/release-signers"
+          git show "FETCH_HEAD:scripts/release/tag-check.mjs" > "$RUNNER_TEMP/tag-check.mjs"
+      - name: Le commit étiqueté est publié sur une branche du dépôt
+        run: |
+          commit="$(git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}")"
+          if [ -z "$(git branch -r --contains "$commit")" ]; then
+            echo "::error::le commit $commit n'est sur aucune branche du dépôt"; exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Signature, rôle, correctif de sécurité
+        id: check
+        env:
+          # Un avis encore privé ne se lit qu'avec un jeton qui y a accès (secret facultatif ADVISORY_READ_TOKEN) ;
+          # sinon l'avis passe pour absent et l'étiquette est traitée en publication ordinaire.
+          GH_TOKEN: ${{ secrets.ADVISORY_READ_TOKEN || github.token }}
+        run: >-
+          node "$RUNNER_TEMP/tag-check.mjs" --tag "$GITHUB_REF_NAME" --raw "$RUNNER_TEMP/tag.raw"
+          --signers "$RUNNER_TEMP/release-signers" --github-output "$GITHUB_OUTPUT"
+      - name: Deuxième lecture de la signature, par git et ssh-keygen
+        run: git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$RUNNER_TEMP/release-signers" verify-tag "$GITHUB_REF_NAME"
+      - name: Les paquets publiés portent la version de l'étiquette
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          git checkout --quiet "refs/tags/$GITHUB_REF_NAME"
+          for p in packages/gate packages/cli; do
+            v="$(node -p "require('./$p/package.json').version")"
+            [ "$v" = "$VERSION" ] || { echo "::error::$p est en $v, l'étiquette dit $VERSION"; exit 1; }
+          done
+      - name: Résumé
+        env:
+          KIND: ${{ steps.check.outputs.kind }}
+          ADVISORY: ${{ steps.check.outputs.advisory }}
+          REFUSED: ${{ steps.check.outputs.security_refused }}
+        run: |
+          {
+            echo "### $GITHUB_REF_NAME"
+            echo "- sorte : $KIND"
+            [ -n "$ADVISORY" ] && echo "- avis : $ADVISORY"
+            [ -n "$REFUSED" ] && echo "- correctif ramené à une publication ordinaire : $REFUSED"
+            true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Essais
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npx vitest run --maxWorkers=2
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+      - run: npm run docs:check
+
+  pack:
+    name: Construction reproductible
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Deux constructions, mêmes archives, SHA256SUMS
+        run: node scripts/pack-check.mjs release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            release/SHA256SUMS
+            release/a/library/*.tgz
+            release/a/cli/*.tgz
+          if-no-files-found: error
+
+  npm:
+    name: npm (provenance)
+    needs: [verify, pack]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+      - name: npm récent (la publication de confiance OIDC demande npm 11.5.1 ou plus)
+        run: npm install -g npm@^11.5.1
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
+      - name: Publier les archives construites et comparées (@filarr/gate puis filarr-gate)
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          # Vide : publication de confiance (OIDC). Le secret NPM_TOKEN ne sert qu'à la toute première publication,
+          # avant que la publication de confiance puisse être réglée sur npm ; on le retire ensuite.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for pair in "@filarr/gate:release/a/library" "filarr-gate:release/a/cli"; do
+            name="${pair%%:*}"; dir="${pair#*:}"
+            if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+              echo "$name@$VERSION est déjà publié"; continue
+            fi
+            npm publish "$dir/filarr-gate-$VERSION.tgz" --provenance --access public
+          done
+
+  image:
+    name: Image Docker (amd64, arm64)
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Le nom de l'image est choisi
+        run: |
+          case "$IMAGE" in
+            *OWNER*|*NAME*|*[A-Z]*) echo "::error::IMAGE vaut « $IMAGE » : choisir le nom de l'image en tête de release.yml"; exit 1 ;;
+          esac
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Date des couches = date du commit étiqueté
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}},value=v${{ needs.verify.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.verify.outputs.version }}
+            type=semver,pattern={{major}},value=v${{ needs.verify.outputs.version }},enable=${{ !startsWith(needs.verify.outputs.version, '0.') }}
+            type=raw,value=latest
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
+      - uses: sigstore/cosign-installer@v3
+      - name: Signer l'image (cosign, sans clé, par l'identité OIDC de la chaîne)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+
+  github-release:
+    name: Publication GitHub
+    needs: [verify, pack, npm, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
+      - name: Notes, SHA256SUMS et archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          KIND: ${{ needs.verify.outputs.kind }}
+          ADVISORY: ${{ needs.verify.outputs.advisory }}
+        run: |
+          mkdir -p assets
+          cp release/SHA256SUMS assets/SHA256SUMS
+          cp "release/a/library/filarr-gate-$VERSION.tgz" "assets/library-filarr-gate-$VERSION.tgz"
+          cp "release/a/cli/filarr-gate-$VERSION.tgz" "assets/cli-filarr-gate-$VERSION.tgz"
+          {
+            echo "Filarr Gate $VERSION."
+            echo
+            if [ "$KIND" = security ]; then echo "Correctif de sécurité : $ADVISORY."; echo; fi
+            echo "SHA256SUMS : library/… = library-filarr-gate-$VERSION.tgz (@filarr/gate), cli/… = cli-filarr-gate-$VERSION.tgz (filarr-gate)."
+            echo "Image : $IMAGE:$VERSION (linux/amd64, linux/arm64), signée par cosign."
+          } > notes.md
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Filarr Gate $VERSION" --notes-file notes.md assets/*
+
+  journal:
+    name: Journal public (entrée « published »)
+    needs: [verify, pack, github-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: ${{ runner.temp }}/release
+      - name: Ajouter l'entrée à journal.jsonl (branche release-journal)
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          COMMIT: ${{ needs.verify.outputs.commit }}
+          RECEIVED_AT: ${{ needs.verify.outputs.received_at }}
+        run: |
+          cp scripts/release/journal.mjs "$RUNNER_TEMP/journal.mjs"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin release-journal >/dev/null; then
+            git fetch origin release-journal
+            git switch -C release-journal FETCH_HEAD
+          else
+            git switch --orphan release-journal
+            printf '%s\n' "# Journal public des mises en service de Filarr Gate" "" \
+              "Une entrée par ligne de journal.jsonl, écrite par la chaîne de publication (docs/RELEASING.md)." > README.md
+            git add README.md
+          fi
+          node "$RUNNER_TEMP/journal.mjs" append journal.jsonl --kind published --version "$VERSION" \
+            --tag "$GITHUB_REF_NAME" --commit "$COMMIT" --sums "$RUNNER_TEMP/release/SHA256SUMS" --published-at "$RECEIVED_AT"
+          git add journal.jsonl
+          git diff --cached --quiet || git commit -m "Journal : $GITHUB_REF_NAME publiée"
+          git push origin release-journal

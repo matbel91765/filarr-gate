@@ -38,8 +38,8 @@ Also check:
 
 - `packages/core/src/PROVENANCE.json`: the copied core matches the Filarr commit it names (`scripts/copy-core.mjs` run
   against that commit leaves the tree unchanged), and the vectors copied from Filarr are identical to theirs.
-- The vectors this repository originates (`source-externe-1`, `gate-fichiers-1`, `gate-settings-1`) are unchanged, or
-  their change is agreed with the Filarr apps first (parity rule).
+- The vectors this repository originates (`source-externe-1`, `gate-fichiers-1`, `gate-settings-1`,
+  `gate-heberge-1-gate`) are unchanged, or their change is agreed with the Filarr apps first (parity rule).
 
 ## Reproducible builds
 
@@ -48,17 +48,22 @@ Also check:
   order. `scripts/pack-check.mjs` builds and packs twice and fails if the archives differ; run it on two machines (or
   in CI and locally) and compare `SHA256SUMS`.
 - The Docker image: pin the base image by digest (`node:22-alpine@sha256:…`, *to do at release time*), build with
-  `SOURCE_DATE_EPOCH` set to the tag's commit time and `docker buildx build --build-arg SOURCE_DATE_EPOCH
-  --output type=image,rewrite-timestamp=true --provenance=true --sbom=true`.
+  `SOURCE_DATE_EPOCH` set to the tag's commit time (the release workflow does it), with provenance and SBOM. Rewriting
+  the layers' timestamps (`--output type=image,rewrite-timestamp=true`) is *to do* once checked on a test push.
 
 ## Publishing (in this order)
 
-1. Tag `v<version>` on `main`, signed.
-2. From GitHub Actions only (OIDC, no long-lived token): `npm publish --provenance --access public -w @filarr/gate`
-   then `-w filarr-gate`. The `prepack` scripts copy the licence files into each package.
-3. The image, from the same workflow: tags `<version>`, `<major>.<minor>`, `<major>` (and `latest`), signed with
-   cosign (keyless), with its provenance and SBOM.
-4. The GitHub release: notes, `SHA256SUMS` (signed), the two `.tgz` archives.
+All of it is `.github/workflows/release.yml`; the step-by-step procedure for the maintainer is
+[RELEASING.md](RELEASING.md).
+
+1. Tag `v<version>` on `main`, signed with a key of `.github/release-signers` (SSH signature of git).
+2. From GitHub Actions only (OIDC, no long-lived token): `npm publish --provenance --access public` of the two
+   archives that `scripts/pack-check.mjs` built and compared, `@filarr/gate` then `filarr-gate`. The `prepack` scripts
+   copy the licence files into each package.
+3. The image, from the same workflow: tags `<version>`, `<major>.<minor>`, `<major>` from 1.0 on (and `latest`),
+   signed with cosign (keyless), with its provenance and SBOM.
+4. The GitHub release: notes, `SHA256SUMS`, the two `.tgz` archives; then the "published" entry of the public
+   release journal (branch `release-journal`).
 5. Check: `npm view @filarr/gate dist.integrity` against the archive; `npm audit signatures`; `cosign verify` on the
    image; the Deploy button on a test account (never the maintainer's production one).
 

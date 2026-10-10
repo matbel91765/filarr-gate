@@ -39,8 +39,9 @@ Vérifiez aussi :
 - `packages/core/src/PROVENANCE.json` : le cœur recopié correspond au commit de Filarr qu'il nomme
   (`scripts/copy-core.mjs` lancé sur ce commit laisse l'arbre inchangé), et les vecteurs recopiés de Filarr sont
   identiques aux siens.
-- Les vecteurs dont ce dépôt est l'origine (`source-externe-1`, `gate-fichiers-1`, `gate-settings-1`) sont inchangés,
-  ou leur changement a d'abord été convenu avec les applis Filarr (règle de parité).
+- Les vecteurs dont ce dépôt est l'origine (`source-externe-1`, `gate-fichiers-1`, `gate-settings-1`,
+  `gate-heberge-1-gate`) sont inchangés, ou leur changement a d'abord été convenu avec les applis Filarr (règle de
+  parité).
 
 ## Des constructions reproductibles
 
@@ -49,17 +50,23 @@ Vérifiez aussi :
   et un ordre stable. `scripts/pack-check.mjs` construit et empaquette deux fois et échoue si les archives diffèrent ;
   lancez-le sur deux machines (ou en CI et en local) et comparez `SHA256SUMS`.
 - L'image Docker : figer l'image de base par son empreinte (`node:22-alpine@sha256:…`, *à faire au moment de la
-  version*), construire avec `SOURCE_DATE_EPOCH` réglé sur l'heure du commit de l'étiquette et `docker buildx build
-  --build-arg SOURCE_DATE_EPOCH --output type=image,rewrite-timestamp=true --provenance=true --sbom=true`.
+  version*), construire avec `SOURCE_DATE_EPOCH` réglé sur l'heure du commit de l'étiquette (la chaîne de publication
+  s'en charge), avec provenance et SBOM. Réécrire l'horodatage des couches (`--output
+  type=image,rewrite-timestamp=true`) est *à faire* une fois vérifié sur un envoi d'essai.
 
 ## Publier (dans cet ordre)
 
-1. Poser l'étiquette signée `v<version>` sur `main`.
-2. Depuis GitHub Actions seulement (OIDC, aucun jeton de longue durée) : `npm publish --provenance --access public -w
-   @filarr/gate`, puis `-w filarr-gate`. Les scripts `prepack` recopient les fichiers de licence dans chaque paquet.
-3. L'image, depuis le même flux de travail : étiquettes `<version>`, `<major>.<minor>`, `<major>` (et `latest`),
-   signée avec cosign (sans clé), avec sa provenance et son SBOM.
-4. La version publiée sur GitHub : notes, `SHA256SUMS` (signé), les deux archives `.tgz`.
+Tout cela est `.github/workflows/release.yml` ; la marche à suivre du mainteneur, pas à pas, est
+[RELEASING.fr.md](RELEASING.fr.md).
+
+1. Poser l'étiquette `v<version>` sur `main`, signée par une clé de `.github/release-signers` (signature SSH de git).
+2. Depuis GitHub Actions seulement (OIDC, aucun jeton de longue durée) : `npm publish --provenance --access public`
+   des deux archives que `scripts/pack-check.mjs` a construites et comparées, `@filarr/gate` puis `filarr-gate`. Les
+   scripts `prepack` recopient les fichiers de licence dans chaque paquet.
+3. L'image, depuis le même flux de travail : étiquettes `<version>`, `<major>.<minor>`, `<major>` à partir de la 1.0
+   (et `latest`), signée avec cosign (sans clé), avec sa provenance et son SBOM.
+4. La version publiée sur GitHub : notes, `SHA256SUMS`, les deux archives `.tgz` ; puis l'entrée « published » du
+   journal public des mises en service (branche `release-journal`).
 5. Vérifier : `npm view @filarr/gate dist.integrity` comparé à l'archive ; `npm audit signatures` ; `cosign verify` sur
    l'image ; le bouton Deploy sur un compte d'essai (jamais celui de production du mainteneur).
 

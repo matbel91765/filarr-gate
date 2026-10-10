@@ -1,0 +1,25 @@
+# Qui peut signer une étiquette de publication de Filarr Gate (contrat gate-heberge-1 § 10.1).
+# Who may sign a Filarr Gate release tag. Step by step: docs/RELEASING.md.
+#
+# Format : celui d'OpenSSH « allowed_signers » (gpg.ssh.allowedSignersFile de git), une clé par ligne :
+#
+#   <rôle>:<nom> namespaces="git" ssh-ed25519 <clé publique en base64>
+#
+# Rôles :
+#   release   publications ordinaires, étiquettes vX.Y.Z ;
+#   security  correctifs de sécurité, étiquettes vX.Y.Z-security : une clé À PART, détenue par le seul
+#             responsable de la sécurité.
+# Une même clé ne tient jamais les deux rôles. Clés Ed25519 seulement ; seule l'option namespaces="git" est admise.
+# La chaîne de publication lit CE fichier sur la branche par défaut, jamais dans l'arbre de l'étiquette : une clé
+# ajoutée ici ne vaut qu'une fois ce changement relu et fusionné.
+#
+# Ajouter une clé :
+#   1. ssh-keygen -t ed25519 -C "filarr-gate release" -f ~/.ssh/filarr-gate-release
+#      (pour un correctif : -C "filarr-gate security" -f ~/.ssh/filarr-gate-security, une autre clé)
+#   2. cut -d' ' -f1,2 ~/.ssh/filarr-gate-release.pub        → « ssh-ed25519 AAAA… »
+#   3. ajouter une ligne ci-dessous, SANS le « # » de tête, avec le rôle et un nom court ;
+#   4. déclarer la même clé publique dans GitHub (Settings › SSH and GPG keys › New SSH key › « Signing Key »).
+#
+# Exemples — PAS de vraies clés, à remplacer :
+# release:mainteneur namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA-remplacer-par-la-cle-publique-release
+# security:mainteneur namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA-remplacer-par-une-AUTRE-cle-security

@@ -1,0 +1,57 @@
+# Intégration continue : installation, typage, essais (jamais contre la production de Filarr : une garde
+# des essais l'interdit), documentation à jour, construction reproductible des paquets.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typage, essais, documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Typage
+        run: npm run typecheck
+      - name: Essais
+        run: npx vitest run --maxWorkers=2
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+      - name: Documentation à jour (pages générées, liens, jumeaux fr/en)
+        run: npm run docs:check
+
+  pack:
+    name: Construction reproductible des paquets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Deux constructions, mêmes archives (rien n'est publié)
+        run: node scripts/pack-check.mjs release
+      - name: Empreintes
+        run: cat release/SHA256SUMS

@@ -52,4 +52,5 @@ enough to follow every tutorial.
 ## Explanations
 
 [Architecture](architecture.md) · [how the gate runs external syncs](external-databases.md) · [the two-way sync](explain/two-way-sync.md) · [moving a gate](explain/migration.md) ·
-[the hosted service](explain/hosted.md) · [the gate on Cloudflare](cloudflare.md) · [release plan](release.md)
+[the hosted service](explain/hosted.md) · [the gate on Cloudflare](cloudflare.md) · [release plan](release.md) ·
+[releasing, step by step](RELEASING.md)

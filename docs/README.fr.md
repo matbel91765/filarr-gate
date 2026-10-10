@@ -60,7 +60,7 @@ bibliothèque](reference/library.fr.md) · [connecteurs de bases externes](refer
 [Architecture](architecture.fr.md) · [comment la boîte noire exécute les synchros externes](external-databases.fr.md) ·
 [la synchro dans les deux sens](explain/two-way-sync.fr.md) · [déménager une boîte noire](explain/migration.fr.md) ·
 [le service hébergé](explain/hosted.fr.md) · [la boîte noire sur Cloudflare](cloudflare.fr.md) ·
-[plan de publication](release.fr.md)
+[plan de publication](release.fr.md) · [publier, pas à pas](RELEASING.fr.md)
 
 ## Vocabulaire
 
