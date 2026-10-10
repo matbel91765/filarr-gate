@@ -16,6 +16,9 @@
 # Correctif de sécurité (vX.Y.Z-security) : la chaîne ne fait QUE vérifier et publier, comme une version
 # ordinaire. La mise en service du service hébergé n'existe pas encore : quand elle viendra, ce sera un travail
 # à part, qui attendra sept jours après l'entrée « published », sauf pour un correctif accepté (kind=security).
+#
+# Les actions sont figées par SHA de commit, la version en commentaire. Pour en changer :
+#   git ls-remote https://github.com/<propriétaire>/<action> refs/tags/vX.Y.Z    → recopier le SHA et la version.
 name: Release
 
 on:
@@ -47,6 +50,7 @@ jobs:
       advisory: ${{ steps.check.outputs.advisory }}
       security_refused: ${{ steps.check.outputs.security_refused }}
       received_at: ${{ steps.received.outputs.at }}
+      on_default: ${{ steps.branch.outputs.on_default }}
     steps:
       - name: Heure de réception de l'étiquette (date de publication du journal, jamais celle de l'étiquette)
         id: received
@@ -55,7 +59,7 @@ jobs:
         run: |
           [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-security)?$ ]] \
             || { echo "::error::étiquette « $GITHUB_REF_NAME » : vX.Y.Z ou vX.Y.Z-security attendu"; exit 1; }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -73,13 +77,21 @@ jobs:
           git fetch --no-tags origin "refs/heads/$DEFAULT_BRANCH"
           git show "FETCH_HEAD:.github/release-signers" > "$RUNNER_TEMP/release-signers"
           git show "FETCH_HEAD:scripts/release/tag-check.mjs" > "$RUNNER_TEMP/tag-check.mjs"
-      - name: Le commit étiqueté est publié sur une branche du dépôt
+      - name: Le commit étiqueté est publié sur une branche du dépôt (la branche par défaut, ou une branche de maintenance)
+        id: branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           commit="$(git rev-parse "refs/tags/$GITHUB_REF_NAME^{commit}")"
           if [ -z "$(git branch -r --contains "$commit")" ]; then
             echo "::error::le commit $commit n'est sur aucune branche du dépôt"; exit 1
           fi
-      - uses: actions/setup-node@v4
+          if git merge-base --is-ancestor "$commit" "refs/remotes/origin/$DEFAULT_BRANCH"; then
+            echo "on_default=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "on_default=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Signature, rôle, correctif de sécurité
@@ -122,10 +134,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -142,17 +154,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci --no-audit --no-fund
       - name: Deux constructions, mêmes archives, SHA256SUMS
         run: node scripts/pack-check.mjs release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release
           path: |
@@ -171,13 +183,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
       - name: npm récent (la publication de confiance OIDC demande npm 11.5.1 ou plus)
         run: npm install -g npm@^11.5.1
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release
           path: release
@@ -212,29 +224,31 @@ jobs:
           case "$IMAGE" in
             *OWNER*|*NAME*|*[A-Z]*) echo "::error::IMAGE vaut « $IMAGE » : choisir le nom de l'image en tête de release.yml"; exit 1 ;;
           esac
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
       - name: Date des couches = date du commit étiqueté
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.IMAGE }}
+          # « latest » seulement par la règle ci-dessous (étiquette de la branche par défaut), jamais d'office
+          flavor: latest=false
           tags: |
             type=semver,pattern={{version}},value=v${{ needs.verify.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=v${{ needs.verify.outputs.version }}
             type=semver,pattern={{major}},value=v${{ needs.verify.outputs.version }},enable=${{ !startsWith(needs.verify.outputs.version, '0.') }}
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ needs.verify.outputs.on_default == 'true' }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -244,7 +258,7 @@ jobs:
           provenance: mode=max
           sbom: true
           build-args: SOURCE_DATE_EPOCH=${{ env.SOURCE_DATE_EPOCH }}
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
       - name: Signer l'image (cosign, sans clé, par l'identité OIDC de la chaîne)
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -258,7 +272,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release
           path: release
@@ -291,13 +305,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: release
           path: ${{ runner.temp }}/release

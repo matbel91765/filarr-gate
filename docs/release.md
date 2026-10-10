@@ -47,7 +47,8 @@ Also check:
 - The bundles (esbuild, Vite) carry no date and no absolute path; `npm pack` writes fixed timestamps and a stable
   order. `scripts/pack-check.mjs` builds and packs twice and fails if the archives differ; run it on two machines (or
   in CI and locally) and compare `SHA256SUMS`.
-- The Docker image: pin the base image by digest (`node:22-alpine@sha256:…`, *to do at release time*), build with
+- The Docker image: the base image is pinned by digest (`NODE_IMAGE` at the top of the `Dockerfile`, which says how to
+  update it), the workflow's actions by commit SHA; build with
   `SOURCE_DATE_EPOCH` set to the tag's commit time (the release workflow does it), with provenance and SBOM. Rewriting
   the layers' timestamps (`--output type=image,rewrite-timestamp=true`) is *to do* once checked on a test push.
 
@@ -60,7 +61,8 @@ All of it is `.github/workflows/release.yml`; the step-by-step procedure for the
 2. From GitHub Actions only (OIDC, no long-lived token): `npm publish --provenance --access public` of the two
    archives that `scripts/pack-check.mjs` built and compared, `@filarr/gate` then `filarr-gate`. The `prepack` scripts
    copy the licence files into each package.
-3. The image, from the same workflow: tags `<version>`, `<major>.<minor>`, `<major>` from 1.0 on (and `latest`),
+3. The image, from the same workflow: tags `<version>`, `<major>.<minor>`, `<major>` from 1.0 on, and `latest`
+   for a tag of the default branch only (never a maintenance fix),
    signed with cosign (keyless), with its provenance and SBOM.
 4. The GitHub release: notes, `SHA256SUMS`, the two `.tgz` archives; then the "published" entry of the public
    release journal (branch `release-journal`).

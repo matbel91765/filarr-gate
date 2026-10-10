@@ -84,6 +84,26 @@ describe('la chaîne de publication (.github)', () => {
     expect(runBlocks('      - run: echo "${{ github.event.head_commit.message }}"\n').join('')).toContain('${{');
   });
 
+  it.each(workflows)('%s : chaque action est figée par SHA de commit, la version en commentaire', (name) => {
+    const uses = read(gh, 'workflows', name).split('\n').filter((l) => /^\s*(-\s+)?uses:/.test(l));
+    expect(uses.length).toBeGreaterThan(0);
+    for (const l of uses) expect(l, l).toMatch(/uses: [\w.-]+\/[\w.-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
+  });
+
+  it('release.yml : « latest » seulement pour une étiquette de la branche par défaut', () => {
+    const image = jobs(release).get('image')!.body;
+    expect(image).toContain('flavor: latest=false');
+    expect(image).toContain("type=raw,value=latest,enable=${{ needs.verify.outputs.on_default == 'true' }}");
+    expect(jobs(release).get('verify')!.body).toContain('git merge-base --is-ancestor "$commit" "refs/remotes/origin/$DEFAULT_BRANCH"');
+  });
+
+  it('Dockerfile : image de base figée par empreinte, utilisateur non root', () => {
+    const docker = read(repo, 'Dockerfile');
+    expect(docker).toMatch(/^ARG NODE_IMAGE=node:22-alpine@sha256:[0-9a-f]{64}$/m);
+    expect(docker.match(/^FROM .*/gm)).toEqual(['FROM ${NODE_IMAGE} AS build', 'FROM ${NODE_IMAGE}']);
+    expect(docker).toMatch(/^USER node$/m);
+  });
+
   it('ci.yml : typage, essais, documentation, construction reproductible', () => {
     for (const step of ['npm ci', 'npm run typecheck', 'npx vitest run', 'npm run docs:check', 'node scripts/pack-check.mjs']) expect(ci).toContain(step);
     expect(ci).toMatch(/^ {2}pull_request:/m);

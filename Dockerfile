@@ -12,7 +12,12 @@
 # L'interface de gestion (8787) n'est publiée que si vous l'ajoutez, sur 127.0.0.1 de
 # l'hôte (`-p 127.0.0.1:8787:8787`) : qui y entre lit les données en clair.
 
-FROM node:22-alpine AS build
+# Image de base figée par son empreinte (index multi-architecture de node:22-alpine, Node 22.23.3, 2026-09-23) :
+# la même base à chaque construction. Pour la mettre à jour :
+#   docker buildx imagetools inspect node:22-alpine     → recopier le « Digest » de l'index (sha256:…) ci-dessous.
+ARG NODE_IMAGE=node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+
+FROM ${NODE_IMAGE} AS build
 WORKDIR /src
 COPY package.json package-lock.json .npmrc ./
 COPY packages/core/package.json packages/core/
@@ -25,7 +30,7 @@ COPY tsconfig.json ./
 COPY packages ./packages
 RUN npm run build -w filarr-gate && npm prune --omit=dev --no-audit --no-fund
 
-FROM node:22-alpine
+FROM ${NODE_IMAGE}
 LABEL org.opencontainers.image.title="Filarr Gate" \
       org.opencontainers.image.description="Serve a Filarr database as an API, without Filarr ever seeing your data." \
       org.opencontainers.image.source="https://github.com/filarr-work/filarr-gate" \

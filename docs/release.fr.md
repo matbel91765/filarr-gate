@@ -49,8 +49,8 @@ Vérifiez aussi :
 - Les paquets construits (esbuild, Vite) ne portent ni date ni chemin absolu ; `npm pack` écrit des horodatages fixes
   et un ordre stable. `scripts/pack-check.mjs` construit et empaquette deux fois et échoue si les archives diffèrent ;
   lancez-le sur deux machines (ou en CI et en local) et comparez `SHA256SUMS`.
-- L'image Docker : figer l'image de base par son empreinte (`node:22-alpine@sha256:…`, *à faire au moment de la
-  version*), construire avec `SOURCE_DATE_EPOCH` réglé sur l'heure du commit de l'étiquette (la chaîne de publication
+- L'image Docker : l'image de base est figée par son empreinte (`NODE_IMAGE` en tête du `Dockerfile`, qui dit comment
+  la mettre à jour), les actions de la chaîne par SHA de commit ; construire avec `SOURCE_DATE_EPOCH` réglé sur l'heure du commit de l'étiquette (la chaîne de publication
   s'en charge), avec provenance et SBOM. Réécrire l'horodatage des couches (`--output
   type=image,rewrite-timestamp=true`) est *à faire* une fois vérifié sur un envoi d'essai.
 
@@ -64,7 +64,8 @@ Tout cela est `.github/workflows/release.yml` ; la marche à suivre du mainteneu
    des deux archives que `scripts/pack-check.mjs` a construites et comparées, `@filarr/gate` puis `filarr-gate`. Les
    scripts `prepack` recopient les fichiers de licence dans chaque paquet.
 3. L'image, depuis le même flux de travail : étiquettes `<version>`, `<major>.<minor>`, `<major>` à partir de la 1.0
-   (et `latest`), signée avec cosign (sans clé), avec sa provenance et son SBOM.
+   et `latest` pour une étiquette de la branche par défaut seulement (jamais un correctif de maintenance), signée avec
+   cosign (sans clé), avec sa provenance et son SBOM.
 4. La version publiée sur GitHub : notes, `SHA256SUMS`, les deux archives `.tgz` ; puis l'entrée « published » du
    journal public des mises en service (branche `release-journal`).
 5. Vérifier : `npm view @filarr/gate dist.integrity` comparé à l'archive ; `npm audit signatures` ; `cosign verify` sur
