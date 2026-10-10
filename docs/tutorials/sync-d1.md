@@ -319,3 +319,5 @@ filarr-gate sources run xs_DemoClientsBoutique002 --ack-guard p_3fa9c1d2e0
 - `extdb_tier`: scheduled syncs need Solo or above.
 - Every code: [reference/errors.md](../reference/errors.md#states-of-an-external-sync). The rule in depth:
   [explain/two-way-sync.md](../explain/two-way-sync.md).
+- In Filarr's help: [feeding a database from an external database](https://filarr.com/en/docs/external-databases),
+  [syncing both ways](https://filarr.com/en/docs/two-way-sync) and [creating a limited key per connector](https://filarr.com/en/docs/external-databases-connectors).

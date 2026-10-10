@@ -211,3 +211,5 @@ A pass to PostgreSQL is one transaction: if something fails, nothing of that pas
 - `extdb_tls`: the certificate does not match the host; fix it, or choose `require`.
 - `extdb_not_found`: the database or the table does not exist (or the role cannot see it).
 - More: [troubleshooting](../troubleshooting.md#external-syncs).
+- In Filarr's help: [feeding a database from an external database](https://filarr.com/en/docs/external-databases),
+  [syncing both ways](https://filarr.com/en/docs/two-way-sync) and [creating a limited key per connector](https://filarr.com/en/docs/external-databases-connectors).

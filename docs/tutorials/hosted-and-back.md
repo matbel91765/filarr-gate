@@ -32,8 +32,8 @@ covered by the commitments only. The full model: [security and trust](../securit
 
 ## Entrust databases (in Filarr)
 
-When you open a database to an API, "Where does the gate run?" offers **at my place** (the default) or **at
-Filarr's**. At Filarr's:
+When you open a database to an API, "Where does the gate run?" offers **on my side** (the default) or **at
+Filarr**. At Filarr:
 
 1. tick each database to entrust (none is ticked for you);
 2. read the consent and tick "I understand that Filarr will be able to read the checked databases while they are
@@ -59,7 +59,7 @@ Five steps, without stopping your software:
 
 1. **Install a gate** where you want it ([computer](install-local.md), [Docker](install-docker.md),
    [Cloudflare](install-cloudflare.md)). Do not give it a token yet.
-2. **Prepare**, in Filarr (**Settings › API access**, the hosted access, "Take the key back"): your device draws a
+2. **Prepare**, in Filarr (**Settings › API access**, the hosted access, **Bring it back home**): your device draws a
    new identity for the access and shows its token once. It waits as a "pending identity" for 7 days; the hosted box
    keeps serving meanwhile. The hosted box checks that the new identity is signed by you, seals its settings for it,
    and drops them at Filarr.
@@ -116,3 +116,5 @@ encryption.
 - [Security and trust](../security-and-trust.md): who sees what in each mode, and how to check the hosted service's
   code.
 - [Revoke an access](revoke.md), hosted or not.
+- In Filarr's help: [the hosted gate](https://filarr.com/en/docs/gate-hosted), [what Filarr can see](https://filarr.com/en/docs/gate-hosted-trust)
+  and [a vault database entrusted to Filarr](https://filarr.com/en/docs/gate-sharing-vaults).

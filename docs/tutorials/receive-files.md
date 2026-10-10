@@ -207,7 +207,7 @@ mobile app shows "N received files are waiting to be filed" but does not file th
 ## Next
 
 - [Revoke an access](revoke.md): the deposit box stays yours; what was deposited stays fileable.
-- The placement rules in Filarr's help: <https://filarr.com/en/docs/gate-files>.
+- In Filarr's help: [receiving files](https://filarr.com/en/docs/gate-files) and [the placement rules](https://filarr.com/en/docs/gate-placement-rules).
 
 ## If it does not work
 
