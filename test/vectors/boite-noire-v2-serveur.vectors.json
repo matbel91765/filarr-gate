@@ -1,0 +1,492 @@
+{
+  "contrat": "api-base-1-rev3 (codes du worker, § 3 bumpDue, § 5 bis réveils) ; gate-heberge-1 § 14",
+  "lecture": "Produit par scripts/gen-boite-noire-v2-serveur-vectors.mjs : `codes` lu dans le contrat, `bumpDue` par une référence à part, `wake` écrit d'après le § 5 bis. Le worker y est comparé (infra/cloudflare-worker/src/gate-server-vectors.test.ts). Les surfaces lisent `codes` pour savoir quel remède accompagne un refus, et `bumpDue` pour savoir quand une montée de génération rendue par GET /api-access est due.",
+  "codes": {
+    "rows": [
+      {
+        "code": "reauth_required",
+        "status": 401,
+        "remedy": [
+          "reauthenticate"
+        ],
+        "retryAfter": false
+      },
+      {
+        "code": "reauth_failed",
+        "status": 401,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "api_tier_hosted",
+        "status": 403,
+        "remedy": [
+          "upgrade"
+        ],
+        "retryAfter": false
+      },
+      {
+        "code": "hosting_forbidden",
+        "status": 403,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "hosting_not_switched",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "consent_outdated",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "host_key_unknown",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "hosting_billing_unavailable",
+        "status": 409,
+        "remedy": [
+          "manageBilling"
+        ],
+        "retryAfter": false
+      },
+      {
+        "code": "hosting_exists",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "consent_required",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "hosting_not_found",
+        "status": 404,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "migration_pending",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "migration_not_ready",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "hosting_too_large",
+        "status": 413,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "hosting_asleep",
+        "status": 403,
+        "remedy": "by-reason",
+        "retryAfter": false
+      },
+      {
+        "code": "hosted_origin_required",
+        "status": 401,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "api_access_pending",
+        "status": 403,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "api_tier_files",
+        "status": 403,
+        "remedy": [
+          "upgrade"
+        ],
+        "retryAfter": false
+      },
+      {
+        "code": "files_not_switched",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "files_not_linked",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "box_not_permanent",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "box_not_found",
+        "status": 404,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "deposit_not_found",
+        "status": 404,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "box_full",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "box_storage_full",
+        "status": 413,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "file_too_large",
+        "status": 413,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "api_quota_files",
+        "status": 429,
+        "remedy": [
+          "wait"
+        ],
+        "retryAfter": true
+      },
+      {
+        "code": "api_quota_file_bytes",
+        "status": 429,
+        "remedy": [
+          "wait"
+        ],
+        "retryAfter": true
+      },
+      {
+        "code": "ext_status_conflict",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "ext_queue_conflict",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "ext_resolve_full",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      },
+      {
+        "code": "extdb_lease_held",
+        "status": 409,
+        "remedy": [
+          "wait"
+        ],
+        "retryAfter": true
+      },
+      {
+        "code": "extdb_relay_off",
+        "status": 409,
+        "remedy": null,
+        "retryAfter": false
+      }
+    ],
+    "asleepRemedyByReason": {
+      "billing": [
+        "updatePayment"
+      ],
+      "tier": [
+        "upgrade"
+      ],
+      "policy": null,
+      "consent": null,
+      "service": null
+    }
+  },
+  "bumpDue": {
+    "rule": "dernier retrait par magasin ; dû si non rouvert après, génération courante connue et égale à celle du retrait ; trié",
+    "cases": [
+      {
+        "name": "retrait, génération inchangée : due",
+        "candidates": [
+          {
+            "storeId": "Store00000000000000001",
+            "g": 0,
+            "at": "2026-10-10T01:00:00.000Z"
+          }
+        ],
+        "current": {
+          "Store00000000000000001": 0
+        },
+        "granted": {},
+        "expected": [
+          "Store00000000000000001"
+        ]
+      },
+      {
+        "name": "la montée faite : plus due",
+        "candidates": [
+          {
+            "storeId": "Store00000000000000001",
+            "g": 0,
+            "at": "2026-10-10T01:00:00.000Z"
+          }
+        ],
+        "current": {
+          "Store00000000000000001": 1
+        },
+        "granted": {},
+        "expected": []
+      },
+      {
+        "name": "rouvert APRÈS le retrait : plus due",
+        "candidates": [
+          {
+            "storeId": "Store00000000000000001",
+            "g": 0,
+            "at": "2026-10-10T01:00:00.000Z"
+          }
+        ],
+        "current": {
+          "Store00000000000000001": 0
+        },
+        "granted": {
+          "Store00000000000000001": "2026-10-10T02:00:00.000Z"
+        },
+        "expected": []
+      },
+      {
+        "name": "droit d’avant seulement rescellé (migration vers chez soi) : due",
+        "candidates": [
+          {
+            "storeId": "Store00000000000000001",
+            "g": 2,
+            "at": "2026-10-10T03:00:00.000Z"
+          }
+        ],
+        "current": {
+          "Store00000000000000001": 2
+        },
+        "granted": {
+          "Store00000000000000001": "2026-10-10T01:00:00.000Z"
+        },
+        "expected": [
+          "Store00000000000000001"
+        ]
+      },
+      {
+        "name": "génération inconnue (magasin supprimé) : jamais due",
+        "candidates": [
+          {
+            "storeId": "Store00000000000000001",
+            "g": 0,
+            "at": "2026-10-10T01:00:00.000Z"
+          }
+        ],
+        "current": {
+          "Store00000000000000001": null
+        },
+        "granted": {},
+        "expected": []
+      },
+      {
+        "name": "le retrait le plus récent fait foi",
+        "candidates": [
+          {
+            "storeId": "Store00000000000000001",
+            "g": 0,
+            "at": "2026-10-10T01:00:00.000Z"
+          },
+          {
+            "storeId": "Store00000000000000001",
+            "g": 3,
+            "at": "2026-10-10T05:00:00.000Z"
+          }
+        ],
+        "current": {
+          "Store00000000000000001": 3
+        },
+        "granted": {},
+        "expected": [
+          "Store00000000000000001"
+        ]
+      },
+      {
+        "name": "un ancien retrait ne revient pas",
+        "candidates": [
+          {
+            "storeId": "Store00000000000000001",
+            "g": 3,
+            "at": "2026-10-10T01:00:00.000Z"
+          },
+          {
+            "storeId": "Store00000000000000001",
+            "g": 0,
+            "at": "2026-10-10T05:00:00.000Z"
+          }
+        ],
+        "current": {
+          "Store00000000000000001": 3
+        },
+        "granted": {},
+        "expected": []
+      },
+      {
+        "name": "révocation : tous les magasins (aucun droit ne compte), triés",
+        "candidates": [
+          {
+            "storeId": "Store00000000000000002",
+            "g": 1,
+            "at": "2026-10-10T04:00:00.000Z"
+          },
+          {
+            "storeId": "Store00000000000000001",
+            "g": 0,
+            "at": "2026-10-10T04:00:00.000Z"
+          }
+        ],
+        "current": {
+          "Store00000000000000001": 0,
+          "Store00000000000000002": 1
+        },
+        "granted": {},
+        "expected": [
+          "Store00000000000000001",
+          "Store00000000000000002"
+        ]
+      }
+    ]
+  },
+  "wake": {
+    "rule": "corps POSTé = `body` + `at` (ISO de l’envoi) : { a, t, storeId?, seq?, state?, at } ; `seq` pour commit, `state` pour hosting (gate-heberge-1, effacement) ; jamais de clé, de signature, d’identifiant de dépôt ni de quota",
+    "cases": [
+      {
+        "message": {
+          "t": "commit",
+          "storeId": "Store00000000000000001",
+          "seq": 41
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "commit",
+          "storeId": "Store00000000000000001",
+          "seq": 41
+        }
+      },
+      {
+        "message": {
+          "t": "grant"
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "grant"
+        }
+      },
+      {
+        "message": {
+          "t": "manifest",
+          "storeId": "Store00000000000000001",
+          "rev": 3
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "manifest",
+          "storeId": "Store00000000000000001"
+        }
+      },
+      {
+        "message": {
+          "t": "quota",
+          "name": "files",
+          "pct": 80
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "quota"
+        }
+      },
+      {
+        "message": {
+          "t": "revoked"
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "revoked"
+        }
+      },
+      {
+        "message": {
+          "t": "files",
+          "depositId": "Deposit000000000000000",
+          "status": "filed"
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "files"
+        }
+      },
+      {
+        "message": {
+          "t": "ext-run",
+          "storeId": "Store00000000000000001",
+          "defId": "xs_dddddddddddddddddddddd",
+          "ack": {
+            "guard": "p1"
+          }
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "ext-run",
+          "storeId": "Store00000000000000001"
+        }
+      },
+      {
+        "message": {
+          "t": "export",
+          "encPublicKey": "CLE",
+          "bindSig": "SIGNATURE"
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "export"
+        }
+      },
+      {
+        "message": {
+          "t": "hosting",
+          "state": "erasing"
+        },
+        "body": {
+          "a": "ACCESS",
+          "t": "hosting",
+          "state": "erasing"
+        }
+      }
+    ]
+  }
+}

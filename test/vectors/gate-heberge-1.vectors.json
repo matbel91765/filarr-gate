@@ -1,0 +1,289 @@
+{
+  "contrat": "gate-heberge-1 § 16 (familles 1, 3, 4, 5, 7)",
+  "lecture": "Produit par scripts/gen-gate-heberge-1-vectors.mjs (référence en Node seul). Les scellés aléatoires n'en font pas partie ; Ed25519 et HMAC sont déterministes. Familles 2, 6, 8, 9 : cœur partagé engine/gate (lot B2) et filarr-gate.",
+  "consent": {
+    "version": "hebergement-v1",
+    "rule": "hex(SHA-256(UTF-8(NFC(texte)))) ; onze lignes jointes par \\n, sans \\n final ; {{box}} NON remplacé",
+    "fr": {
+      "text": "Confier ces bases à la boîte noire hébergée par Filarr ?\nJusqu'ici, Filarr ne pouvait pas lire ces bases : seuls vos appareils en avaient la clé.\nSi vous les confiez à la boîte noire « {{box}} », hébergée par Filarr :\nla clé de chaque base cochée sera remise à un service de Filarr, isolé, qui la déchiffre pour répondre à vos logiciels ;\nFilarr pourra donc techniquement lire toutes leurs lignes et toutes leurs colonnes, y compris celles qu'aucune vue ne montre, ainsi que tout ce qui s'y écrira tant qu'elles restent confiées ;\ncela vaut aussi en transit : l'adresse de la boîte est un nom de filarr.com, et le compte de Filarr qui gère ce nom, celui qui sert aussi l'API de Filarr, peut techniquement voir les appels de vos logiciels et les réponses ;\nsi vous y branchez une base externe, Filarr tiendra aussi sa clé et verra ses lignes ; si la boîte reçoit des fichiers, Filarr les verra au passage ;\nvos autres bases, vos notes, vos fichiers et vos coffres resteront illisibles pour Filarr.\nFilarr s'engage à ne pas journaliser ce contenu, à ne l'utiliser que pour servir votre API, à en garder les copies dans l'Union européenne et à effacer la clé et la copie quand vous la reprenez. Ce sont des engagements, pas une protection par le chiffrement.\nVous pouvez reprendre la clé à tout moment. Les clés de ces bases changent alors : la boîte hébergée ne pourra plus rien lire de ce qui s'écrira ensuite. Ce qu'elle a lu avant reste couvert par les seuls engagements ci-dessus.\nJ'ai compris que Filarr pourra lire les bases cochées tant qu'elles lui sont confiées.",
+      "hash": "a94f923df01b9faae769be6819d4dd4068a9ef7666e14ed55caca7794d35b727"
+    },
+    "en": {
+      "text": "Entrust these databases to the black box hosted by Filarr?\nUntil now, Filarr could not read these databases: only your devices had their key.\nIf you entrust them to the black box \"{{box}}\", hosted by Filarr:\nthe key of each checked database will be handed to an isolated Filarr service, which decrypts it to answer your software;\nFilarr will therefore technically be able to read all their rows and all their columns, including those no view shows, and everything written to them while they remain entrusted;\nthis also holds in transit: the box's address is a filarr.com name, and the Filarr account that manages that name, the one that also serves Filarr's API, can technically see your software's calls and the responses;\nif you connect an external database to it, Filarr will also hold its key and see its rows; if the box receives files, Filarr will see them in passing;\nyour other databases, your notes, your files and your vaults will remain unreadable to Filarr.\nFilarr commits to not logging this content, to using it only to serve your API, to keeping its copies in the European Union and to erasing the key and the copy when you take it back. These are commitments, not protection by encryption.\nYou can take the key back at any time. The keys of these databases then change: the hosted box will no longer be able to read anything written afterwards. What it read before remains covered only by the commitments above.\nI understand that Filarr will be able to read the checked databases while they are entrusted to it.",
+      "hash": "0553e463a4cca99bac530e08cd7cc378243641a0420566d294b7caa4a9c95bd2"
+    },
+    "nfd": {
+      "lang": "fr",
+      "text": "Confier ces bases à la boîte noire hébergée par Filarr ?\nJusqu'ici, Filarr ne pouvait pas lire ces bases : seuls vos appareils en avaient la clé.\nSi vous les confiez à la boîte noire « {{box}} », hébergée par Filarr :\nla clé de chaque base cochée sera remise à un service de Filarr, isolé, qui la déchiffre pour répondre à vos logiciels ;\nFilarr pourra donc techniquement lire toutes leurs lignes et toutes leurs colonnes, y compris celles qu'aucune vue ne montre, ainsi que tout ce qui s'y écrira tant qu'elles restent confiées ;\ncela vaut aussi en transit : l'adresse de la boîte est un nom de filarr.com, et le compte de Filarr qui gère ce nom, celui qui sert aussi l'API de Filarr, peut techniquement voir les appels de vos logiciels et les réponses ;\nsi vous y branchez une base externe, Filarr tiendra aussi sa clé et verra ses lignes ; si la boîte reçoit des fichiers, Filarr les verra au passage ;\nvos autres bases, vos notes, vos fichiers et vos coffres resteront illisibles pour Filarr.\nFilarr s'engage à ne pas journaliser ce contenu, à ne l'utiliser que pour servir votre API, à en garder les copies dans l'Union européenne et à effacer la clé et la copie quand vous la reprenez. Ce sont des engagements, pas une protection par le chiffrement.\nVous pouvez reprendre la clé à tout moment. Les clés de ces bases changent alors : la boîte hébergée ne pourra plus rien lire de ce qui s'écrira ensuite. Ce qu'elle a lu avant reste couvert par les seuls engagements ci-dessus.\nJ'ai compris que Filarr pourra lire les bases cochées tant qu'elles lui sont confiées.",
+      "hash": "a94f923df01b9faae769be6819d4dd4068a9ef7666e14ed55caca7794d35b727",
+      "sameAs": "fr"
+    },
+    "variant": {
+      "lang": "fr",
+      "text": "Confier ces bases à la boîte noire hébergée par Filarr ?\nJusqu'ici, Filarr ne pouvait pas lire ces bases : seuls vos appareils en avaient la clé.\nSi vous les confiez à la boîte noire « {{box}} », hébergée par Filarr :\nla clé de chaque base cochée sera remise à un service de Filarr, isolé, qui la déchiffre pour répondre à vos logiciels :\nFilarr pourra donc techniquement lire toutes leurs lignes et toutes leurs colonnes, y compris celles qu'aucune vue ne montre, ainsi que tout ce qui s'y écrira tant qu'elles restent confiées ;\ncela vaut aussi en transit : l'adresse de la boîte est un nom de filarr.com, et le compte de Filarr qui gère ce nom, celui qui sert aussi l'API de Filarr, peut techniquement voir les appels de vos logiciels et les réponses ;\nsi vous y branchez une base externe, Filarr tiendra aussi sa clé et verra ses lignes ; si la boîte reçoit des fichiers, Filarr les verra au passage ;\nvos autres bases, vos notes, vos fichiers et vos coffres resteront illisibles pour Filarr.\nFilarr s'engage à ne pas journaliser ce contenu, à ne l'utiliser que pour servir votre API, à en garder les copies dans l'Union européenne et à effacer la clé et la copie quand vous la reprenez. Ce sont des engagements, pas une protection par le chiffrement.\nVous pouvez reprendre la clé à tout moment. Les clés de ces bases changent alors : la boîte hébergée ne pourra plus rien lire de ce qui s'écrira ensuite. Ce qu'elle a lu avant reste couvert par les seuls engagements ci-dessus.\nJ'ai compris que Filarr pourra lire les bases cochées tant qu'elles lui sont confiées.",
+      "hash": "d380fe1f9adedb57dad4e608f9029bc94add21eeff51c1c4ca4ad8587b70bfc9",
+      "mustDiffer": true
+    },
+    "tenLines": {
+      "lang": "fr",
+      "text": "Confier ces bases à la boîte noire hébergée par Filarr ?\nJusqu'ici, Filarr ne pouvait pas lire ces bases : seuls vos appareils en avaient la clé.\nSi vous les confiez à la boîte noire « {{box}} », hébergée par Filarr :\nla clé de chaque base cochée sera remise à un service de Filarr, isolé, qui la déchiffre pour répondre à vos logiciels ;\nFilarr pourra donc techniquement lire toutes leurs lignes et toutes leurs colonnes, y compris celles qu'aucune vue ne montre, ainsi que tout ce qui s'y écrira tant qu'elles restent confiées ;\nsi vous y branchez une base externe, Filarr tiendra aussi sa clé et verra ses lignes ; si la boîte reçoit des fichiers, Filarr les verra au passage ;\nvos autres bases, vos notes, vos fichiers et vos coffres resteront illisibles pour Filarr.\nFilarr s'engage à ne pas journaliser ce contenu, à ne l'utiliser que pour servir votre API, à en garder les copies dans l'Union européenne et à effacer la clé et la copie quand vous la reprenez. Ce sont des engagements, pas une protection par le chiffrement.\nVous pouvez reprendre la clé à tout moment. Les clés de ces bases changent alors : la boîte hébergée ne pourra plus rien lire de ce qui s'écrira ensuite. Ce qu'elle a lu avant reste couvert par les seuls engagements ci-dessus.\nJ'ai compris que Filarr pourra lire les bases cochées tant qu'elles lui sont confiées.",
+      "hash": "0f8ee040bac99fbf441afe6e384bcb753651fafbd065653f1cd859cc15abcbec",
+      "accepted": false
+    }
+  },
+  "hostRequest": {
+    "key": {
+      "id": "h-test",
+      "encPublicKey": "d36FjJOaoaivtr3Ey9LZ4Ofu9fwDChEYHyYtNDtCSVA=",
+      "signPublicKey": "JDDvC9GrVEmISFi0/FnIzHtKLecqHqhOc9T6ATxSPZU=",
+      "notBefore": "2026-01-01T00:00:00.000Z",
+      "notAfter": "2030-01-01T00:00:00.000Z"
+    },
+    "skewSeconds": 300,
+    "accepted": [
+      {
+        "method": "GET",
+        "path": "/api-access/hosted/AAECAwQFBgcICQoLDA0ODw/token",
+        "t": 1791504000,
+        "body": "",
+        "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "message": "filarr/gate-host/v1|req|GET|/api-access/hosted/AAECAwQFBgcICQoLDA0ODw/token|1791504000|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sig": "VSSQdsvI4p1SEsEkF06n7_RsnmylSQUYO71nZzcD_SormhRk0QH-wF3hu7WY13pSB41x2SYTSIYn267oA7tQDQ",
+        "header": "k=h-test,t=1791504000,s=VSSQdsvI4p1SEsEkF06n7_RsnmylSQUYO71nZzcD_SormhRk0QH-wF3hu7WY13pSB41x2SYTSIYn267oA7tQDQ",
+        "now": 1791504299
+      },
+      {
+        "method": "POST",
+        "path": "/api-access/hosted/usage?x=1",
+        "t": 1791504000,
+        "body": "{\"items\":[{\"accessId\":\"AAECAwQFBgcICQoLDA0ODw\",\"period\":\"2026-10\",\"calls\":42}]}",
+        "bodySha256": "1d0b864f2e00cb674550598a46144025c815e86b9f1b826f56069cc808821be0",
+        "message": "filarr/gate-host/v1|req|POST|/api-access/hosted/usage?x=1|1791504000|1d0b864f2e00cb674550598a46144025c815e86b9f1b826f56069cc808821be0",
+        "sig": "-pQbkvHbJ3E5bsMD-sfCDKyWAXdHRquLqHphmB9RBiSIq9XLwAfim5wA4MSLpCw7aIICQO3Nh6iH0eIGhWTrBg",
+        "header": "k=h-test,t=1791504000,s=-pQbkvHbJ3E5bsMD-sfCDKyWAXdHRquLqHphmB9RBiSIq9XLwAfim5wA4MSLpCw7aIICQO3Nh6iH0eIGhWTrBg",
+        "now": 1791503701
+      }
+    ],
+    "refused": [
+      {
+        "why": "horloge : 301 s de retard",
+        "method": "GET",
+        "path": "/api-access/hosted/AAECAwQFBgcICQoLDA0ODw/token",
+        "t": 1791504000,
+        "body": "",
+        "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "message": "filarr/gate-host/v1|req|GET|/api-access/hosted/AAECAwQFBgcICQoLDA0ODw/token|1791504000|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sig": "VSSQdsvI4p1SEsEkF06n7_RsnmylSQUYO71nZzcD_SormhRk0QH-wF3hu7WY13pSB41x2SYTSIYn267oA7tQDQ",
+        "header": "k=h-test,t=1791504000,s=VSSQdsvI4p1SEsEkF06n7_RsnmylSQUYO71nZzcD_SormhRk0QH-wF3hu7WY13pSB41x2SYTSIYn267oA7tQDQ",
+        "now": 1791504301
+      },
+      {
+        "why": "chemin différent de celui signé",
+        "method": "GET",
+        "path": "/api-access/hosted/AAECAwQFBgcICQoLDA0ODw/pending",
+        "t": 1791504000,
+        "body": "",
+        "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "message": "filarr/gate-host/v1|req|GET|/api-access/hosted/AAECAwQFBgcICQoLDA0ODw/token|1791504000|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sig": "VSSQdsvI4p1SEsEkF06n7_RsnmylSQUYO71nZzcD_SormhRk0QH-wF3hu7WY13pSB41x2SYTSIYn267oA7tQDQ",
+        "header": "k=h-test,t=1791504000,s=VSSQdsvI4p1SEsEkF06n7_RsnmylSQUYO71nZzcD_SormhRk0QH-wF3hu7WY13pSB41x2SYTSIYn267oA7tQDQ",
+        "now": 1791504000
+      },
+      {
+        "why": "corps altéré",
+        "method": "POST",
+        "path": "/api-access/hosted/usage?x=1",
+        "t": 1791504000,
+        "body": "{\"items\":[{\"accessId\":\"AAECAwQFBgcICQoLDA0ODw\",\"period\":\"2026-10\",\"calls\":43}]}",
+        "bodySha256": "1d0b864f2e00cb674550598a46144025c815e86b9f1b826f56069cc808821be0",
+        "message": "filarr/gate-host/v1|req|POST|/api-access/hosted/usage?x=1|1791504000|1d0b864f2e00cb674550598a46144025c815e86b9f1b826f56069cc808821be0",
+        "sig": "-pQbkvHbJ3E5bsMD-sfCDKyWAXdHRquLqHphmB9RBiSIq9XLwAfim5wA4MSLpCw7aIICQO3Nh6iH0eIGhWTrBg",
+        "header": "k=h-test,t=1791504000,s=-pQbkvHbJ3E5bsMD-sfCDKyWAXdHRquLqHphmB9RBiSIq9XLwAfim5wA4MSLpCw7aIICQO3Nh6iH0eIGhWTrBg",
+        "now": 1791504000
+      },
+      {
+        "why": "clé inconnue",
+        "method": "GET",
+        "path": "/api-access/hosted/AAECAwQFBgcICQoLDA0ODw/token",
+        "t": 1791504000,
+        "body": "",
+        "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "message": "filarr/gate-host/v1|req|GET|/api-access/hosted/AAECAwQFBgcICQoLDA0ODw/token|1791504000|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sig": "VSSQdsvI4p1SEsEkF06n7_RsnmylSQUYO71nZzcD_SormhRk0QH-wF3hu7WY13pSB41x2SYTSIYn267oA7tQDQ",
+        "header": "k=h-autre,t=1791504000,s=VSSQdsvI4p1SEsEkF06n7_RsnmylSQUYO71nZzcD_SormhRk0QH-wF3hu7WY13pSB41x2SYTSIYn267oA7tQDQ",
+        "now": 1791504000
+      }
+    ]
+  },
+  "notify": {
+    "token": "flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y",
+    "accessId": "jpWco6qxuL_GzdTb4unw9w",
+    "secret": "adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f86",
+    "derivation": "A_notify = HKDF-SHA256(ikm = secret, salt = accessId (16 o), info = \"filarr/api/v1|notify\", 32 o)",
+    "aNotify": "52bbe39e49cc5596b7ebc1e546413c1a4939df31e273310eb50e4b6c2cb6f7a4",
+    "notifyKeyB64": "UrvjnknMVZa368HlRkE8Gkk53zHiczEOtQ5LbCy296Q=",
+    "body": "{\"a\":\"jpWco6qxuL_GzdTb4unw9w\",\"t\":\"commit\",\"storeId\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"seq\":41,\"at\":\"2026-10-09T00:02:03.000Z\"}",
+    "t": 1791504123,
+    "header": "t=1791504123,v1=e412569e4aa5e3036eac9b8c9f3e7a397368a2f43fdf8c9f73de395f8cb29bbe",
+    "maxAgeSeconds": 300,
+    "accepted": [
+      {
+        "now": 1791504133
+      },
+      {
+        "now": 1791503823
+      }
+    ],
+    "refused": [
+      {
+        "why": "horodatage trop vieux (301 s)",
+        "now": 1791504424,
+        "body": "{\"a\":\"jpWco6qxuL_GzdTb4unw9w\",\"t\":\"commit\",\"storeId\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"seq\":41,\"at\":\"2026-10-09T00:02:03.000Z\"}",
+        "header": "t=1791504123,v1=e412569e4aa5e3036eac9b8c9f3e7a397368a2f43fdf8c9f73de395f8cb29bbe"
+      },
+      {
+        "why": "corps altéré",
+        "now": 1791504123,
+        "body": "{\"a\":\"jpWco6qxuL_GzdTb4unw9w\",\"t\":\"commit\",\"storeId\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"seq\":42,\"at\":\"2026-10-09T00:02:03.000Z\"}",
+        "header": "t=1791504123,v1=e412569e4aa5e3036eac9b8c9f3e7a397368a2f43fdf8c9f73de395f8cb29bbe"
+      },
+      {
+        "why": "autre clé (A_auth au lieu de A_notify)",
+        "now": 1791504123,
+        "body": "{\"a\":\"jpWco6qxuL_GzdTb4unw9w\",\"t\":\"commit\",\"storeId\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"seq\":41,\"at\":\"2026-10-09T00:02:03.000Z\"}",
+        "header": "t=1791504123,v1=0d6a5e3854d898d09bdfb92958625ea6551b75f2c38edfa9e6f8df9d63748ce7"
+      }
+    ]
+  },
+  "receipt": {
+    "key": {
+      "id": "h-test",
+      "encPublicKey": "d36FjJOaoaivtr3Ey9LZ4Ofu9fwDChEYHyYtNDtCSVA=",
+      "signPublicKey": "JDDvC9GrVEmISFi0/FnIzHtKLecqHqhOc9T6ATxSPZU=",
+      "notBefore": "2026-01-01T00:00:00.000Z",
+      "notAfter": "2030-01-01T00:00:00.000Z"
+    },
+    "receipt": {
+      "v": 1,
+      "kind": "filarr-gate-host/erasure",
+      "keyId": "h-test",
+      "accessId": "jpWco6qxuL_GzdTb4unw9w",
+      "hostName": "site-vitrine-7qm2",
+      "reason": "revoked",
+      "stores": [
+        {
+          "storeId": "AAAAAAAAAAAAAAAAAAAAAA",
+          "g": 4
+        }
+      ],
+      "erased": [
+        "token",
+        "dbKeys",
+        "copy",
+        "state",
+        "extdbKeys"
+      ],
+      "requestedAt": "2026-10-09T10:00:00.000Z",
+      "erasedAt": "2026-10-09T10:00:03.000Z",
+      "version": "0.2.0",
+      "codeHash": "sha256:abababababababababababababababababababababababababababababababab"
+    },
+    "canonical": "{\"accessId\":\"jpWco6qxuL_GzdTb4unw9w\",\"codeHash\":\"sha256:abababababababababababababababababababababababababababababababab\",\"erased\":[\"token\",\"dbKeys\",\"copy\",\"state\",\"extdbKeys\"],\"erasedAt\":\"2026-10-09T10:00:03.000Z\",\"hostName\":\"site-vitrine-7qm2\",\"keyId\":\"h-test\",\"kind\":\"filarr-gate-host/erasure\",\"reason\":\"revoked\",\"requestedAt\":\"2026-10-09T10:00:00.000Z\",\"stores\":[{\"g\":4,\"storeId\":\"AAAAAAAAAAAAAAAAAAAAAA\"}],\"v\":1,\"version\":\"0.2.0\"}",
+    "message": "filarr/gate-host/v1|receipt|{\"accessId\":\"jpWco6qxuL_GzdTb4unw9w\",\"codeHash\":\"sha256:abababababababababababababababababababababababababababababababab\",\"erased\":[\"token\",\"dbKeys\",\"copy\",\"state\",\"extdbKeys\"],\"erasedAt\":\"2026-10-09T10:00:03.000Z\",\"hostName\":\"site-vitrine-7qm2\",\"keyId\":\"h-test\",\"kind\":\"filarr-gate-host/erasure\",\"reason\":\"revoked\",\"requestedAt\":\"2026-10-09T10:00:00.000Z\",\"stores\":[{\"g\":4,\"storeId\":\"AAAAAAAAAAAAAAAAAAAAAA\"}],\"v\":1,\"version\":\"0.2.0\"}",
+    "sig": "9iWQ6zPqITj6ybhcKC76fjBkOQvf0Q-ARMmMbcs94IKsqnV-Ko8-MY6wM039knzsFJVAdLV18fHmvaAjIX3oBQ",
+    "altered": {
+      "receipt": {
+        "v": 1,
+        "kind": "filarr-gate-host/erasure",
+        "keyId": "h-test",
+        "accessId": "jpWco6qxuL_GzdTb4unw9w",
+        "hostName": "site-vitrine-7qm2",
+        "reason": "revoked",
+        "stores": [
+          {
+            "storeId": "AAAAAAAAAAAAAAAAAAAAAA",
+            "g": 5
+          }
+        ],
+        "erased": [
+          "token",
+          "dbKeys",
+          "copy",
+          "state",
+          "extdbKeys"
+        ],
+        "requestedAt": "2026-10-09T10:00:00.000Z",
+        "erasedAt": "2026-10-09T10:00:03.000Z",
+        "version": "0.2.0",
+        "codeHash": "sha256:abababababababababababababababababababababababababababababababab"
+      },
+      "sig": "9iWQ6zPqITj6ybhcKC76fjBkOQvf0Q-ARMmMbcs94IKsqnV-Ko8-MY6wM039knzsFJVAdLV18fHmvaAjIX3oBQ",
+      "accepted": false
+    },
+    "version": {
+      "announcement": {
+        "version": "0.2.0",
+        "codeHash": "sha256:abababababababababababababababababababababababababababababababab",
+        "buildRef": "v0.2.0",
+        "deployedAt": "2026-10-16T08:00:00.000Z",
+        "keyId": "h-test"
+      },
+      "message": "filarr/gate-host/v1|version|{\"buildRef\":\"v0.2.0\",\"codeHash\":\"sha256:abababababababababababababababababababababababababababababababab\",\"deployedAt\":\"2026-10-16T08:00:00.000Z\",\"keyId\":\"h-test\",\"version\":\"0.2.0\"}",
+      "sig": "proX5OQYhA_T8vK4Y7soNhpQLb_3SpIDV3-j-64NvEurlehe59FD2D-tsj8U2UJpThf5u5yvQgtg5ynqjyYVBA"
+    }
+  },
+  "hostName": {
+    "rule": "slug(nom de l’accès, 30) d’api-base-1 § 4 (vide → \"base\") + \"-\" + 4 caractères base36 aléatoires",
+    "max": 30,
+    "cases": [
+      {
+        "name": "Site vitrine",
+        "slug": "site-vitrine"
+      },
+      {
+        "name": "ERP Atelier",
+        "slug": "erp-atelier"
+      },
+      {
+        "name": "Données clients — 2026",
+        "slug": "donnees-clients-2026"
+      },
+      {
+        "name": "Œuvres & Archives",
+        "slug": "uvres-archives"
+      },
+      {
+        "name": "İstanbul Şube",
+        "slug": "istanbul-sube"
+      },
+      {
+        "name": "Straße",
+        "slug": "stra-e"
+      },
+      {
+        "name": "",
+        "slug": "base"
+      },
+      {
+        "name": "   ",
+        "slug": "base"
+      },
+      {
+        "name": "🙂 émoji 🙂",
+        "slug": "emoji"
+      },
+      {
+        "name": "Une boîte noire au nom vraiment beaucoup trop long pour une adresse",
+        "slug": "une-boite-noire-au-nom-vraimen"
+      },
+      {
+        "name": "trente-caractères-exactement--",
+        "slug": "trente-caracteres-exactement"
+      },
+      {
+        "name": "CTL",
+        "slug": "ctl"
+      }
+    ]
+  }
+}

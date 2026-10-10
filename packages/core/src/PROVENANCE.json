@@ -252,6 +252,18 @@
     "rewritten": 0
   },
   {
+    "file": "test/vectors/gate-heberge-1.vectors.json",
+    "from": "test-vectors/gate-heberge-1.vectors.json",
+    "commit": "fa10494a",
+    "rewritten": 0
+  },
+  {
+    "file": "test/vectors/boite-noire-v2-serveur.vectors.json",
+    "from": "test-vectors/boite-noire-v2-serveur.vectors.json",
+    "commit": "fa10494a",
+    "rewritten": 0
+  },
+  {
     "file": "packages/core/src/engine/extsrc/types.ts",
     "from": "filarr-gate",
     "commit": null,

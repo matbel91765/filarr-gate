@@ -87,6 +87,13 @@ for (const name of ['api-base-1.vectors.json', 'db-store-1.vectors.json']) {
   writeFileSync(join(process.cwd(), 'test', 'vectors', name), readFileSync(join(CONTRACTS, name)));
   manifest.push({ file: `test/vectors/${name}`, from: `.filarr-parity/contracts/${name}`, commit: null, rewritten: 0 });
 }
+// Les vecteurs que le WORKER écrit et que la boîte lit (réveils, corps des réveils) : copie identique.
+for (const name of ['gate-heberge-1.vectors.json', 'boite-noire-v2-serveur.vectors.json']) {
+  const src = `test-vectors/${name}`;
+  const commit = execFileSync('git', ['-C', filarg, 'log', '-1', '--format=%h', '--', src], { encoding: 'utf8' }).trim();
+  writeFileSync(join(process.cwd(), 'test', 'vectors', name), readFileSync(join(filarg, src)));
+  manifest.push({ file: `test/vectors/${name}`, from: src, commit, rewritten: 0 });
+}
 // Ce dont filarr-gate est l'ORIGINE (révision 3 d'api-base-1, gate-fichiers-1, source-externe-1) : jamais
 // réécrit par cette recopie ; la provenance le garde. filarg le recopiera d'ici (lot B2).
 const ORIGIN = JSON.parse(readFileSync(join(out, 'PROVENANCE.json'), 'utf8')).filter((e) => e.from === 'filarr-gate');
