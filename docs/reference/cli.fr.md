@@ -15,15 +15,15 @@ docker exec <conteneur> filarr-gate <commande>
 | commande | ce qu'elle fait |
 |---|---|
 | `filarr-gate [serve]` | Démarre l'API locale et l'interface de gestion (la commande par défaut). |
-| `filarr-gate init --token flr_live_… [--host 127.0.0.1] [--port 8443]` | Range le jeton (fichier en mode 0600) et les réglages donnés, puis s'arrête. `--import FICHIER` applique un paquet de réglages (migration). Refusé tant qu'une boîte noire tourne sur le même répertoire d'état. |
-| `filarr-gate health` | Interroge `/health` de l'API locale sur cette machine ; sort en 0 quand elle répond 200 (le contrôle de santé de Docker). |
-| `filarr-gate doctor` | Diagnostique sans rien changer : horloge, Filarr, jeton, clé du créateur, bases et clés, quotas, fichiers, synchros. Sort en 1 quand un contrôle échoue. |
+| `filarr-gate init --token flr_live_… [--host 127.0.0.1] [--port 8443]` | Enregistre le jeton (fichier en mode 0600) et les réglages donnés, puis s'arrête. `--import FICHIER` applique un paquet de réglages (migration). Refusé tant qu'une boîte noire tourne sur le même répertoire d'état. |
+| `filarr-gate health` | Interroge `/health` de l'API locale sur cette machine ; renvoie le code de sortie 0 quand elle répond 200 (le contrôle de santé de Docker). |
+| `filarr-gate doctor` | Diagnostique sans rien changer : horloge, Filarr, jeton, clé du créateur, bases et clés, quotas, fichiers, synchros. Renvoie le code de sortie 1 quand un contrôle échoue. |
 | `filarr-gate version` | Affiche la version. |
-| `filarr-gate keys create --name NOM [--sql] [--mcp] [--files] [--rate 600] [--days 90]` | Crée une clé d'application qui lit toutes les vues (`--sql` : le SQL aussi ; `--mcp` : MCP ; `--files` : le dépôt de fichiers ; `--rate` : requêtes par minute ; `--days` : échéance). La clé ne s'affiche qu'une fois. Les clés plus étroites (une base, une vue, l'écriture) se créent dans l'interface de gestion. |
+| `filarr-gate keys create --name NOM [--sql] [--mcp] [--files] [--rate 600] [--days 90]` | Crée une clé d'application qui lit toutes les vues (`--sql` : le SQL aussi ; `--mcp` : MCP ; `--files` : le dépôt de fichiers ; `--rate` : requêtes par minute ; `--days` : échéance). La clé ne s'affiche qu'une fois. Les clés plus restreintes (une base, une vue, l'écriture) se créent dans l'interface de gestion. |
 | `filarr-gate keys list` | Liste les clés d'application (préfixe, nom, pause, échéance). |
-| `filarr-gate keys revoke ID\|PRÉFIXE` | Révoque une clé par son identifiant ou le début de son préfixe ; elle cesse de répondre tout de suite. |
+| `filarr-gate keys revoke ID\|PRÉFIXE` | Révoque une clé par son identifiant ou le début de son préfixe ; elle est refusée tout de suite. |
 | `filarr-gate sources list` | Liste les synchros externes que Filarr confie à cette boîte noire, ce qui bloque chacune, et d'où vient sa clé. |
-| `filarr-gate sources key DEF_ID (--secret VALEUR \| --stdin \| --clear)` | Donne (ou efface) la clé d'une base externe ; `--stdin` la tient hors de l'historique du shell. Rangée chiffrée sous une clé tirée du jeton. |
+| `filarr-gate sources key DEF_ID (--secret VALEUR \| --stdin \| --clear)` | Donne (ou efface) la clé d'une base externe ; `--stdin` la garde hors de l'historique du shell. Conservée chiffrée sous une clé tirée du jeton. |
 | `filarr-gate sources run DEF_ID [--ack-guard PASSAGE] [--initial source\|filarr]` | Lance un passage de synchro tout de suite. `--ack-guard PASSAGE` accepte un passage arrêté (garde-fou), pour ce passage seulement ; `--initial source\|filarr` tranche un premier passage qui a rencontré trop de conflits. |
 | `filarr-gate sources pause DEF_ID \| sources resume DEF_ID` | Met une synchro en pause sur cette boîte noire (`sources resume` la reprend). La définition reste dans Filarr. |
 | `filarr-gate files test` | Dépose un petit fichier d'essai dans la boîte de dépôt liée. |

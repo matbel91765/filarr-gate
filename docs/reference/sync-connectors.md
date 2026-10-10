@@ -18,8 +18,8 @@ two-way sync: [explain/two-way-sync.md](../explain/two-way-sync.md).
    `extdb_unsigned`.
 3. The plan allows scheduled syncs (`extdb_tier`), the connector can run here (no TCP on Cloudflare), the **key** is
    present (`extdb_key_missing`), the sync is not paused on this gate.
-4. It holds the **lease** of the definition at Filarr: two processes started with the same token never pass together
-   (`extdb_lease_held`).
+4. The gate holds the **lease** of the definition at Filarr: two processes started with the same token never pass
+   together (`extdb_lease_held`).
 
 ## Giving the key
 
@@ -73,7 +73,8 @@ Details per connector:
   erased, never by a row number kept from before.
 - **Notion**: `api.notion.com`, `Notion-Version: 2022-06-28` fixed by the connector, pages of 100, at most 3 requests
   per second. The column `id` is the page id; the marker `last_edited_time`; titles and rich texts as plain text,
-  selects by name, dates by their start. Deleting means moving to the trash. A relation property cannot be mapped (`unsupported_column`).
+  selects by name, dates by their start. Deleting means moving to the trash. A relation property cannot be mapped
+  (`unsupported_column`).
 - **CSV or JSON**: `GET` over https; CSV per RFC 4180 (separator and header row configurable), JSON from a simple path
   (`$.items`, `$.data.rows`).
 

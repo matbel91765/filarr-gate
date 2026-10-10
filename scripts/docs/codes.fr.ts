@@ -47,7 +47,7 @@ export const LOCAL_CODES_FR: Record<string, CodeText & { byStatus?: Record<numbe
   bad_response: { what: 'Filarr a accepté un dépôt de fichier sans rendre son identifiant.', fix: 'Recommencez ; si cela persiste, lancez `filarr-gate doctor` et signalez-le.' },
   base_not_found: {
     what: "Aucune base ouverte à cet accès n'a ce slug.",
-    fix: "Vérifiez l'adresse : `GET /openapi.json`, ou l'écran **Bases** de l'interface de gestion, liste les slugs.",
+    fix: "Vérifiez l'adresse : `GET /openapi.json`, ou l'écran **Bases et points d'accès** de l'interface de gestion, liste les slugs.",
   },
   base_read_only: { what: "Filarr a ouvert cette base à l'accès en lecture seule (droit `r`).", fix: "Dans Filarr, ouvrez la base à l'accès en lecture et écriture." },
   body_too_large: {
@@ -267,7 +267,7 @@ export const LINK_STATES_FR: Record<string, CodeText> = {
     fix: 'Rien. Pour aller plus vite sans flux, donnez à Filarr une adresse de réveil (`/_filarr/notify`).',
   },
   offline: {
-    what: 'Filarr ne répond pas. La boîte noire continue de servir sa dernière copie et réessaie, de plus en plus espacé.',
+    what: 'Filarr ne répond pas. La boîte noire continue de servir sa dernière copie et réessaie à intervalles de plus en plus espacés.',
     fix: 'Vérifiez le réseau et le DNS de la machine ; `filarr-gate doctor` teste Filarr.',
   },
   limited: {
@@ -328,7 +328,7 @@ export const FILARR_REV2_FR: Record<string, CodeText & { gate: string }> = {
   api_rate: {
     what: "L'accès envoie trop de requêtes par minute à Filarr.",
     gate: "Suspend tout échange avec Filarr jusqu'à `Retry-After` ; les lectures locales continuent.",
-    fix: 'Rien ; cela reprend. Moins de boîtes noires sur le même jeton aident.',
+    fix: 'Rien ; cela reprend. Faire tourner moins de boîtes noires sur le même jeton aide.',
   },
   api_poll_interval: {
     what: 'Palier Free : une base a été relevée plus tôt que permis.',
@@ -372,8 +372,8 @@ export const FILARR_REV3_FR: Record<string, CodeText & { gate?: string }> = {
   reauth_failed: { what: "La preuve d'identité est fausse.", fix: 'Recommencez ; après 10 essais en une heure, patientez.' },
   api_tier_hosted: { what: 'La boîte hébergée demande le palier Pro ou plus.', fix: 'Un palier supérieur, ou une boîte noire chez vous.' },
   hosting_forbidden: { what: "L'organisation interdit les boîtes hébergées.", fix: "Voyez avec un administrateur de l'organisation, ou installez la boîte noire chez vous." },
-  hosting_not_switched: { what: "La boîte hébergée n'est pas encore ouverte pour ce compte.", fix: 'Rien à faire : elle ouvre compte par compte.' },
-  consent_outdated: { what: "Le texte de l'accord a changé depuis que vous l'avez accepté.", fix: 'Filarr remontre le nouveau texte ; acceptez-le pour garder la base confiée.' },
+  hosting_not_switched: { what: "La boîte hébergée n'est pas encore ouverte pour ce compte.", fix: "Rien à faire : elle s'ouvre compte par compte." },
+  consent_outdated: { what: "Le texte de l'accord a changé depuis que vous l'avez accepté.", fix: 'Filarr réaffiche le nouveau texte ; acceptez-le pour garder la base confiée.' },
   host_key_unknown: { what: 'Votre appli Filarr ne connaît pas la clé actuelle du service hébergé.', fix: "Mettez l'appli Filarr à jour." },
   hosting_billing_unavailable: { what: "Aucun abonnement Stripe ne peut porter l'option pour ce payeur.", fix: "Gérez la facturation dans Filarr, ou facturez l'organisation." },
   hosting_exists: { what: 'Cet accès est déjà hébergé.', fix: "Rien ; pour changer l'endroit où il tourne, passez par la migration." },
@@ -392,7 +392,7 @@ export const FILARR_REV3_FR: Record<string, CodeText & { gate?: string }> = {
   },
   hosted_origin_required: {
     what: "Le jeton d'une boîte hébergée a été présenté hors du service hébergé.",
-    gate: 'Refusé : un jeton hébergé ne sert à rien ailleurs.',
+    gate: 'Refusé, car un jeton hébergé ne sert à rien ailleurs.',
     fix: "Rien : c'est ce qui protège ce jeton.",
   },
   api_access_pending: {
@@ -401,13 +401,13 @@ export const FILARR_REV3_FR: Record<string, CodeText & { gate?: string }> = {
     fix: 'Terminez la migration dans Filarr.',
   },
   api_tier_files: { what: "Recevoir des fichiers par l'API demande le palier Pro ou plus.", gate: 'Transmet le refus (`403`).', fix: 'Un palier supérieur.' },
-  files_not_switched: { what: "Les fichiers par l'API ne sont pas encore ouverts pour ce compte.", gate: 'Transmet le refus.', fix: 'Rien : ils ouvrent compte par compte.' },
+  files_not_switched: { what: "Les fichiers par l'API ne sont pas encore ouverts pour ce compte.", gate: 'Transmet le refus.', fix: "Rien : ils s'ouvrent compte par compte." },
   files_not_linked: { what: "Aucune boîte de dépôt n'est liée à l'accès.", gate: "Refuse avant d'envoyer (`409`).", fix: 'Liez une boîte de dépôt dans Filarr.' },
   box_not_permanent: { what: "La boîte liée à l'accès n'est pas une boîte de dépôt permanente.", gate: 'Transmet le refus.', fix: 'Liez une boîte permanente (Filarr en crée une pour vous).' },
   box_not_found: { what: "La boîte de dépôt liée n'existe plus.", gate: 'Transmet le refus.', fix: 'Liez-en une autre dans Filarr.' },
   deposit_not_found: { what: 'Filarr ne connaît pas ce dépôt.', gate: 'État inconnu.', fix: "Vérifiez l'identifiant." },
   box_full: {
-    what: "Trop de dépôts attendent d'être rangés dans la boîte.",
+    what: "Trop de dépôts attendent dans la boîte d'être rangés.",
     gate: "Refuse avant d'envoyer quand elle le sait déjà ; sinon, transmet le refus.",
     fix: 'Ouvrez Filarr pour les ranger.',
   },
@@ -472,7 +472,7 @@ export const SYNC_CODES_FR: Record<string, CodeText> = {
   extdb_lease_held: { what: 'Une autre instance de cette boîte noire exécute cette synchro.', fix: 'Une seule boîte noire par jeton.' },
   extdb_guard: {
     what: "Garde-fou : trop de lignes seraient marquées ou supprimées d'un coup. Rien n'a été écrit.",
-    fix: 'Vérifiez la source ; pour continuer pour ce passage seulement, acceptez dans Filarr, ou lancez `filarr-gate sources run <id> --ack-guard <passage>`.',
+    fix: 'Vérifiez la source ; pour continuer, pour ce passage seulement, donnez votre accord dans Filarr, ou lancez `filarr-gate sources run <id> --ack-guard <passage>`.',
   },
   extdb_conflict_burst: {
     what: "Trop de nouveaux conflits en un passage. Rien n'a été écrit.",
@@ -501,7 +501,7 @@ export const SYNC_CODES_FR: Record<string, CodeText> = {
   },
   extdb_relay_limited: { what: 'Web seulement : le débit du relais pour les bases externes est épuisé.', fix: "Attendez, ou lancez la synchro depuis l'appli de bureau ou une boîte noire." },
   extdb_web_unsupported: {
-    what: 'Web seulement : ce connecteur ne se joint pas depuis un navigateur (PostgreSQL, MySQL).',
+    what: 'Web seulement : ce connecteur ne peut pas joindre sa base depuis un navigateur (PostgreSQL, MySQL).',
     fix: "Lancez la synchro depuis l'appli de bureau ou une boîte noire.",
   },
 };

@@ -28,9 +28,9 @@ Chaque base garde sa propre clé : retirer une base d'un accès change la clé d
 - Un compte Filarr connecté sur ce profil, l'appli déverrouillée.
 - Une base dans une note. Vous devez en être le propriétaire ; pour une base de coffre, le propriétaire ou un
   administrateur du coffre.
-- Toutes les bases ne s'ouvrent pas : une base adossée à un dossier (ses lignes sont des fichiers) ou rangée dans votre
-  propre stockage (BYOS), non. Ouvrir une petite base la fait d'abord passer au stockage des grandes bases de Filarr,
-  quel que soit son poids ; cela ne change rien pour vous.
+- Toutes les bases ne s'ouvrent pas : une base adossée à un dossier (ses lignes sont des fichiers) ou conservée dans
+  votre propre stockage (BYOS), non. Ouvrir une petite base la fait d'abord passer au stockage des grandes bases de
+  Filarr, quel que soit son poids ; cela ne change rien pour vous.
 
 ## 1. Ouvrir le formulaire
 
@@ -45,7 +45,7 @@ grandes bases sont coupées sur cet appareil, ou quand vous n'êtes pas proprié
   journaux.
 - **Bases ouvertes** : la base d'où vous partez est cochée ; cochez-en d'autres pour les ouvrir avec le même jeton.
   Pour chacune, choisissez **Lecture** ou **Lecture et écriture**. (L'écriture demande aussi un palier qui comprend
-  l'écriture par l'API ; sinon, le choix dit « pas dans votre palier ».)
+  l'écriture par l'API ; sinon, le choix affiche « Lecture et écriture (hors de votre palier) ».)
 - **Les slugs** : le nom de chaque base et de chaque vue dans l'API de la boîte noire, proposé d'après leur titre
   (minuscules, sans accents, des tirets) : `clients`, `clients-actifs`. **Ils ne se choisissent que maintenant.**
   Ensuite ils ne changent plus, même si vous renommez la base ou une vue dans Filarr : vos intégrations ne cassent pas.
@@ -70,16 +70,16 @@ flr_live_7Qm2kT…  (75 caractères)
 ```
 
 Copiez-le là où la boîte noire le lira : votre gestionnaire de mots de passe, un secret de votre serveur ou de votre
-compte Cloudflare. Filarr n'en garde qu'une empreinte : un jeton perdu ne peut pas être remontré, seulement remplacé.
+compte Cloudflare. Filarr n'en garde qu'une empreinte : un jeton perdu ne peut pas être réaffiché, seulement remplacé.
 Qui le détient lit les bases qu'il ouvre : traitez-le comme un mot de passe.
 
 L'écran propose quatre façons de faire tourner la boîte noire (sur ce poste, Docker, dans votre code, Cloudflare).
-Suivez le tutoriel qui correspond : [votre ordinateur](install-local.fr.md), [un serveur avec Docker](install-docker.fr.md),
-[votre compte Cloudflare](install-cloudflare.fr.md), ou [la bibliothèque dans votre code](library.fr.md). Cliquez
-ensuite sur **J'ai mis le jeton de côté**.
+Suivez le tutoriel qui correspond : [votre ordinateur](install-local.fr.md), [un serveur avec
+Docker](install-docker.fr.md), [votre compte Cloudflare](install-cloudflare.fr.md), ou [la bibliothèque dans votre
+code](library.fr.md). Cliquez ensuite sur **J'ai mis le jeton de côté**.
 
 Si d'anciens blocs de la base utilisent une clé que cet appareil ne détient plus, l'écran prévient que la boîte noire
-les signalera « clé manquante » jusqu'à ce qu'un appareil qui la détient ouvre Filarr.
+les signalera comme « clé manquante » jusqu'à ce qu'un appareil qui la détient ouvre Filarr.
 
 ## 4. Le donner à la boîte noire
 
@@ -93,8 +93,8 @@ boîte noire apparaît dans Filarr sous **Paramètres › Accès API**, avec sa 
 
 ## Vérifier que ça marche
 
-Dans l'interface de la boîte noire, **Bases** liste chaque base avec son adresse, ses vues, ses champs et les clés
-autorisées à la lire. Ou bien :
+Dans l'interface de la boîte noire, **Bases et points d'accès** liste chaque base avec son adresse, ses vues, ses champs
+et les clés autorisées à la lire. Ou bien :
 
 ```sh
 curl -s http://127.0.0.1:8443/openapi.json | head -c 400

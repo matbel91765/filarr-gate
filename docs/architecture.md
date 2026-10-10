@@ -66,11 +66,12 @@ packages/cloudflare a Worker and a Durable Object hosting the same box
 
 ### Reading
 
-For each store: `GET /dbstore/:id/head` → open the head under `hk` (when `hk` is null, a pre-generation head: the generation-0 keys, newest epoch first) → for every
-block entry, check that its `K_db(e, g)` is held (otherwise the base shows "missing key for (e, g)" and keeps serving
-its last complete state) → take changed blocks from the local cache or `POST /dbstore/:id/slots:batchGet` (repeated
-while `more`) → verify each body against the head's MAC → decrypt → merge the last-writer-wins registers → materialise
-rows in memory. A partial state is never served. A server that goes back in sequence is refused.
+For each store: `GET /dbstore/:id/head` → open the head under `hk` (when `hk` is null, a pre-generation head: the
+generation-0 keys, newest epoch first) → for every block entry, check that its `K_db(e, g)` is held (otherwise the base
+shows "missing key for (e, g)" and keeps serving its last complete state) → take changed blocks from the local cache or
+`POST /dbstore/:id/slots:batchGet` (repeated while `more`) → verify each body against the head's MAC → decrypt → merge
+the last-writer-wins registers → materialise rows in memory. A partial state is never served. A server that goes back in
+sequence is refused.
 
 The local cache holds encrypted bodies only, content-addressed (SHA-256) with a `p|ver` index per store, verified again
 against the head before use. `FILARR_GATE_CACHE=memory` keeps nothing on disk.
@@ -79,12 +80,12 @@ against the head before use. `FILARR_GATE_CACHE=memory` keeps nothing on disk.
 
 `GET /api-access/self/stream` (WebSocket): `commit` triggers a re-read of that store, `grant` and `manifest` a re-read
 of `self`, `quota` an alert (log, UI, `gate.quota` webhooks), `revoked` the wipe. The gate sends an application-level
-`{"t":"ping"}` every 30 s (the relay closes on anything else) and reconnects with a growing, jittered delay. Close codes:
-4301 revoked or token rotated (wipe), 4302 paused, 4303 access changed (re-read `self`), 4304 expired (wipe), 4305
-monthly sync quota spent (poll every 900 s until the next month), 4306 too many streams (back off).
+`{"t":"ping"}` every 30 s (the relay closes on anything else) and reconnects with a growing, jittered delay. Close
+codes: 4301 revoked or token rotated (wipe), 4302 paused, 4303 access changed (re-read `self`), 4304 expired (wipe),
+4305 monthly sync quota spent (poll every 900 s until the next month), 4306 too many streams (back off).
 
 Without the stream (Free: `access.stream` is false), the gate polls `GET /dbstore/:id/changes?since=` per store, never
-faster than the plan's `pollIntervalS` (300 s on Free) nor `FILARR_GATE_POLL_SECONDS`, and reads the head only when a
+faster than the plan's `pollIntervalS` nor `FILARR_GATE_POLL_SECONDS`, and reads the head only when a
 store moved. `410 since_too_old` falls back to the head.
 
 ### Limits
@@ -117,10 +118,10 @@ the owner block id of each store (`head.dbId`). In SQL, a database that is not o
 ### The creator's key
 
 `GET /api-access/self` returns `creator: { userId, signingPublicKey, tag }` and `access.bindSig`. The gate recomputes
-`tag = HMAC(A_mac, "filarr/api/v1|creator|" + accessId + "|" + signingPublicKey)` with `A_mac` derived from the token, and
-checks `bind_sig` (the creator's signature of the access public key). Only then is the key **authenticated**: deposit
-boxes (`boxSig`), sync definitions and a migration target are accepted only when signed by it. A server cannot forge the
-tag, nor substitute its own key.
+`tag = HMAC(A_mac, "filarr/api/v1|creator|" + accessId + "|" + signingPublicKey)` with `A_mac` derived from the token,
+and checks `bind_sig` (the creator's signature of the access public key). Only then is the key **authenticated**:
+deposit boxes (`boxSig`), sync definitions and a migration target are accepted only when signed by it. A server cannot
+forge the tag, nor substitute its own key.
 
 ### Push wake-ups
 

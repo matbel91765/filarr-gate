@@ -37,7 +37,7 @@ Codes the gate itself returns to your software (and, marked "Admin", its managem
 | `bad_since` | 400 | `since` is not a version number. | Pass the `version` of a page you already read (`since=1042` or `since=v1042`). |
 | `bad_tags` | 400 | More than 10 tags, or a tag longer than 40 characters, on a file deposit. | Send 10 tags at most, 40 characters each. |
 | `bad_value` | 400 | A value does not fit the column it is written to (a text for a number, a malformed date…). `field` names the field. | Send the JSON type the field expects; `GET /openapi.json` lists each field with its type. |
-| `base_not_found` | 404 | No database opened to this access has this slug. | Check the address: `GET /openapi.json`, or the **Databases** screen of the management UI, lists the slugs. |
+| `base_not_found` | 404 | No database opened to this access has this slug. | Check the address: `GET /openapi.json`, or the **Databases and endpoints** screen of the management UI, lists the slugs. |
 | `base_read_only` | 403 | Filarr opened this database to the access for reading only (right `r`). | In Filarr, open the database to the access in read and write. |
 | `body_too_large` | 413 | The body is larger than the gate accepts (4 MiB for JSON; 8 KiB for a wake-up). | Send fewer rows per request (500 at most), or split the work. |
 | `box_full` | 409 | The deposit box linked to the access already holds as many deposits waiting to be filed as Filarr allows. Nothing was sent. | Open Filarr on a device that files the box (desktop or web), or file the waiting deposits by hand. Waiting does not help: someone must open Filarr. |

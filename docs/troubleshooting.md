@@ -58,8 +58,8 @@ serving its last complete copy: your software keeps reading.
 - **Not in the list at all** (`base_not_found`, or absent from `/openapi.json`): the access does not open it.
   Check the access in Filarr (**Settings › API access**). A database just added to an access appears once Filarr has
   sealed its key and published its views, which happens on a device of the creator, unlocked.
-- **Listed with "manifest missing"** on the **Databases** screen: its views are not published for this access
-  yet. They are republished the next time its note is opened in Filarr.
+- **Listed as "Database without a manifest"** on the **Databases and endpoints** screen: its views are not published for
+  this access yet. They are republished the next time its note is opened in Filarr.
 - **`503` with `key_missing`**: Filarr changed the keys of the database (a new generation, for instance after
   another access was revoked) and the creator has not re-sealed them for this access. The creator opens Filarr
   (desktop, web or mobile), unlocked: the keys are re-sealed and the gate catches up within seconds. Until then the

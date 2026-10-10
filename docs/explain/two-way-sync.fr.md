@@ -18,8 +18,8 @@ Pour chaque cellule synchronisée, la boîte noire compare :
   d'accord, et l'horloge de Filarr à ce moment-là.
 
 « La source a changé » veut dire `empreinte(S) ≠ O`. « Filarr a changé » veut dire `F.horloge ≠ O.horloge`. Comparer
-l'horloge, et pas une date, c'est ce qui empêche de perdre un appareil qui revient en ligne avec une vieille
-modification : son écriture a changé l'horloge du registre, elle compte donc comme un changement.
+l'horloge, et pas une date, c'est ce qui évite de perdre la vieille modification d'un appareil qui revient en ligne :
+son écriture a changé l'horloge du registre, elle compte donc comme un changement.
 
 ## Les cas
 
@@ -42,7 +42,7 @@ suivent la politique que vous avez choisie. Un garde-fou protège un premier pas
 |---|---|---|
 | la source l'emporte | Filarr ← S ; la valeur de Filarr au journal | |
 | Filarr l'emporte | source ← F ; la valeur de la source au journal | |
-| la plus récente l'emporte | la plus tardive du repère de la source et de l'horloge de Filarr | le repère date la LIGNE, pas la cellule ; les horloges de deux machines |
+| la plus récente l'emporte | la plus tardive entre le repère de la source et l'horloge de Filarr | le repère date la LIGNE, pas la cellule ; les horloges de deux machines |
 | me demander | rien n'est écrit ; la cellule entre dans la file | les deux côtés montrent des valeurs différentes jusqu'à ce que quelqu'un décide |
 
 Aucune n'est cochée d'office : vous choisissez, par colonne ou pour la définition, avant le premier passage. Toute
@@ -54,7 +54,7 @@ au passage suivant).
 L'identifiant d'une entrée est calculé à partir de la définition, de la clé de ligne, de la colonne et des deux
 empreintes. Donc :
 
-- détecter de nouveau le même conflit donne la même entrée (rien ne se double) ;
+- détecter de nouveau le même conflit donne la même entrée (rien n'est dupliqué) ;
 - un côté qui change donne un nouvel identifiant : l'ancienne entrée est remplacée, et une décision prise sur les
   anciennes valeurs est **périmée** ;
 - les décisions s'appliquent dans l'ordre où le serveur les a reçues ; la première valide pour une entrée l'emporte,
@@ -70,8 +70,8 @@ empreintes. Donc :
    repère), plus une lecture ciblée de chaque ligne changée dans Filarr que la lecture incrémentale n'a pas rendue ;
 4. le plan (pur) ; 5. les garde-fous, **avant toute écriture** ;
 6. les écritures dans la source **seulement si la valeur est encore celle qui a été lue** (quand le connecteur le
-   sait), puis relecture : une valeur que la source a normalisée (arrondie, redatée) est réécrite dans Filarr dans le
-   même passage ; une cellule qui le fait deux fois de suite est **instable** et cesse de partir ;
+   permet), puis relecture : une valeur que la source a normalisée (arrondie, redatée) est réécrite dans Filarr dans le
+   même passage ; une cellule qui le fait deux fois de suite est **instable** et n'est plus envoyée ;
 7. UNE validation dans Filarr ; un registre qui a changé pendant le passage n'est jamais écrasé (il devient un cas E la
    fois suivante) ;
 8. référence, file et journal enregistrés ensemble ; l'état publié (scellé pour les membres) ; les décisions
@@ -82,19 +82,19 @@ changé » vers la même valeur, cas D, rien n'est écrit deux fois. Un arrêt e
 
 ## Ce qui passe par Filarr pendant un passage
 
-Filarr ne fait que relayer et garder des objets scellés ; l'exécutant parle à ces routes du magasin de la base, avec la
+Filarr ne fait que relayer et garder des objets scellés ; l'exécutant appelle ces routes du magasin de la base, avec la
 preuve de son accès (`runnerId` vaut `a:<accessId>`) :
 
 | route | pour quoi |
 |---|---|
-| `POST /dbstore/<id>/ext-lease` `{ defId, runnerId, instance, ttlS }` | prendre ou renouveler le bail ; `409 extdb_lease_held` quand un autre processus (une autre `instance`) le tient. `DELETE /dbstore/<id>/ext-lease/<defId>?instance=…` le rend à un arrêt propre |
+| `POST /dbstore/<id>/ext-lease` `{ defId, runnerId, instance, ttlS }` | prendre ou renouveler le bail ; `409 extdb_lease_held` quand un autre processus (une autre `instance`) le tient. `DELETE /dbstore/<id>/ext-lease/<defId>?instance=…` le rend lors d'un arrêt propre |
 | `GET /dbstore/<id>/ext-resolve/<runnerId>?after=<seq>` | la boîte aux lettres des décisions : `{ "decisions": [{ "seq": 41, "sealed": "…" }, …], "next": 41 }`, dans l'ordre où le serveur les a reçues ; `next` dit où reprendre, `null` sur la dernière page. La boîte noire lit jusqu'à dix pages par passage, le reste au suivant |
 | `DELETE /dbstore/<id>/ext-resolve/<runnerId>?upTo=<seq>` | acquitter les décisions appliquées, seulement APRÈS l'enregistrement de la référence et de la file |
 | `PUT /dbstore/<id>/ext-status/<runnerId>`, `PUT /dbstore/<id>/ext-queue/<runnerId>` `{ rev, e, g, sealed }` | publier l'état et la file, par comparaison et échange sur `rev` |
 | `POST /dbstore/<id>/commit` | l'unique validation du passage dans la base |
 
 Chaque décision est scellée par l'appli du membre sous une clé tirée de la clé de la base (`K_xs`), que chaque membre et
-la boîte noire tirent et que Filarr ne tire pas : Filarr voit un objet scellé et sa taille.
+la boîte noire savent tirer, et Filarr non : Filarr voit un objet scellé et sa taille.
 
 ## Les invariants que vérifient les vecteurs
 
@@ -104,7 +104,7 @@ la boîte noire tirent et que Filarr ne tire pas : Filarr voit un objet scellé 
 | I2, idempotence | rejouer un passage interrompu donne le même état final ; rejouer une décision déjà appliquée ne fait rien |
 | I3, rien de perdu en silence | chaque valeur écrasée par l'exécutant, d'un côté ou de l'autre, est au journal avec sa valeur précédente |
 | I4, déterminisme | deux exécutants avec les mêmes entrées font le même plan |
-| I5, un seul rédacteur | le bail : un seul exécutant écrit dans la source par définition |
+| I5, un seul rédacteur | le bail : pour chaque définition, un seul exécutant écrit dans la source |
 | I6, sens respectés | une colonne `in` n'envoie jamais rien à la source ; une colonne `out` n'écrit jamais dans Filarr (sauf la clé et l'écho) |
 | I7, garde-fous | aucun passage ne supprime ni ne marque au-delà du seuil sans un accord explicite pour ce passage |
 | I8, la file intacte | une cellule de la file n'est écrite d'aucun côté tant qu'une décision valide ne la vise pas |
@@ -114,7 +114,7 @@ la boîte noire tirent et que Filarr ne tire pas : Filarr voit un objet scellé 
 
 - En cas de conflit, un côté perd (au journal) ou la cellule attend ; le choix vous revient.
 - « La plus récente l'emporte » compare les horloges de deux machines et date la ligne.
-- Airtable, Google Sheets et Notion ne savent pas écrire « seulement si inchangé » : il reste une fenêtre de moins
+- Airtable, Google Sheets et Notion ne permettent pas d'écrire « seulement si inchangé » : il reste une fenêtre de moins
   d'une seconde.
 - Pendant qu'un conflit attend, les logiciels qui lisent la source voient la valeur de la source.
 - Les disparitions ne se voient qu'à une relecture complète.

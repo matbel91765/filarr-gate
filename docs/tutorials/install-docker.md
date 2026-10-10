@@ -157,10 +157,10 @@ Back up the volume while the gate is stopped, or accept a few seconds of lag:
 docker run --rm -v docker_gate-data:/data -v "$PWD":/backup alpine tar czf /backup/gate-data.tgz -C /data .
 ```
 
-(The volume is named after the Compose project: `docker volume ls` shows its exact name.) The archive holds the
-token only if you gave it with `init` rather than `.env`, plus encrypted blocks, key fingerprints and webhook
-secrets: store it like a secret. To move the gate to another server, prefer the settings package:
-`filarr-gate export` ([migration](../explain/migration.md)).
+(The volume is named after the Compose project: `docker volume ls` shows its exact name.) The archive holds encrypted
+blocks, key fingerprints and webhook secrets, plus the token if you gave it with `init` rather than `.env`: store it
+like a secret. To move the gate to another server, prefer the settings package: `filarr-gate export`
+([migration](../explain/migration.md)).
 
 ## Without Compose
 

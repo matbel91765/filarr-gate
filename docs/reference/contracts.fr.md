@@ -35,7 +35,7 @@ Un vecteur dont la boîte noire est l'origine ne change qu'avec l'accord préala
 ## Le cœur recopié
 
 `packages/core` contient le cœur portable de Filarr, recopié tel quel du dépôt de Filarr (chiffrement des magasins,
-codec, registres, moteur de vues, moteur SQL) et relicencié Apache-2.0 par son ayant droit ;
+codec, registres, moteur de vues, moteur SQL) et relicencié sous Apache-2.0 par son ayant droit ;
 `packages/core/src/PROVENANCE.json` nomme le commit de Filarr de chaque fichier. Les dépôts propres de Filarr gardent
 leurs licences.
 

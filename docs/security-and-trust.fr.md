@@ -3,9 +3,9 @@
 [Read in English](security-and-trust.md)
 
 Filarr chiffre vos notes et vos bases de bout en bout : ses serveurs gardent des blocs qu'ils ne savent pas lire. Pour
-servir une base comme une API, quelque chose doit la déchiffrer. Cette page dit exactement quoi, dans chaque mode, qui
-peut donc lire quoi, et ce qui est garanti par le chiffrement, ce qui se vérifie, et ce qui ne repose que sur des
-engagements. Là où une limite existe, elle est écrite ici.
+servir une base sous forme d'API, quelque chose doit la déchiffrer. Cette page dit exactement ce qui la déchiffre dans
+chaque mode, qui peut donc lire quoi, et ce qui est garanti par le chiffrement, ce qui se vérifie, et ce qui ne repose
+que sur des engagements. Là où une limite existe, elle est écrite ici.
 
 ## Les trois modes
 
@@ -19,7 +19,7 @@ engagements. Là où une limite existe, elle est écrite ici.
 
 | qui | voit | ne voit jamais |
 |---|---|---|
-| **Les serveurs de Filarr** | l'accès (son identifiant, sa clé publique, l'empreinte de sa preuve), les clés scellées et les vues scellées (qu'ils ne savent pas ouvrir), des compteurs (requêtes, octets téléchargés, validations), l'adresse IP et la version de la boîte noire | le jeton, les clés qu'il tire, une clé de base, une ligne, un nom de colonne |
+| **Les serveurs de Filarr** | l'accès (son identifiant, sa clé publique, l'empreinte de sa preuve), les clés scellées et les vues scellées (qu'ils ne savent pas ouvrir), des compteurs (requêtes, octets téléchargés, validations), l'adresse IP et la version de la boîte noire | le jeton, les clés qui en sont tirées, une clé de base, une ligne, un nom de colonne |
 | **La boîte noire, et qui la fait tourner** | toutes les lignes et toutes les colonnes des bases ouvertes à l'accès, pas seulement ce que montrent les vues | une base qui ne lui est pas ouverte, vos autres notes, fichiers et coffres, les clés de votre compte |
 | **Vos logiciels** | ce que leur clé d'application permet (une base, une vue, une requête, le SQL, les fichiers) | le jeton Filarr |
 | **Un récepteur de webhook** | les lignes (et les champs) que son webhook sélectionne, signées | tout le reste |
@@ -37,18 +37,18 @@ façonner ce que rend un point d'accès. Pour partager moins, ouvrez une base qu
   noire tire (HKDF-SHA256) la preuve qu'elle présente à Filarr et une clé privée ; Filarr ne garde que l'empreinte de
   la preuve et la clé publique. Un journal de requêtes volé chez Filarr n'ouvre rien.
 - **Une clé par base et par génération.** Chaque clé de base est tirée à sens unique de votre clé racine, pour une base
-  et une génération, et scellée pour la clé publique de l'accès. On ne peut en remonter ni à votre clé racine, ni à la
-  génération suivante, ni à la clé d'une autre base.
+  et une génération, et scellée pour la clé publique de l'accès. On ne peut en déduire ni votre clé racine, ni la clé de
+  la génération suivante, ni celle d'une autre base.
 - **La révocation coupe l'avenir.** Révoquer un accès (ou lui retirer une base) fait passer chaque base à une nouvelle
   génération dont la clé n'est jamais scellée pour l'ancien jeton : ce qui s'écrit ensuite lui est illisible, même si
   des blocs chiffrés fuitaient par un autre chemin.
 - **Rien n'est accepté au mauvais endroit.** Chaque clé scellée nomme son accès, sa base et sa génération, et la boîte
-  noire refuse celle qu'elle trouverait ailleurs. Chaque bloc est vérifié contre les empreintes de la tête de la base
+  noire refuse celle qu'elle trouverait ailleurs. Chaque bloc est vérifié au regard des empreintes de la tête de la base
   avant d'être déchiffré ; un serveur qui remonte le temps est refusé.
 - **Les objets signés viennent du créateur, pas d'un serveur.** Les boîtes de dépôt, les définitions de synchro et les
   cibles de migration ne sont acceptées que signées par la clé d'identité du créateur de l'accès, que la boîte noire
-  authentifie par une étiquette que seul le jeton sait calculer. Un serveur qui servirait sa propre clé serait refusé :
-  aucun fichier ne serait scellé pour lui, une définition de synchro modifiée ne tournerait pas.
+  authentifie par une étiquette que seul le jeton permet de calculer. Un serveur qui servirait sa propre clé serait
+  refusé : aucun fichier ne serait scellé pour lui, une définition de synchro modifiée ne tournerait pas.
 - **Les fichiers sont scellés avant de partir.** La boîte noire chiffre chaque fichier avec une clé neuve, scellée pour
   votre boîte de dépôt ; Filarr garde ce qu'il ne sait pas ouvrir, et n'apprend ni le nom ni le dossier.
 
@@ -67,7 +67,8 @@ façonner ce que rend un point d'accès. Pour partager moins, ouvrez une base qu
   limitée à ses points d'accès, avec un débit, des adresses autorisées et une échéance.
 - La révocation efface la copie, les clés et le cache de blocs d'une boîte noire qui l'apprend.
 - L'interface de gestion demande un mot de passe (dix caractères au moins), écoute sur `127.0.0.1` d'office, refuse les
-  écritures sans son propre en-tête (une page d'un autre site ne peut pas le forger), et limite les mots de passe faux.
+  écritures sans son propre en-tête (une page d'un autre site ne peut pas le forger), et limite les tentatives de mot de
+  passe erronées.
 
 **Ce qui n'est pas garanti, dit clairement**
 
@@ -77,9 +78,9 @@ façonner ce que rend un point d'accès. Pour partager moins, ouvrez une base qu
   ou jusqu'à ce qu'on l'efface sur sa machine.
 - **Remplacer un jeton ne change pas les clés** (révoquer, si). Voyez [révoquer](tutorials/revoke.fr.md).
 - **Les webhooks portent des lignes en clair** jusqu'à votre récepteur : employez HTTPS, et vérifiez la signature.
-- **Les synchros dans les deux sens vers Airtable, Google Sheets et Notion** ne savent pas écrire « seulement si la
-  valeur est encore celle que j'ai lue » : la boîte noire relit juste avant d'écrire, et il reste une fenêtre de moins
-  d'une seconde où un changement fait dans la source à cet instant pourrait être écrasé (et gardé au journal). D1,
+- **Les synchros dans les deux sens vers Airtable, Google Sheets et Notion** ne permettent pas d'écrire « seulement si
+  la valeur est encore celle que j'ai lue » : la boîte noire relit juste avant d'écrire, et il reste une fenêtre de
+  moins d'une seconde où un changement fait dans la source à cet instant pourrait être écrasé (et gardé au journal). D1,
   PostgreSQL, MySQL et Supabase n'ont pas cette fenêtre.
 - **« La plus récente l'emporte »** compare les horloges de deux machines, et date la ligne, pas la cellule.
 - **La variante Cloudflare** : Cloudflare, en hébergeur de votre Worker, exécute votre code et pourrait techniquement
@@ -91,14 +92,14 @@ façonner ce que rend un point d'accès. Pour partager moins, ouvrez une base qu
 > puissiez la juger avant qu'elle ouvre.
 
 Pour les bases que vous lui **confiez**, et tant qu'elles restent confiées, un service de Filarr tient leur clé et fait
-tourner la même Filarr Gate. Filarr n'emploie qu'une expression : une base « confiée à Filarr », une boîte « hébergée
+tourner la même Filarr Gate. Filarr n'emploiera qu'une expression : une base « confiée à Filarr », une boîte « hébergée
 par Filarr ».
 
 ### Ce que Filarr peut techniquement voir
 
 | quoi | qui chez Filarr | pourquoi |
 |---|---|---|
-| toutes les lignes et toutes les colonnes des bases confiées, vues ou non | le service hébergé | il tient leurs clés et sert l'API depuis sa copie |
+| toutes les lignes et toutes les colonnes des bases confiées, qu'une vue les montre ou non | le service hébergé | il tient leurs clés et sert l'API depuis sa copie |
 | ce qui s'y écrit tant qu'elles restent confiées (par vous, les membres, l'API) | le service hébergé | la génération en cours lui est scellée tant que la base reste confiée |
 | les requêtes de vos logiciels et les réponses | le service hébergé | il sert l'API |
 | les mêmes requêtes et réponses, **en transit** | le compte Cloudflare qui gère filarr.com, celui de l'API de Filarr, qui héberge aussi le service | l'adresse de la boîte, `<nom>.gate.filarr.com`, est un nom de sa zone : il termine lui-même le TLS |
@@ -174,9 +175,9 @@ ultérieur.
 
 Voici, mot pour mot, ce que vous acceptez en confiant des bases (version `hebergement-v1`). `{{box}}` y devient le nom
 de la boîte. La mise en forme (titre, puces, case à cocher) peut varier d'une appli à l'autre ; les mots, non : chaque
-appli Filarr est éprouvée contre l'empreinte SHA-256 de ce texte que fixe le contrat, et cette page aussi
-(`npm test`). Si le texte change, Filarr vous redemande votre accord ; sans nouvel accord au bout de 30 jours, la base
-est retirée de la boîte.
+appli Filarr est vérifiée au regard de l'empreinte SHA-256 de ce texte, fixée par le contrat, et cette page aussi (`npm
+test`). Si le texte change, Filarr vous redemande votre accord ; sans nouvel accord au bout de 30 jours, la base est
+retirée de la boîte.
 
 <!-- consent: hebergement-v1 fr -->
 ```text

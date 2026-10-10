@@ -17,7 +17,7 @@ et comment vérifier dans les journaux que cela a marché.
 
 ## La clé d'application d'un programme a fuité
 
-Révoquez-la sur la boîte noire ; elle cesse de répondre à la requête suivante. Le jeton, les autres clés et Filarr ne
+Révoquez-la sur la boîte noire ; elle est refusée dès la requête suivante. Le jeton, les autres clés et Filarr ne
 sont pas touchés.
 
 ```sh
@@ -57,13 +57,13 @@ joignable. », et un de vos appareils s'en charge à sa prochaine ouverture.
   clés et les lignes déchiffrées, et supprime son cache de blocs chiffrés.
 - **Une boîte noire qui était hors ligne** l'apprend à son prochain contact avec Filarr et fait de même. D'ici là, elle
   ne peut servir que la copie qu'elle avait déjà : **ce qu'elle a déjà copié reste sur sa machine** jusqu'à ce qu'elle
-  se reconnecte ou qu'on l'efface. Si la machine n'est plus digne de confiance, effacez-la sur place :
+  se reconnecte ou qu'on l'efface. Si la machine n'est plus digne de confiance, effacez la copie sur place :
   **Réglages › Oublier cette machine** dans l'interface de gestion (copie, clés dérivées, jeton, clés d'application,
   webhooks, journal), ou supprimez le répertoire d'état.
 - **Vos clés d'application et vos webhooks survivent à un remplacement de jeton** sur une boîte noire que vous gardez :
   donnez-lui le nouveau jeton (**Réglages › Remplacer le jeton** dans son interface, ou `FILARR_GATE_TOKEN` et un
-  redémarrage) et ils remarchent. Les clés des bases externes sont chiffrées sous une clé tirée du jeton : donnez-les de
-  nouveau.
+  redémarrage) et ils fonctionnent de nouveau. Les clés des bases externes sont chiffrées sous une clé tirée du jeton :
+  donnez-les de nouveau.
 
 ## Remplacer un jeton sans longue coupure
 
@@ -79,7 +79,7 @@ joignable. », et un de vos appareils s'en charge à sa prochaine ouverture.
   « clés changées · <base> (génération g) » pour chaque base, et chaque présentation ultérieure de l'ancien jeton comme
   « jeton refusé ».
 - Sur la boîte noire, `filarr-gate doctor` montre la liaison `revoked` ; `/health` répond `"link":"revoked"` ; l'écran
-  **Journal** montre quand elle a effacé.
+  **Journal** montre quand elle a effacé sa copie.
 
 ```sh
 curl -s http://127.0.0.1:8443/health

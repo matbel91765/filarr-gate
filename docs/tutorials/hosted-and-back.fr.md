@@ -2,14 +2,14 @@
 
 [Read in English](hosted-and-back.md)
 
-> **Bientôt.** La boîte hébergée par Filarr n'est pas encore ouverte : elle ouvre après une revue de sécurité externe,
-> compte par compte, et cette page la décrit telle que la fixe le contrat gelé `gate-heberge-1`. Ce qui marche déjà
+> **Bientôt.** La boîte hébergée par Filarr n'est pas encore ouverte : elle ouvrira, compte par compte, après une revue
+> de sécurité externe, et cette page la décrit telle que la fixe le contrat gelé `gate-heberge-1`. Ce qui marche déjà
 > aujourd'hui, c'est la moitié du déménagement qui revient à la boîte noire : le paquet de réglages (`gate-settings-1`)
 > qui porte vos clés d'application, vos webhooks et vos requêtes enregistrées d'une boîte noire à la suivante, en ligne
 > ou par fichier, exécuté par la suite d'essais.
 
-**À la fin**, vous saurez ce que change « hébergée par Filarr », comment lui confier des bases, comment reprendre la
-clé vers une boîte noire à vous avec les mêmes clés d'application et les mêmes webhooks, et ce que le reçu
+**À la fin**, vous saurez ce que change « hébergée par Filarr », comment lui confier des bases, comment reprendre la clé
+pour revenir à une boîte noire à vous avec les mêmes clés d'application et les mêmes webhooks, et ce que le reçu
 d'effacement prouve et ne prouve pas.
 
 **Palier :** une option payante à partir de Pro (une boîte incluse par organisation Teams ou Enterprise). Le prix est
@@ -43,7 +43,7 @@ Filarr**. Chez Filarr :
 
 1. cochez chaque base à confier (aucune n'est cochée pour vous) ;
 2. lisez l'accord et cochez « J'ai compris que Filarr pourra lire les bases cochées tant qu'elles lui sont confiées. »
-   (le texte est versionné : un changement de texte vous redemande votre accord) ;
+   (le texte est versionné : s'il change, Filarr vous redemande votre accord) ;
 3. prouvez de nouveau que c'est vous (mot de passe et code de double authentification, ou une clé d'accès) ;
 4. **Confier 1 base à Filarr**.
 
@@ -57,19 +57,19 @@ Toute personne qui peut voir une base confiée la voit marquée « API hébergé
 base », sur tous les appareils ; les membres d'un coffre apprennent qui l'a confiée. Seuls le propriétaire ou les
 administrateurs du coffre peuvent confier ou reprendre une base de ce coffre.
 
-En sommeil : si le paiement échoue ou si le palier descend sous Pro, la boîte dort 30 jours (elle répond
-`503 gate_asleep` ; la clé est gardée), se réveille une fois payée, et est effacée avec un reçu au bout des 30 jours.
+En sommeil : si le paiement échoue ou si le palier descend sous Pro, la boîte dort 30 jours (elle répond `503
+gate_asleep` ; la clé est gardée), se réveille dès le paiement reçu, et est effacée avec un reçu au bout des 30 jours.
 
 ## Revenir chez vous
 
 Cinq étapes, sans arrêter vos logiciels :
 
-1. **Installez une boîte noire** là où vous la voulez ([ordinateur](install-local.fr.md), [Docker](install-docker.fr.md),
-   [Cloudflare](install-cloudflare.fr.md)). Ne lui donnez pas encore de jeton.
-2. **Préparez**, dans Filarr (**Paramètres › Accès API**, l'accès hébergé, **Reprendre chez moi**) : votre appareil
-   tire une identité neuve pour l'accès et montre son jeton une fois. Elle attend sept jours, comme « identité en
-   attente » ; la boîte hébergée continue de servir en attendant. La boîte hébergée vérifie que l'identité neuve est
-   signée par vous, scelle ses réglages pour elle, et les dépose chez Filarr.
+1. **Installez une boîte noire** là où vous la voulez ([ordinateur](install-local.fr.md),
+   [Docker](install-docker.fr.md), [Cloudflare](install-cloudflare.fr.md)). Ne lui donnez pas encore de jeton.
+2. **Préparez**, dans Filarr (**Paramètres › Accès API**, l'accès hébergé, **Reprendre chez moi**) : votre appareil tire
+   une identité neuve pour l'accès et montre son jeton une fois. Elle reste sept jours en attente (« identité en attente
+   ») ; la boîte hébergée continue de servir en attendant. La boîte hébergée vérifie que l'identité neuve est signée par
+   vous, scelle ses réglages pour elle, et les dépose chez Filarr.
 3. **Démarrez votre boîte noire avec le nouveau jeton** :
 
    ```sh

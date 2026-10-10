@@ -17,7 +17,8 @@ Filarr-Gate-Signature: t=<secondes unix>,v1=<hex>
 ```
 
 `v1 = HMAC-SHA256(secret, t + "." + corps brut)`, en hexadécimal. Vérifiez-la sur les **octets bruts** du corps, avant
-de le lire, avec une comparaison en temps constant, et refusez un `t` à plus de 300 secondes de votre horloge.
+de le lire, avec une comparaison en temps constant, et refusez un `t` qui s'écarte de plus de 300 secondes de votre
+horloge.
 
 ## Les événements
 
@@ -43,7 +44,7 @@ importés avec un paquet de réglages.
 | réglage | |
 |---|---|
 | base, vue | les lignes de cette base ; avec une vue, seulement celles que ses filtres gardent |
-| condition | du SQL sur les champs JSON de la ligne, évalué par le moteur SQL de Filarr (`montant > 1000 AND statut = 'Client'`) ; une ligne sur laquelle elle échoue ne passe pas |
+| condition | du SQL sur les champs JSON de la ligne, évalué par le moteur SQL de Filarr (`montant > 1000 AND statut = 'Client'`) ; une ligne pour laquelle elle provoque une erreur ne passe pas |
 | devient vraie | pour `row.updated` : seulement quand la ligne passe maintenant et ne passait pas avant |
 | champs | les champs envoyés (`id` toujours) ; vide : toute la ligne |
 | relations à résoudre | les champs de relation dont les lignes liées sont envoyées entières (quand leur base est ouverte à l'accès) |
@@ -60,6 +61,6 @@ importés avec un paquet de réglages.
 
 ## Les secrets
 
-Montré une fois à la création (`whsec_…`) ; **renouveler** en montre un nouveau, et l'ancien cesse de signer tout de
-suite. Les secrets sont gardés dans l'état de la boîte noire (ils voyagent dans un paquet de réglages, pour que les
-récepteurs continuent de vérifier après une migration).
+Chaque secret (`whsec_…`) n'est montré qu'une fois, à la création ; **renouveler** en montre un nouveau, et l'ancien
+cesse de signer tout de suite. Les secrets sont gardés dans l'état de la boîte noire (ils voyagent dans un paquet de
+réglages, pour que les récepteurs continuent de vérifier après une migration).

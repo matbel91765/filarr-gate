@@ -15,7 +15,7 @@ plus gros fichier que la boîte noire peut recevoir.
 
 | | Node, Docker | Cloudflare |
 |---|---|---|
-| changements venus de Filarr | flux en direct, environ une seconde | pas de flux : le Durable Object dort entre deux **alarmes** et relève toutes les `FILARR_GATE_POLL_SECONDS` (300 s au moins) ; avec une **adresse de réveil**, Filarr le réveille en quelques secondes |
+| changements venus de Filarr | flux en direct, environ une seconde | pas de flux : le Durable Object dort entre deux **alarmes** et relève toutes les `FILARR_GATE_POLL_SECONDS` secondes (300 au moins) ; avec une **adresse de réveil**, Filarr le réveille en quelques secondes |
 | synchros externes | tous les connecteurs | connecteurs HTTPS seulement (D1, Supabase, Airtable, Google Sheets, Notion, CSV ou JSON) ; **ni PostgreSQL ni MySQL** (pas de TCP) |
 | réglages | environnement, `gate.toml`, interface | variables du Worker (verrouillées dans l'interface), et l'interface |
 | écoute, TLS, cache | à votre choix | fixés : Cloudflare sert le HTTPS ; les blocs chiffrés vivent dans le stockage de l'objet |
@@ -54,7 +54,7 @@ npx wrangler secret put FILARR_GATE_TOKEN            # collez le jeton
 npx wrangler secret put FILARR_GATE_ADMIN_PASSWORD   # le mot de passe de gestion, dix caractères ou plus
 ```
 
-Ce sont des secrets de VOTRE compte : chiffrés par Cloudflare, jamais remontrés, lisibles par votre Worker seulement.
+Ce sont des secrets de VOTRE compte : chiffrés par Cloudflare, jamais réaffichés, lisibles par votre Worker seulement.
 
 ## 3. Ouvrir l'interface de gestion
 
@@ -73,7 +73,7 @@ Dans l'interface : **Clés des applications › Nouvelle clé**. Puis :
 curl -s -H "Authorization: Bearer gk_…" "https://filarr-gate.<votre-compte>.workers.dev/v1/clients?limit=2"
 ```
 
-La ligne de commande `filarr-gate` sait aussi piloter cette boîte noire, depuis votre ordinateur :
+La ligne de commande `filarr-gate` peut aussi piloter cette boîte noire, depuis votre ordinateur :
 
 ```sh
 filarr-gate keys list --remote https://filarr-gate.<votre-compte>.workers.dev --admin-password '…'
@@ -89,7 +89,7 @@ quelques secondes, donnez à l'accès cette **adresse de réveil** dans Filarr (
 https://filarr-gate.<votre-compte>.workers.dev/_filarr/notify
 ```
 
-À chaque changement, Filarr y poste un court message signé d'une clé tirée du jeton : aucun contenu, juste « relis ».
+À chaque changement, Filarr y envoie un court message signé d'une clé tirée du jeton : aucun contenu, juste « relis ».
 La boîte noire vérifie la signature et une fenêtre de cinq minutes, répond `202`, et relit par ses routes habituelles.
 Un accès créé avant l'arrivée des réveils doit d'abord voir son jeton remplacé (Filarr le dit).
 
@@ -130,7 +130,7 @@ Le Durable Object garde, dans son propre stockage : l'état (empreintes des clé
 réglages), les blocs chiffrés tels que Filarr les garde, le journal local, et l'état chiffré des synchros. Les lignes
 déchiffrées ne vivent qu'en mémoire, tant que l'objet est éveillé. Le `wrangler.jsonc` du dépôt allume Workers Logs
 (`observability`) : ils reçoivent les lignes de console de la boîte noire (chemins, codes, durées ; jamais un jeton,
-une clé ni une ligne) sur VOTRE compte. Éteignez-le là si vous préférez.
+une clé ni une ligne) sur VOTRE compte. Désactivez `observability` dans ce fichier si vous préférez.
 
 ## Et ensuite
 

@@ -44,7 +44,7 @@ export const LOCAL_CODES: Record<string, CodeText & { byStatus?: Record<number, 
   bad_value: { what: 'A value does not fit the column it is written to (a text for a number, a malformed date…). `field` names the field.', fix: 'Send the JSON type the field expects; `GET /openapi.json` lists each field with its type.' },
   bad_password: { what: 'Admin: the management password is wrong.', fix: 'Type it again. After 5 failures in a minute the gate answers `too_many_attempts` for a minute.' },
   bad_response: { what: 'Filarr accepted a file deposit without returning its identifier.', fix: 'Try again; if it persists, run `filarr-gate doctor` and report it.' },
-  base_not_found: { what: 'No database opened to this access has this slug.', fix: 'Check the address: `GET /openapi.json`, or the **Databases** screen of the management UI, lists the slugs.' },
+  base_not_found: { what: 'No database opened to this access has this slug.', fix: 'Check the address: `GET /openapi.json`, or the **Databases and endpoints** screen of the management UI, lists the slugs.' },
   base_read_only: { what: 'Filarr opened this database to the access for reading only (right `r`).', fix: 'In Filarr, open the database to the access in read and write.' },
   body_too_large: { what: 'The body is larger than the gate accepts (4 MiB for JSON; 8 KiB for a wake-up).', fix: 'Send fewer rows per request (500 at most), or split the work.' },
   box_full: {

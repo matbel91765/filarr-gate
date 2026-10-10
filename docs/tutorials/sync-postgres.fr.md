@@ -1,9 +1,9 @@
-# Refléter un PostgreSQL de votre réseau local, puis le synchroniser dans les deux sens
+# Un PostgreSQL de votre réseau local en miroir entrant, puis dans les deux sens
 
 [Read in English](sync-postgres.md)
 
 > **Bientôt, côté Filarr**, comme pour [D1](sync-d1.fr.md) : la boîte noire l'exécute dès aujourd'hui, et la suite
-> d'essais exécute chaque étape de ce tutoriel côté boîte noire et côté PostgreSQL contre un vrai PostgreSQL jetable,
+> d'essais exécute chaque étape de ce tutoriel côté boîte noire et côté PostgreSQL sur un vrai PostgreSQL jetable,
 > avec le SQL exact de l'exemple et le rôle limité qu'il crée. Les écrans de Filarr qui créent la synchro arrivent avec
 > une prochaine version de l'appli.
 
@@ -51,9 +51,9 @@ CREATE INDEX IF NOT EXISTS commandes_updated_at_idx ON commandes (updated_at);
 ```
 
 `updated_at` est le repère ; le déclencheur le tient à jour qui que ce soit qui écrive (votre ERP, un script, ou la
-synchro elle-même), et laisse tranquille un `UPDATE` qui le fixe exprès. `numeric(12, 2)` ne pose pas de problème : la
+synchro elle-même), et respecte un `UPDATE` qui le fixe explicitement. `numeric(12, 2)` ne pose pas de problème : la
 boîte noire lit `1240.50` comme le nombre 1240.5, et quand PostgreSQL arrondit une valeur qu'elle réécrit, la boîte
-noire relit la valeur arrondie dans le même passage (et cesse d'envoyer une colonne qui change sans cesse sous ses
+noire relit la valeur arrondie dans le même passage (et arrête d'envoyer une colonne qui change sans cesse sous ses
 pieds).
 
 ## 2. Un rôle qui ne peut faire que cela
@@ -87,7 +87,7 @@ comprise).
 
 La définition dit comment la boîte noire se connecte (`conn.tls`) :
 
-- `verify-full` (par défaut) : TLS, certificat vérifié contre le nom d'hôte. Employez-le dès que PostgreSQL a un
+- `verify-full` (par défaut) : TLS, certificat vérifié par rapport au nom d'hôte. Employez-le dès que PostgreSQL a un
   certificat.
 - `require` : TLS sans vérifier le certificat (chiffré, mais une machine au milieu pourrait se faire passer pour le
   serveur).
@@ -211,7 +211,7 @@ source.
 - La synchro ne lit que les colonnes associées (et la clé et le repère) :
   `SELECT "id", "numero", … FROM "public"."commandes"`.
 - Une source écrite comme une requête (`from.query`, un `SELECT`) se lit dans une transaction en lecture seule et ne
-  peut qu'être reflétée.
+  peut servir qu'en miroir entrant.
 - 100 000 lignes au plus par définition, pour une boîte noire.
 
 ## Si ça ne marche pas

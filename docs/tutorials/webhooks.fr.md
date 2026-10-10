@@ -2,7 +2,7 @@
 
 [Read in English](webhooks.md)
 
-**À la fin**, quand une ligne change dans Filarr (ou par l'API), la boîte noire la déchiffre et la poste, signée, à
+**À la fin**, quand une ligne change dans Filarr (ou par l'API), la boîte noire la déchiffre et l'envoie, signée, à
 votre logiciel ; votre récepteur vérifie la signature et agit. Vous aurez un récepteur en Node et un en Python, un
 webhook qui ne part que quand une condition devient vraie, et vous saurez ce qui se passe quand votre récepteur est
 arrêté.
@@ -13,13 +13,14 @@ récepteur, jamais par Filarr.
 
 ## 1. Démarrer un récepteur
 
-Les deux récepteurs vérifient la signature sur le corps BRUT, refusent un horodatage à plus de cinq minutes, répondent
-`204` tout de suite, puis agissent. Ils sont dans [examples/webhook-receiver](../../examples/webhook-receiver) ; la
-suite d'essais lance chacun, fait un changement dans Filarr, vérifie que la livraison est traitée, puis en envoie une
-contrefaite et vérifie qu'elle est refusée.
+Les deux récepteurs vérifient la signature sur le corps BRUT, refusent un horodatage décalé de plus de cinq minutes,
+répondent `204` tout de suite, puis agissent. Ils sont dans [examples/webhook-receiver](../../examples/webhook-receiver)
+; la suite d'essais lance chacun, fait un changement dans Filarr, vérifie que la livraison est traitée, puis en envoie
+une contrefaite et vérifie qu'elle est refusée.
 
-La vérification de la signature, en Node (vrai quand l'en-tête `Filarr-Gate-Signature`, `t=<secondes>,v1=<hex>`,
-signe le corps brut avec le secret, il y a moins de 5 minutes : `v1 = HMAC-SHA256(secret, t + "." + corps)`) :
+La vérification de la signature, en Node (la fonction renvoie vrai quand l'en-tête `Filarr-Gate-Signature`,
+`t=<secondes>,v1=<hex>`, signe le corps brut avec le secret et date de moins de 5 minutes : `v1 = HMAC-SHA256(secret, t
++ "." + corps)`) :
 
 <!-- snippet: examples/webhook-receiver/receiver.mjs#verify -->
 ```js
@@ -102,7 +103,7 @@ Dans l'interface de gestion, **Webhooks › Nouveau webhook** :
   liées elles-mêmes (quand leur base est ouverte à l'accès), pas seulement leurs identifiants.
 
 **Créer le webhook** montre le **secret de signature** (`whsec_…`) une seule fois : donnez-le à votre récepteur
-(`WEBHOOK_SECRET`) et redémarrez-le. **Envoyer un essai** poste tout de suite un événement `ping`.
+(`WEBHOOK_SECRET`) et redémarrez-le. **Envoyer un essai** envoie tout de suite un événement `ping`.
 
 ## 3. Regarder une livraison
 
@@ -145,8 +146,8 @@ Filarr-Gate-Signature: t=1760074123,v1=5d41402abc4b2a76b9719d911017c592…
   heures et demie en tout ; un `Retry-After` plus long de votre récepteur est respecté. Ensuite elle abandonne, et le
   journal le dit.
 - Les livraisons en attente vivent **en mémoire seulement** (leurs corps portent des lignes en clair) : un redémarrage
-  de la boîte noire les abandonne, et le journal dit combien. Pour une copie fiable, rapprochez de temps en temps avec
-  `GET /v1/<base>?since=<version>`.
+  de la boîte noire les abandonne, et le journal dit combien. Pour une copie fiable, faites de temps en temps un
+  rapprochement avec `GET /v1/<base>?since=<version>`.
 - L'écran **Webhooks** montre les dernières livraisons de chaque webhook : statut, durée, essai, prochain essai.
 
 ## Changer le secret
@@ -159,7 +160,7 @@ nouveau au récepteur sans attendre.
 La boîte noire envoie aussi `file.filed` (un fichier déposé par cette boîte noire a été rangé par l'appli Filarr :
 `file: { id, status, depositedAt, filedAt, sizeBytes, source }`, jamais où ni sous quel nom) et `sync.done` /
 `sync.failed` (un passage d'une synchro externe : `defId`, `name`, `base`, `state`, `code`, `counts`, `queue`).
-L'interface de gestion ne sait pas encore choisir ces événements : seuls les webhooks qui les portent (importés du
+L'interface de gestion ne permet pas encore de choisir ces événements : seuls les webhooks qui les portent (importés du
 paquet de réglages d'une autre boîte noire) les reçoivent.
 
 ## Et ensuite

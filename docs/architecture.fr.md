@@ -71,46 +71,46 @@ packages/cloudflare un Worker et un Durable Object qui hébergent la même boît
 ### La lecture
 
 Pour chaque magasin : `GET /dbstore/:id/head` → ouvrir la tête sous `hk` (quand `hk` est nul, une tête d'avant les
-générations : les clés de la génération 0, la plus récente époque d'abord) → pour chaque entrée de bloc, vérifier que
+générations : les clés de la génération 0, l'époque la plus récente d'abord) → pour chaque entrée de bloc, vérifier que
 sa `K_db(e, g)` est détenue (sinon la base affiche « clé manquante pour (e, g) » et continue de servir son dernier état
 complet) → prendre les blocs changés dans le cache local ou par `POST /dbstore/:id/slots:batchGet` (répété tant que
-`more`) → vérifier chaque corps contre le MAC de la tête → déchiffrer → fusionner les registres « le dernier rédacteur
+`more`) → vérifier chaque corps avec le MAC de la tête → déchiffrer → fusionner les registres « le dernier rédacteur
 l'emporte » → matérialiser les lignes en mémoire. Un état partiel n'est jamais servi. Un serveur qui recule dans la
 séquence est refusé.
 
 Le cache local ne garde que des corps chiffrés, adressés par leur contenu (SHA-256), avec un index `p|ver` par
-magasin, revérifiés contre la tête avant usage. `FILARR_GATE_CACHE=memory` ne garde rien sur le disque.
+magasin, revérifiés au regard de la tête avant usage. `FILARR_GATE_CACHE=memory` ne garde rien sur le disque.
 
 ### Rester à jour
 
 `GET /api-access/self/stream` (WebSocket) : `commit` déclenche une relecture de ce magasin, `grant` et `manifest` une
 relecture de `self`, `quota` une alerte (journal, interface, webhooks `gate.quota`), `revoked` l'effacement. La boîte
-noire envoie un `{"t":"ping"}` applicatif toutes les 30 s (le relais ferme sur toute autre chose) et se reconnecte avec
-un délai croissant et aléatoire. Codes de fermeture : 4301 révoqué ou jeton remplacé (effacement), 4302 en pause, 4303
-accès changé (relire `self`), 4304 expiré (effacement), 4305 quota mensuel de synchro épuisé (relève toutes les 900 s
-jusqu'au mois suivant), 4306 trop de flux (reculer).
+noire envoie un `{"t":"ping"}` applicatif toutes les 30 s (le relais coupe la connexion à tout autre message) et se
+reconnecte avec un délai croissant et aléatoire. Codes de fermeture : 4301 révoqué ou jeton remplacé (effacement), 4302
+en pause, 4303 accès changé (relire `self`), 4304 expiré (effacement), 4305 quota mensuel de synchro épuisé (relève
+toutes les 900 s jusqu'au mois suivant), 4306 trop de flux (espacer les tentatives).
 
 Sans le flux (Free : `access.stream` vaut false), la boîte noire relève `GET /dbstore/:id/changes?since=` par magasin,
-jamais plus vite que le `pollIntervalS` du palier (300 s en Free) ni que `FILARR_GATE_POLL_SECONDS`, et ne lit la tête
-que quand un magasin a bougé. `410 since_too_old` se rabat sur la tête.
+jamais plus vite que le `pollIntervalS` du palier ni que `FILARR_GATE_POLL_SECONDS`, et ne lit la tête
+que quand un magasin a bougé. Sur `410 since_too_old`, elle se rabat sur la tête.
 
 ### Les limites
 
 Chaque `429` est respecté. `api_rate` suspend tout échange avec Filarr jusqu'à `Retry-After`. `api_poll_interval`,
 `api_quota_sync` (sur une tête ou des changements) et `api_quota_bytes` ne retiennent que le magasin concerné.
-`api_quota_writes` arrive à l'application qui a tenté d'écrire, avec `Retry-After`. Les lectures locales continuent
+`api_quota_writes` est renvoyé à l'application qui a tenté d'écrire, avec `Retry-After`. Les lectures locales continuent
 tout du long. Les en-têtes `X-Filarr-Quota` et `RateLimit-*` de chaque réponse alimentent l'écran « Consommation et
 limites » ; la table des paliers vient de `GET /public/api-limits`.
 
 ### L'écriture (§ 7, éteinte d'office)
 
-Un `POST`/`PATCH`/`DELETE` local devient des opérations de registre horodatées par l'horloge logique hybride de la boîte
-noire (son identifiant de site est tiré une fois par installation). Les blocs touchés sont réécrits (découpés au-delà
-de 32 Kio), scellés sous `K_db(e en cours, g en cours)`, la tête est reconstruite (racine de Merkle, index des zones)
-et scellée sous la même clé avec `seq + 1` en AAD, et `POST /dbstore/:id/commit` porte `baseSeq`, le `g` de chaque bloc
-et `hk`. Sur `409 seq_conflict`, `stale_generation`, `slot_version` ou `bad_cover`, la boîte noire relit la tête,
-rescelle et rejoue (les registres fusionnent comme une union). Sans la clé de la génération en cours, l'écriture est
-refusée ; elle n'est jamais scellée sous une clé plus ancienne. Les restrictions à des colonnes ou à des vues sont
+Un `POST`/`PATCH`/`DELETE` local se traduit par des opérations de registre horodatées par l'horloge logique hybride de
+la boîte noire (son identifiant de site est tiré une fois par installation). Les blocs touchés sont réécrits (découpés
+au-delà de 32 Kio), scellés sous `K_db(e en cours, g en cours)`, la tête est reconstruite (racine de Merkle, index des
+zones) et scellée sous la même clé avec `seq + 1` en AAD, et `POST /dbstore/:id/commit` porte `baseSeq`, le `g` de
+chaque bloc et `hk`. Sur `409 seq_conflict`, `stale_generation`, `slot_version` ou `bad_cover`, la boîte noire relit la
+tête, rescelle et rejoue (les registres fusionnent comme une union). Sans la clé de la génération en cours, l'écriture
+est refusée ; elle n'est jamais scellée sous une clé plus ancienne. Les restrictions à des colonnes ou à des vues sont
 appliquées par la boîte noire (portées des clés d'application), pas par le chiffrement.
 
 ### Les relations vers des bases non ouvertes (§ 8)
@@ -132,10 +132,10 @@ acceptées que signées par elle. Un serveur ne peut pas forger l'étiquette, ni
 
 ### Les réveils poussés
 
-Quand le créateur donne une adresse, Filarr poste `{ a, t, storeId?, seq?, state?, at }` à `/_filarr/notify`, signé
-`Filarr-Notify: t=<s>,v1=HMAC-SHA256(A_notify, t + "." + corps)`. La boîte noire vérifie la signature sur le corps brut
-et une fenêtre de 300 secondes, répond 202, puis relit par ses routes habituelles : un réveil ne porte aucun contenu.
-Le code de fermeture 4308 (boîte hébergée en sommeil) n'est pas une erreur.
+Quand le créateur donne une adresse, Filarr envoie `{ a, t, storeId?, seq?, state?, at }` en POST à `/_filarr/notify`,
+signé `Filarr-Notify: t=<s>,v1=HMAC-SHA256(A_notify, t + "." + corps)`. La boîte noire vérifie la signature sur le corps
+brut et une fenêtre de 300 secondes, répond 202, puis relit par ses routes habituelles : un réveil ne porte aucun
+contenu. Le code de fermeture 4308 (boîte hébergée en sommeil) n'est pas une erreur.
 
 ### La fente à fichiers
 
@@ -157,20 +157,20 @@ la base). Voyez [external-databases.fr.md](external-databases.fr.md).
 Le paquet de réglages (`gate-settings-1` : empreintes des clés d'application, webhooks et secrets, requêtes
 enregistrées, références des synchros, filtre de fichiers, CORS, écriture) est scellé pour la clé publique de la boîte
 noire suivante après vérification de son `bind_sig`, en ligne (`self/export`, puis l'identité en attente lit
-`self/import`) ou par fichier (`filarr-gate export` / `init --import`). Il ne porte jamais le mot de passe de gestion
-ni une clé de base externe.
+`self/import`) ou par fichier (`filarr-gate export` / `init --import`). Il ne porte jamais le mot de passe de gestion ni
+aucune clé de base externe.
 
 ### Où elle tourne
 
-La boîte noire est écrite contre `Request`/`Response` et de petites interfaces de stockage (état, journal, cache de
+La boîte noire repose sur `Request`/`Response` et de petites interfaces de stockage (état, journal, cache de
 blocs, objets). Node ajoute les fichiers, les ports et le flux `ws` ; la variante Cloudflare ajoute un Durable Object,
 des alarmes au lieu de minuteries, et aucun flux (relève plus réveils). La bibliothèque n'emploie que le réplicateur.
 
 ## La révocation
 
-1. Filarr refuse aussitôt le jeton et le dit au flux (`revoked`, fermeture 4301).
-2. La boîte noire s'arrête, efface de la mémoire les clés dérivées, les clés des bases et les lignes, et supprime son
-   cache de blocs.
+1. Filarr refuse aussitôt le jeton et l'annonce sur le flux (`revoked`, fermeture 4301).
+2. La boîte noire s'arrête, efface de la mémoire les clés tirées du jeton, les clés des bases et les lignes, et supprime
+   son cache de blocs.
 3. L'appli fait monter la génération de chaque magasin que l'accès pouvait lire et rescelle les nouvelles clés pour les
    accès qui restent. Tout ce qui s'écrit ensuite est illisible avec les anciennes clés, même si des blocs fuient.
 

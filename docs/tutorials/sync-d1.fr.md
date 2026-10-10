@@ -1,18 +1,18 @@
-# Synchroniser une base Cloudflare D1, dans tous les sens
+# Synchroniser une base Cloudflare D1, dans un sens, dans l'autre ou dans les deux
 
 [Read in English](sync-d1.md)
 
 > **Bientôt, côté Filarr.** La boîte noire exécute ces synchros dès aujourd'hui, et chaque étape de ce tutoriel qui se
-> passe dans la boîte noire ou dans D1 est exécutée par la suite d'essais (`test/examples-sync.test.ts`) contre un D1
+> passe dans la boîte noire ou dans D1 est exécutée par la suite d'essais (`test/examples-sync.test.ts`) face à un D1
 > simulé sur SQLite, le moteur même de D1. Les écrans de Filarr qui créent une synchro (« ··· » sur une base ›
-> « Alimenter depuis une base externe… ») arrivent avec une prochaine version de l'appli, et la fonction ouvre compte
+> « Alimenter depuis une base externe… ») arrivent avec une prochaine version de l'appli, et la fonction s'ouvrira compte
 > par compte. Les étapes côté Filarr ci-dessous suivent le contrat gelé `source-externe-1` ; elles seront vérifiées à
 > l'écran quand l'appli les livrera.
 
 **À la fin**, vous aurez une base Filarr alimentée par une table D1 (miroir entrant), une base Filarr publiée vers D1
 (publication vers la source), et une base synchronisée **dans les deux sens** avec une politique de conflit choisie
 colonne par colonne, « me demander » compris, dont les conflits attendent votre décision. La clé de D1 reste dans votre
-boîte noire : Filarr ne la voit jamais, ni les lignes.
+boîte noire : Filarr ne voit jamais ni la clé ni les lignes.
 
 **Palier :** une synchro planifiée et exécutée par une boîte noire demande Solo ou plus. (Un import ponctuel depuis
 l'appli de bureau est offert à tous les paliers.)
@@ -26,10 +26,10 @@ l'appli de bureau est offert à tous les paliers.)
 - **L'exécutant** est cette boîte noire : elle lit les définitions qui nomment son accès, prend un bail (un seul
   exécutant à la fois), lit D1 et sa propre copie de Filarr, décide, écrit dans D1 et dans Filarr.
 - **La clé de ligne** (`id`) associe une ligne de D1 à une ligne de Filarr. Une ligne créée depuis D1 reçoit un
-  identifiant Filarr calculé à partir de la source et de la clé (`ext-…`) : importer deux fois la même table ne fait
+  identifiant Filarr calculé à partir de la source et de la clé (`ext-…`) : importer deux fois la même table ne crée
   jamais de doublon.
-- **Le repère** (`maj_le`) permet à chaque passage de ne lire que les lignes changées depuis le précédent ; une relecture
-  complète toutes les 24 heures (ou tous les 96 passages) rattrape le reste.
+- **Le repère** (`maj_le`) permet à chaque passage de ne lire que les lignes changées depuis le précédent ; une
+  relecture complète toutes les 24 heures (ou tous les 96 passages) rattrape le reste.
 - **La référence** retient, pour chaque cellule, la dernière valeur sur laquelle les deux côtés étaient d'accord (une
   empreinte, chiffrée sur le disque de la boîte noire) : c'est ainsi que la boîte noire sait quel côté a changé.
 
@@ -108,7 +108,7 @@ Sur la base Filarr qui recevra les lignes, « ··· » › « Alimenter depuis 
    (`maj_le`). Les colonnes que vous n'associez pas ne sont jamais lues. Les colonnes de Filarr que vous n'associez pas
    restent **à vous** : jamais écrasées, jamais envoyées.
 3. **Sens, exécutant, fréquence** : le sens (plus bas), **cette boîte noire** comme exécutant (le nom de son accès),
-   toutes les 15 minutes, toutes les heures, chaque jour à une heure, ou à la demande ; que faire des lignes qui
+   toutes les 15 minutes, toutes les heures, chaque jour à une heure donnée, ou à la demande ; que faire des lignes qui
    disparaissent ; et, dans les deux sens, les **politiques de conflit** : Filarr n'en coche aucune et ne vous laisse
    pas continuer tant que vous n'avez pas choisi.
 
@@ -173,8 +173,8 @@ Clé enregistrée (chiffrée sur cette machine).
 ```
 
 ou sur l'écran **Sources** de l'interface de gestion, ou dans la variable `FILARR_GATE_EXTDB_DEMOCLIE` (le nom que la
-liste affiche), ou dans `gate.toml` (`[extdb."xs_DemoClientsBoutique002"] secret = "…"`). La boîte noire range une clé
-donnée par la commande ou l'interface chiffrée sous une clé tirée de son jeton ; elle ne l'envoie jamais à Filarr, ne
+liste affiche), ou dans `gate.toml` (`[extdb."xs_DemoClientsBoutique002"] secret = "…"`). Une clé donnée par la commande
+ou l'interface est conservée chiffrée sous une clé tirée du jeton ; la boîte noire ne l'envoie jamais à Filarr, ne
 l'écrit jamais au journal, et un paquet de réglages ne la porte jamais.
 
 ## 5. Le premier passage
@@ -193,7 +193,8 @@ passage, les conflits en attente. L'écran **Sources** montre la même chose.
 
 ## Miroir entrant : D1 fait foi
 
-`mode: "mirror"`, chaque colonne associée en `in` ([definition.mirror.json](../../examples/sync-d1/definition.mirror.json)).
+`mode: "mirror"`, chaque colonne associée en `in`
+([definition.mirror.json](../../examples/sync-d1/definition.mirror.json)).
 
 - Chaque passage apporte les changements de D1 dans Filarr.
 - Les colonnes associées sont **verrouillées** dans Filarr : un cadenas, pas de modification, « vient de D1 ». L'API
@@ -206,7 +207,8 @@ passage, les conflits en attente. L'écran **Sources** montre la même chose.
 
 ## Publication vers la source : Filarr fait foi
 
-`mode: "publish"`, les colonnes associées en `out` sauf la clé ([definition.publish.json](../../examples/sync-d1/definition.publish.json)).
+`mode: "publish"`, les colonnes associées en `out` sauf la clé
+([definition.publish.json](../../examples/sync-d1/definition.publish.json)).
 
 - Les lignes de Filarr sont insérées dans D1 ; l'identifiant que D1 leur donne (`RETURNING`) revient dans la colonne
   clé de Filarr.
@@ -228,7 +230,7 @@ passage, les conflits en attente. L'écran **Sources** montre la même chose.
 | oui | oui, vers des valeurs différentes | **un conflit** : la politique de la colonne décide |
 
 « Filarr a changé » veut dire que l'horloge propre à la cellule a changé dans Filarr, pas que « la ligne a été
-touchée » : un appareil qui revient en ligne avec une vieille modification n'est jamais perdu en silence.
+touchée » : la vieille modification d'un appareil qui revient en ligne n'est jamais perdue en silence.
 
 ### Les quatre politiques
 
@@ -245,7 +247,7 @@ suite d'essais quand Filarr change d'abord Acme, puis que D1 change les quatre m
 
 Chaque valeur qui perd va au journal de la synchro, avec « Rétablir ». `latest` demande un repère qui soit une date, et
 date la LIGNE, pas la cellule : un changement plus récent d'une autre colonne dans D1 fait gagner D1 sur celle-ci
-aussi. Il compare aussi deux horloges de deux machines.
+aussi. Cette politique compare aussi les horloges de deux machines.
 
 ### « Me demander » : la file
 
@@ -273,9 +275,9 @@ Ce que la file garantit :
 ### « Rétablir »
 
 Sur une entrée du journal (un conflit, une valeur remplacée, une décision), **Rétablir** réécrit la valeur perdue dans
-Filarr comme une modification ordinaire. Au passage suivant, Filarr seul a changé : la valeur part vers D1 si la
-colonne y va. Dans la suite d'essais, rétablir la `ville` qui avait perdu face à D1 la remet dans D1 au `sources run`
-suivant.
+Filarr comme une modification ordinaire. Au passage suivant, Filarr seul a changé : la valeur part vers D1 si la colonne
+est envoyée vers D1. Dans la suite d'essais, rétablir la `ville` qui avait perdu face à D1 la remet dans D1 au `sources
+run` suivant.
 
 ### Les lignes supprimées d'un côté, modifiées de l'autre
 
@@ -306,23 +308,23 @@ que le passage aurait fait), jamais les lignes qu'il aurait marquées, et les co
 n'a été écrit. Le **Journal** de la boîte noire elle-même nomme la cause, le nombre prévu et le seuil, et dit que rien
 n'a été écrit.
 
-Vérifiez d'abord D1 (une table tronquée, un mauvais filtre). Si les disparitions sont réelles, acceptez pour ce
-passage seulement :
+Vérifiez d'abord D1 (une table tronquée, un mauvais filtre). Si les disparitions sont réelles, donnez votre accord pour
+ce passage seulement :
 
 ```sh
 filarr-gate sources run xs_DemoClientsBoutique002 --ack-guard p_3fa9c1d2e0
 ```
 
-(ou acceptez dans Filarr). L'accord vaut pour ce passage et ce nombre de lignes ; l'arrêt suivant redemande.
+(ou donnez votre accord dans Filarr). L'accord vaut pour ce passage et ce nombre de lignes ; l'arrêt suivant redemande.
 
 - **Trop de conflits d'un coup** (`extdb_conflict_burst`) arrêtent un passage de la même façon ; sur un premier
   passage, `--initial source` ou `--initial filarr` le tranche dans un sens, une fois.
 
 ## Fréquence, pause, lancer maintenant
 
-- `15m`, `1h` (avec ± 10 % de variation), `1d` à une heure dans un fuseau horaire, ou à la demande ; la publication et
-  les deux sens peuvent aussi tourner 10 secondes après un changement dans Filarr (au plus une fois toutes les 30
-  secondes).
+- `15m`, `1h` (avec ± 10 % de variation), `1d` à une heure donnée, dans un fuseau horaire, ou à la demande ; la
+  publication et les deux sens peuvent aussi tourner 10 secondes après un changement dans Filarr (au plus une fois
+  toutes les 30 secondes).
 - Après un échec, la boîte noire réessaie au bout de 1, 2, 4… minutes, jusqu'à une fois par heure.
 - `filarr-gate sources pause <id>` / `resume <id>` la mettent en pause sur cette boîte noire ; la définition reste dans
   Filarr.

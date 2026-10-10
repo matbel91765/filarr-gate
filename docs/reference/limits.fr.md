@@ -39,7 +39,8 @@ externes planifiées, l'option hébergée.
 
 ## Comment se comporte la boîte noire
 
-La boîte noire continue de servir sa dernière copie à travers chaque limite : vos logiciels continuent de lire.
+La boîte noire continue de servir sa dernière copie, quelle que soit la limite atteinte : vos logiciels continuent de
+lire.
 
 | Filarr répond | la boîte noire |
 |---|---|
@@ -68,6 +69,6 @@ Celles-ci sont les siennes, pas celles d'un palier :
 
 ## Écrire moins, compter moins
 
-Une validation compte une fois quelle que soit sa taille : créez les lignes par lots (une requête avec un tableau), et
+Une validation compte pour une, quelle que soit sa taille : créez les lignes par lots (une requête avec un tableau), et
 laissez une synchro écrire son passage en une validation (c'est ce qu'elle fait). Surveillez les compteurs de la boîte
 noire avec Prometheus, et les alertes dans Filarr.

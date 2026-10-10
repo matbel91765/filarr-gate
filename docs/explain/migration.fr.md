@@ -2,7 +2,7 @@
 
 [Read in English](migration.md)
 
-Quand un accès change de boîte noire (un nouveau serveur, de votre boîte noire à la boîte hébergée et retour), la
+Quand un accès change de boîte noire (un nouveau serveur, de votre boîte noire à la boîte hébergée, ou l'inverse), la
 nouvelle boîte noire reçoit une **identité neuve** (un nouveau jeton pour le même accès), et l'ancienne lui remet ses
 réglages dans un **paquet de réglages** (`gate-settings-1`), scellé pour que seul le nouveau jeton puisse l'ouvrir.
 
@@ -17,7 +17,7 @@ réglages dans un **paquet de réglages** (`gate-settings-1`), scellé pour que 
 | le filtre de fichiers, le CORS, le réglage `write` | |
 
 Les champs que la nouvelle boîte noire ne connaît pas sont gardés : les réglages d'une boîte noire plus récente
-survivent ainsi à une plus ancienne.
+survivent ainsi au passage par une boîte noire plus ancienne.
 
 ## En ligne
 
@@ -45,6 +45,6 @@ autres ajoutés.
 
 ## Après le déménagement
 
-Donnez les clés des bases externes à la nouvelle boîte noire (`filarr-gate sources key`), et changez, dans vos
+Donnez les clés des bases externes à la nouvelle boîte noire (`filarr-gate sources key`), et mettez à jour, dans vos
 logiciels, l'adresse de la boîte noire si elle a changé. Les vecteurs `gate-settings-1` (un paquet scellé fixe et ce
 qu'il donne une fois ouvert) sont rejoués par la suite d'essais.

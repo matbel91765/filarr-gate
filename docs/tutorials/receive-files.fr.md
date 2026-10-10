@@ -2,12 +2,12 @@
 
 [Read in English](receive-files.md)
 
-> **Bientôt, côté Filarr.** La fente à fichiers de la boîte noire marche dès aujourd'hui : chaque étape côté boîte
-> noire ci-dessous est exécutée par la suite d'essais, y compris le refus d'un exécutable avant que rien ne parte. Lier
-> une boîte de dépôt à un accès, et les règles de placement, arrivent avec une prochaine version de l'appli Filarr, et
-> la fonction ouvre compte par compte. Les étapes côté Filarr suivent le contrat gelé `gate-fichiers-1`.
+> **Bientôt, côté Filarr.** La fente à fichiers de la boîte noire marche dès aujourd'hui : chaque étape côté boîte noire
+> ci-dessous est exécutée par la suite d'essais, y compris le refus d'un exécutable avant que rien ne parte. Lier une
+> boîte de dépôt à un accès, et les règles de placement, arrivent avec une prochaine version de l'appli Filarr, et la
+> fonction s'ouvrira compte par compte. Les étapes côté Filarr suivent le contrat gelé `gate-fichiers-1`.
 
-**À la fin**, votre ERP poste chaque facture à la boîte noire ; la boîte noire la contrôle, la chiffre pour votre boîte
+**À la fin**, votre ERP envoie chaque facture à la boîte noire ; la boîte noire la contrôle, la chiffre pour votre boîte
 de dépôt et la dépose chez Filarr ; votre appli Filarr la range dans « Comptabilité › Factures › 2026 › 10 » selon une
 règle que vous avez écrite ; l'ERP apprend « rangé », jamais où. Filarr voit un dépôt scellé et sa taille ; jamais le
 nom, le chemin demandé, les étiquettes ni le dossier.
@@ -28,9 +28,9 @@ les lit chez Filarr.
    **boîte de dépôt**. Elle ne le fait que pour une boîte **signée par le créateur de l'accès** : un serveur qui
    glisserait sa propre boîte serait refusé.
 4. Filarr garde le dépôt scellé. Il ne peut pas l'ouvrir.
-5. Un de vos appareils où « ranger automatiquement » est actif (ou « Ranger maintenant ») l'ouvre, vérifie le SHA-256,
-   le place selon vos règles, le renomme, traite les doublons, et note où. La boîte noire apprend `filed` (ou
-   `rejected`, `expired`).
+5. Un de vos appareils où « Ranger automatiquement sur cet appareil » est actif (ou « Ranger maintenant ») l'ouvre,
+   vérifie le SHA-256, le place selon vos règles, le renomme, traite les doublons, et note où. La boîte noire apprend
+   `filed` (ou `rejected`, `expired`).
 
 C'est une fente : la boîte noire dépose, elle ne peut jamais lister, relire ni supprimer ce qui est rangé. Un jeton
 volé permet de déposer, jamais de lire vos fichiers.
@@ -48,8 +48,8 @@ signe. Réglez ensuite où vont les fichiers :
   faire des **doublons** (ignorer, garder les deux, nouvelle version), et le sous-dossier de **repli** (« À ranger »)
   pour ce qu'aucune règle ne prend.
 
-Les règles sont rangées chiffrées dans votre trousseau : chaque appareil range de la même façon. Les mots entre
-accolades des modèles sont rangés en anglais et s'affichent dans votre langue (`{year}` ou `{année}`) ; vous pouvez
+Les règles sont conservées chiffrées dans votre trousseau : chaque appareil range de la même façon. Les mots entre
+accolades des modèles sont enregistrés en anglais et s'affichent dans votre langue (`{year}` ou `{année}`) ; vous pouvez
 les taper dans l'une ou l'autre. Le détail : <https://filarr.com/docs/gate-placement-rules>.
 
 L'accès a besoin d'une **étiquette du créateur** : un accès créé par une appli Filarr récente en a une ; pour un plus
@@ -131,9 +131,10 @@ const { data: deposit } = await check(await fetch(`${GATE}/v1/files`, { method: 
 console.log(`deposited ${deposit.id}: ${deposit.status}`);
 ```
 
-En Python, bibliothèque standard seulement ([examples/receive-files/deposit.py](../../examples/receive-files/deposit.py)) :
-les octets bruts partent, le nom, le chemin demandé et les étiquettes vont dans la chaîne de requête ; sur un `429`
-(quotas ou débit de Filarr), on attend ce que dit `Retry-After`.
+En Python, bibliothèque standard seulement
+([examples/receive-files/deposit.py](../../examples/receive-files/deposit.py)) : les octets bruts partent, le nom, le
+chemin demandé et les étiquettes vont dans la chaîne de requête ; sur un `429` (quotas ou débit de Filarr), on attend ce
+que dit `Retry-After`.
 
 <!-- snippet: examples/receive-files/deposit.py#deposit -->
 ```python

@@ -5,9 +5,9 @@
 **À la fin**, Filarr Gate tournera sur votre ordinateur, avec son interface de gestion ouverte, une clé d'application,
 et une première réponse de l'API locale à `curl`. Comptez une dizaine de minutes.
 
-**Palier :** ouvrir une base à une API est offert à tous les paliers de Filarr (Free : un accès, des changements
-relevés toutes les quelques minutes, pas d'écriture). Les limites de chaque palier sont sur la page des offres de
-Filarr et dans **Paramètres › Accès API**.
+**Palier :** ouvrir une base à une API est offert à tous les paliers de Filarr (Free : un accès, des changements relevés
+à quelques minutes d'intervalle, pas d'écriture). Les limites de chaque palier sont sur la page des offres de Filarr et
+dans **Paramètres › Accès API**.
 
 ## Avant de commencer
 
@@ -57,14 +57,14 @@ vous voyiez les changements arriver. Puis, dans votre premier terminal, faites p
 export FILARR_GATE_API_URL=http://127.0.0.1:8790     # PowerShell : $env:FILARR_GATE_API_URL = "http://127.0.0.1:8790"
 ```
 
-Sautez cette étape avec un vrai jeton : la boîte noire parle d'office à `https://api.filarr.com`.
+Avec un vrai jeton, sautez cette étape : la boîte noire s'adresse par défaut à `https://api.filarr.com`.
 
 ## 3. Donner son jeton à la boîte noire
 
 Deux façons ; choisissez-en une.
 
-**Par la commande** (le jeton et le mot de passe de gestion sont rangés dans le répertoire d'état, `~/.filarr-gate`,
-dans des fichiers que seul votre utilisateur peut lire) :
+**Par la commande** (le jeton et le mot de passe de gestion sont enregistrés dans le répertoire d'état,
+`~/.filarr-gate`, dans des fichiers que seul votre utilisateur peut lire) :
 
 ```sh
 filarr-gate init --token flr_live_… --admin-password 'un-long-mot-de-passe-ici'
@@ -98,7 +98,8 @@ qu'à cette machine. `live` veut dire qu'un changement fait dans Filarr arrive �
 seconde ; `polling` (palier Free), qu'elle relève Filarr au rythme du palier.
 
 Ouvrez <http://127.0.0.1:8787/admin/>. Le **Tableau de bord** montre les bases, leurs lignes, la liaison avec Filarr ;
-**Bases** montre l'adresse de chaque base (`/v1/clients`), ses vues (`/v1/clients/clients-actifs`) et ses champs.
+**Bases et points d'accès** montre l'adresse de chaque base (`/v1/clients`), ses vues (`/v1/clients/clients-actifs`) et
+ses champs.
 
 ## 5. Créer une clé d'application
 
@@ -118,7 +119,7 @@ Elle ne sera plus montrée.
 ```
 
 La clé ne s'affiche qu'une fois ; la boîte noire n'en garde que l'empreinte. Celle-ci lit toutes les vues et exécute
-du SQL. Pour une clé plus étroite (une base, une vue, l'écriture, une échéance, des adresses autorisées), passez par
+du SQL. Pour une clé plus restreinte (une base, une vue, l'écriture, une échéance, des adresses autorisées), passez par
 **Clés des applications › Nouvelle clé** dans l'interface.
 
 ## 6. Votre premier appel
@@ -157,8 +158,8 @@ ok    base catalogue         ready · 2 lignes
 ```
 
 `/health` répond `{"status":"ok","link":"live",…}` avec chaque base et sa version ; `doctor` affiche une ligne par
-contrôle (Filarr joignable, l'horloge, le jeton, la clé du créateur, chaque base, la consommation du mois) et sort en 1
-quand l'un d'eux échoue.
+contrôle (Filarr joignable, l'horloge, le jeton, la clé du créateur, chaque base, la consommation du mois) et renvoie le
+code de sortie 1 quand l'un d'eux échoue.
 
 ## La garder en marche
 
@@ -177,11 +178,12 @@ Filarr les garde, le journal local ; jamais une ligne déchiffrée. Le détail e
 
 - [Appeler l'API](first-calls.fr.md) en curl, JavaScript ou Python.
 - [Recevoir les changements par webhook](webhooks.fr.md).
-- [L'installer sur un serveur avec Docker](install-docker.fr.md), ou [sur votre compte Cloudflare](install-cloudflare.fr.md).
+- [L'installer sur un serveur avec Docker](install-docker.fr.md), ou [sur votre compte
+  Cloudflare](install-cloudflare.fr.md).
 - Tous les réglages : [configuration](../reference/configuration.fr.md).
 
 ## Si ça ne marche pas
 
-- `EADDRINUSE` : un autre programme occupe 8443 ou 8787 : `FILARR_GATE_PORT=9443 filarr-gate`.
+- `EADDRINUSE` : un autre programme occupe le port 8443 ou 8787 ; lancez `FILARR_GATE_PORT=9443 filarr-gate`.
 - `revoked`, `expired`, `unknown_access` dans le journal : le jeton n'est plus valide ; demandez-en un nouveau à Filarr.
 - Une base manque, ou répond `503` : voyez le [dépannage](../troubleshooting.fr.md#une-base-manque-ou-répond-503).

@@ -3,18 +3,18 @@
 [Read in English](api.md)
 
 Chaque boîte noire sert cette API depuis sa copie déchiffrée des bases ouvertes à son accès. Les routes communes à
-toutes les boîtes noires sont décrites en OpenAPI 3.1 dans [../openapi/filarr-gate.v1.json](../openapi/filarr-gate.v1.json)
-(vérifiée route par route contre une boîte noire en marche par la suite d'essais) ; chaque boîte noire sert sa
-description EXACTE à `/openapi.json`, avec ses bases, ses champs typés, ses vues et ses requêtes enregistrées, et une
-page lisible à `/docs`.
+toutes les boîtes noires sont décrites en OpenAPI 3.1 dans
+[../openapi/filarr-gate.v1.json](../openapi/filarr-gate.v1.json) (description vérifiée route par route par la suite
+d'essais, face à une boîte noire en marche) ; chaque boîte noire sert sa description EXACTE à `/openapi.json`, avec ses
+bases, ses champs typés, ses vues et ses requêtes enregistrées, et une page lisible à `/docs`.
 
 Tutoriel : [appeler l'API](../tutorials/first-calls.fr.md). Codes : [errors.fr.md](errors.fr.md).
 
 ## L'authentification
 
-Chaque appel à `/v1/*` et à `/mcp` porte une **clé d'application** : `Authorization: Bearer gk_…` (ou
-`X-Gate-Key: gk_…`). Les clés d'application se créent sur la boîte noire (interface de gestion, **Clés des
-applications**, ou `filarr-gate keys create`), s'affichent une fois, et sont gardées en empreinte SHA-256. Chaque clé a :
+Chaque appel à `/v1/*` et à `/mcp` porte une **clé d'application** : `Authorization: Bearer gk_…` (ou `X-Gate-Key:
+gk_…`). Les clés d'application se créent sur la boîte noire (interface de gestion, **Clés des applications**, ou
+`filarr-gate keys create`), s'affichent une fois, et sont gardées en empreinte SHA-256. Chaque clé a :
 
 | propriété | |
 |---|---|
@@ -26,7 +26,7 @@ applications**, ou `filarr-gate keys create`), s'affichent une fois, et sont gar
 | pause | `403 key_paused` jusqu'à la reprise |
 
 `/health` et `/metrics` ne demandent pas de clé ; `/openapi.json` et `/docs` non plus, tant que le réglage `docs` est
-allumé (d'office).
+allumé (c'est le cas par défaut).
 
 ## Les routes
 
@@ -59,8 +59,8 @@ la vue est renommée. Une vue créée plus tard reçoit son slug quand Filarr la
 
 - **Les noms de champs** suivent les noms des colonnes : minuscules, sans accents, `_` entre les mots, 48 caractères au
   plus, un chiffre en tête préfixé de `c_` ; une deuxième colonne du même nom reçoit `_2`. `id`, `created_at` et
-  `updated_at` sont réservés. La boîte noire serveur **garde** un nom une fois donné : renommer une colonne dans Filarr
-  ne le change pas. (La bibliothèque calcule les noms à chaque démarrage.)
+  `updated_at` sont réservés. La boîte noire en mode serveur **garde** un nom une fois donné : renommer une colonne dans
+  Filarr ne le change pas. (La bibliothèque calcule les noms à chaque démarrage.)
 - **Les valeurs**, selon le type de la colonne dans Filarr :
 
 | type Filarr | JSON | s'écrit |
@@ -94,7 +94,8 @@ la vue est renommée. Une vue créée plus tard reçoit son slug quand Filarr la
 
 Comment comparent les filtres :
 
-- les textes : sans casse ni accents (`ville=lyon` trouve « Lyon ») ; `contains` cherche à l'intérieur ;
+- les textes : sans tenir compte de la casse ni des accents (`ville=lyon` trouve « Lyon ») ; `contains` cherche à
+  l'intérieur ;
 - les nombres : comme des nombres (`ca[gte]=1000`) ; les booléens : `1`, `true`, `yes`, `oui` sont vrais ;
 - les listes (sélection multiple, relations, personnes) : `eq` et `contains` trouvent un élément, `ne` aucun, `in`
   n'importe laquelle des valeurs ;
@@ -129,9 +130,10 @@ supprimer dans cette base.
   omises reçoivent leur valeur par défaut (l'option par défaut d'une sélection), comme le fait « Nouvelle ligne » dans
   Filarr ; un champ donné à `null` reste vide. Réponse `201` : `{ id, row, version, validated: true }` (ou
   `{ rows, version, validated: true }` pour un tableau).
-- `PATCH /v1/<base>/rows/<id>` : change les champs donnés, `null` en vide un. Réponse `{ id, row, version, validated }`.
+- `PATCH /v1/<base>/rows/<id>` : change les champs donnés ; un champ mis à `null` est vidé. Réponse `{ id, row, version,
+  validated }`.
 - `DELETE /v1/<base>/rows/<id>` : `{ id, deleted: true, version, validated }`. Une suppression l'emporte sur une
-  modification concurrente ; la ligne se restaure dans Filarr.
+  modification concurrente ; la ligne peut être restaurée dans Filarr.
 - **`Idempotency-Key`** : la même clé, la même clé d'application, la même méthode et le même chemin dans les 24 heures
   rendent la première réponse (`Idempotency-Replayed: true`) et n'écrivent rien. Gardée en mémoire.
 - Chaque écriture suit « le dernier rédacteur l'emporte », cellule par cellule, horodatée par l'horloge de la boîte
@@ -179,7 +181,7 @@ ouvre la page : ne lui donnez que ce que la page doit faire (voyez [examples/pub
 | `filarr_gate_base_rows{base}`, `filarr_gate_base_version{base}`, `filarr_gate_base_ready{base}` | par base |
 | `filarr_gate_quota_used{name}`, `filarr_gate_quota_max{name}` | les compteurs de Filarr (`sync`, `bytes`, `writes`) |
 
-Les métriques ne portent jamais une ligne, une clé ni un jeton. `/metrics` n'a pas de clé : gardez l'API sur un réseau
+Les métriques ne contiennent jamais de ligne, de clé ni de jeton. `/metrics` n'a pas de clé : gardez l'API sur un réseau
 de confiance, ou éteignez-les (`metrics = false`).
 
 ## Les limites de l'API locale

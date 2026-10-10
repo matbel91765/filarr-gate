@@ -4,7 +4,7 @@
 
 [Read in English](errors.md)
 
-Chaque refus de l'API locale est du JSON : `{ "error": "<message>", "code": "<code>", … }`. **Fiez-vous à `code`** : il est stable ; `error` est un message pour les personnes (en français pour l'instant) et peut changer. Un `429` porte `Retry-After` (en secondes).
+Chaque refus de l'API locale est du JSON : `{ "error": "<message>", "code": "<code>", … }`. **Fiez-vous à `code`** : il est stable ; `error` est un message destiné aux humains (en français pour l'instant) et peut changer. Un `429` porte `Retry-After` (en secondes).
 
 Pour la marche à suivre selon ce que vous voyez, consultez [le dépannage](../troubleshooting.fr.md).
 
@@ -37,7 +37,7 @@ Les codes que la boîte noire rend elle-même à vos logiciels (et, marqués « 
 | `bad_since` | 400 | `since` n'est pas un numéro de version. | Passez la `version` d'une page déjà lue (`since=1042` ou `since=v1042`). |
 | `bad_tags` | 400 | Plus de 10 étiquettes, ou une étiquette de plus de 40 caractères, sur un dépôt de fichier. | Envoyez 10 étiquettes au plus, de 40 caractères chacune. |
 | `bad_value` | 400 | Une valeur ne convient pas à la colonne où elle s'écrit (un texte pour un nombre, une date mal formée…). `field` nomme le champ. | Envoyez le type JSON qu'attend le champ ; `GET /openapi.json` liste chaque champ avec son type. |
-| `base_not_found` | 404 | Aucune base ouverte à cet accès n'a ce slug. | Vérifiez l'adresse : `GET /openapi.json`, ou l'écran **Bases** de l'interface de gestion, liste les slugs. |
+| `base_not_found` | 404 | Aucune base ouverte à cet accès n'a ce slug. | Vérifiez l'adresse : `GET /openapi.json`, ou l'écran **Bases et points d'accès** de l'interface de gestion, liste les slugs. |
 | `base_read_only` | 403 | Filarr a ouvert cette base à l'accès en lecture seule (droit `r`). | Dans Filarr, ouvrez la base à l'accès en lecture et écriture. |
 | `body_too_large` | 413 | Le corps dépasse ce que la boîte noire accepte (4 Mio pour du JSON ; 8 Kio pour un réveil). | Envoyez moins de lignes par requête (500 au plus), ou découpez le travail. |
 | `box_full` | 409 | La boîte de dépôt liée à l'accès contient déjà autant de dépôts en attente de rangement que Filarr le permet. Rien n'est parti. | Ouvrez Filarr sur un appareil qui range la boîte (bureau ou web), ou rangez les dépôts en attente à la main. Attendre ne suffit pas : quelqu'un doit ouvrir Filarr. |
@@ -136,7 +136,7 @@ Tant qu'une base n'est pas complète et vérifiée, ses routes répondent `503` 
 | `connecting` | Démarrage, ou reconnexion après une pause. | Rien : cela passe tout seul. |
 | `live` | Le flux des changements est ouvert : un changement fait dans Filarr arrive à la boîte noire en une seconde environ. | Rien. |
 | `polling` | Pas de flux en direct (palier Free, variante Cloudflare, ou flux refusé) : la boîte noire relève Filarr au rythme de son palier, et à chaque réveil poussé. | Rien. Pour aller plus vite sans flux, donnez à Filarr une adresse de réveil (`/_filarr/notify`). |
-| `offline` | Filarr ne répond pas. La boîte noire continue de servir sa dernière copie et réessaie, de plus en plus espacé. | Vérifiez le réseau et le DNS de la machine ; `filarr-gate doctor` teste Filarr. |
+| `offline` | Filarr ne répond pas. La boîte noire continue de servir sa dernière copie et réessaie à intervalles de plus en plus espacés. | Vérifiez le réseau et le DNS de la machine ; `filarr-gate doctor` teste Filarr. |
 | `limited` | Filarr limite cet accès (un `429`) : la boîte noire attend `Retry-After` et continue de servir sa copie. | Voyez **Consommation et limites** (interface de gestion) et les limites du palier dans Filarr. |
 | `paused` | L'accès est en pause dans Filarr. | Rouvrez-le dans Filarr, **Paramètres › Accès API**. |
 | `not_switched` | Les accès API ne sont pas encore ouverts pour le compte Filarr qui a créé l'accès. | Rien à faire sur la boîte noire : elle démarre dès que Filarr les ouvre. |
@@ -165,7 +165,7 @@ La boîte noire s'en charge seule ; vous les voyez dans son journal, dans `filar
 | `api_tier_stream` | 403 | Le palier n'a pas de flux en direct (Free). | Relève à la place, jamais plus vite que le palier ne le permet. | Rien ; ou un palier avec les changements en direct. |
 | `api_tier_write` | 403 | Le palier ne comprend pas l'écriture par l'API. | Transmet le refus à l'application qui a écrit. | Un palier qui comprend l'écriture, ou la lecture seule. |
 | `api_write_unavailable` | 403 | L'écriture par l'API n'est pas encore allumée du côté de Filarr. | Transmet le refus. | Rien à faire sur la boîte noire. |
-| `api_rate` | 429 | L'accès envoie trop de requêtes par minute à Filarr. | Suspend tout échange avec Filarr jusqu'à `Retry-After` ; les lectures locales continuent. | Rien ; cela reprend. Moins de boîtes noires sur le même jeton aident. |
+| `api_rate` | 429 | L'accès envoie trop de requêtes par minute à Filarr. | Suspend tout échange avec Filarr jusqu'à `Retry-After` ; les lectures locales continuent. | Rien ; cela reprend. Faire tourner moins de boîtes noires sur le même jeton aide. |
 | `api_poll_interval` | 429 | Palier Free : une base a été relevée plus tôt que permis. | Retient cette base jusqu'à `Retry-After`. | Rien ; la boîte noire ne relève jamais plus vite que `poll_seconds` et le palier. |
 | `api_quota_sync` | 429 | Le compte a épuisé ses requêtes de synchro du mois. | Ralentit cette base (tête et changements au plus toutes les 900 s) ; les lectures locales continuent. | Attendez le mois suivant (UTC), ou un palier supérieur. |
 | `api_quota_bytes` | 429 | Le compte a épuisé son volume téléchargé du mois. | Cesse de télécharger des blocs jusqu'au 1er (UTC) ; continue de servir ce qu'elle a. | Attendez le mois suivant, ou un palier supérieur. |
@@ -185,8 +185,8 @@ Révision 3 (boîte hébergée, fichiers, synchros externes), lue dans les vecte
 | `reauth_failed` | 401 |  |  | La preuve d'identité est fausse. | Recommencez ; après 10 essais en une heure, patientez. |
 | `api_tier_hosted` | 403 | `upgrade` |  | La boîte hébergée demande le palier Pro ou plus. | Un palier supérieur, ou une boîte noire chez vous. |
 | `hosting_forbidden` | 403 |  |  | L'organisation interdit les boîtes hébergées. | Voyez avec un administrateur de l'organisation, ou installez la boîte noire chez vous. |
-| `hosting_not_switched` | 409 |  |  | La boîte hébergée n'est pas encore ouverte pour ce compte. | Rien à faire : elle ouvre compte par compte. |
-| `consent_outdated` | 409 |  |  | Le texte de l'accord a changé depuis que vous l'avez accepté. | Filarr remontre le nouveau texte ; acceptez-le pour garder la base confiée. |
+| `hosting_not_switched` | 409 |  |  | La boîte hébergée n'est pas encore ouverte pour ce compte. | Rien à faire : elle s'ouvre compte par compte. |
+| `consent_outdated` | 409 |  |  | Le texte de l'accord a changé depuis que vous l'avez accepté. | Filarr réaffiche le nouveau texte ; acceptez-le pour garder la base confiée. |
 | `host_key_unknown` | 409 |  |  | Votre appli Filarr ne connaît pas la clé actuelle du service hébergé. | Mettez l'appli Filarr à jour. |
 | `hosting_billing_unavailable` | 409 | `manageBilling` |  | Aucun abonnement Stripe ne peut porter l'option pour ce payeur. | Gérez la facturation dans Filarr, ou facturez l'organisation. |
 | `hosting_exists` | 409 |  |  | Cet accès est déjà hébergé. | Rien ; pour changer l'endroit où il tourne, passez par la migration. |
@@ -196,15 +196,15 @@ Révision 3 (boîte hébergée, fichiers, synchros externes), lue dans les vecte
 | `migration_not_ready` | 409 |  |  | La nouvelle boîte noire n'a pas encore importé son paquet de réglages. | Démarrez la nouvelle boîte noire avec son nouveau jeton, attendez l'import, puis basculez. |
 | `hosting_too_large` | 413 |  |  | Les bases à confier sont trop lourdes pour une boîte hébergée. | Confiez-en moins, ou installez la boîte noire chez vous. |
 | `hosting_asleep` | 403 | billing : `updatePayment` ; tier : `upgrade` ; policy : aucun ; consent : aucun ; service : aucun |  | La boîte hébergée est en sommeil (paiement, palier ou politique). `remedy` dit ce qui la réveille. Boîte noire : liaison `asleep`. | Voyez **Paramètres › Accès API** dans Filarr. |
-| `hosted_origin_required` | 401 |  |  | Le jeton d'une boîte hébergée a été présenté hors du service hébergé. Boîte noire : refusé : un jeton hébergé ne sert à rien ailleurs. | Rien : c'est ce qui protège ce jeton. |
+| `hosted_origin_required` | 401 |  |  | Le jeton d'une boîte hébergée a été présenté hors du service hébergé. Boîte noire : refusé, car un jeton hébergé ne sert à rien ailleurs. | Rien : c'est ce qui protège ce jeton. |
 | `api_access_pending` | 403 |  |  | Une identité neuve, en attente de migration, a appelé autre chose que `self` ou son import. Boîte noire : liaison `pending` ; lit son paquet de réglages et attend. | Terminez la migration dans Filarr. |
 | `api_tier_files` | 403 | `upgrade` |  | Recevoir des fichiers par l'API demande le palier Pro ou plus. Boîte noire : transmet le refus (`403`). | Un palier supérieur. |
-| `files_not_switched` | 409 |  |  | Les fichiers par l'API ne sont pas encore ouverts pour ce compte. Boîte noire : transmet le refus. | Rien : ils ouvrent compte par compte. |
+| `files_not_switched` | 409 |  |  | Les fichiers par l'API ne sont pas encore ouverts pour ce compte. Boîte noire : transmet le refus. | Rien : ils s'ouvrent compte par compte. |
 | `files_not_linked` | 409 |  |  | Aucune boîte de dépôt n'est liée à l'accès. Boîte noire : refuse avant d'envoyer (`409`). | Liez une boîte de dépôt dans Filarr. |
 | `box_not_permanent` | 409 |  |  | La boîte liée à l'accès n'est pas une boîte de dépôt permanente. Boîte noire : transmet le refus. | Liez une boîte permanente (Filarr en crée une pour vous). |
 | `box_not_found` | 404 |  |  | La boîte de dépôt liée n'existe plus. Boîte noire : transmet le refus. | Liez-en une autre dans Filarr. |
 | `deposit_not_found` | 404 |  |  | Filarr ne connaît pas ce dépôt. Boîte noire : état inconnu. | Vérifiez l'identifiant. |
-| `box_full` | 409 |  |  | Trop de dépôts attendent d'être rangés dans la boîte. Boîte noire : refuse avant d'envoyer quand elle le sait déjà ; sinon, transmet le refus. | Ouvrez Filarr pour les ranger. |
+| `box_full` | 409 |  |  | Trop de dépôts attendent dans la boîte d'être rangés. Boîte noire : refuse avant d'envoyer quand elle le sait déjà ; sinon, transmet le refus. | Ouvrez Filarr pour les ranger. |
 | `box_storage_full` | 413 |  |  | Les dépôts en attente dans la boîte prennent trop de place. Boîte noire : transmet le refus (`413`). | Ouvrez Filarr pour les ranger. |
 | `file_too_large` | 413 |  |  | Le fichier dépasse la taille que Filarr accepte (`limit`). Boîte noire : refuse avant d'envoyer quand elle connaît la limite. | Envoyez un fichier plus petit. |
 | `api_quota_files` | 429 | `wait` | oui | Le compte a déposé ce mois-ci autant de fichiers que son palier le permet. Boîte noire : transmet le refus avec `Retry-After` (jusqu'au 1er, UTC). | Attendez le mois suivant. |
@@ -234,7 +234,7 @@ La boîte noire publie l'état de chaque synchro qu'elle exécute (scellé : Fil
 | `extdb_tier` | Le palier ne comprend pas la synchro planifiée (Solo et plus). | Un palier supérieur. |
 | `extdb_unsigned` | La définition n'est pas signée par le créateur de l'accès (quelqu'un d'autre l'a changée), ou la clé du créateur n'est pas authentifiée. | Le créateur approuve le changement dans Filarr ; un accès sans étiquette du créateur doit voir son jeton remplacé. |
 | `extdb_lease_held` | Une autre instance de cette boîte noire exécute cette synchro. | Une seule boîte noire par jeton. |
-| `extdb_guard` | Garde-fou : trop de lignes seraient marquées ou supprimées d'un coup. Rien n'a été écrit. | Vérifiez la source ; pour continuer pour ce passage seulement, acceptez dans Filarr, ou lancez `filarr-gate sources run <id> --ack-guard <passage>`. |
+| `extdb_guard` | Garde-fou : trop de lignes seraient marquées ou supprimées d'un coup. Rien n'a été écrit. | Vérifiez la source ; pour continuer, pour ce passage seulement, donnez votre accord dans Filarr, ou lancez `filarr-gate sources run <id> --ack-guard <passage>`. |
 | `extdb_conflict_burst` | Trop de nouveaux conflits en un passage. Rien n'a été écrit. | Vérifiez le sens et la clé de ligne ; sur un premier passage, tranchez avec `--initial source` ou `--initial filarr`. |
 | `extdb_def_newer` | La définition a été écrite par une version plus récente de Filarr. | Mettez Filarr Gate à jour. |
 | `extdb_conflicts_pending` | La synchro tourne ; des cellules attendent une décision dans la file « me demander ». | Tranchez-les dans Filarr ; le passage suivant applique les décisions. |
@@ -243,4 +243,4 @@ La boîte noire publie l'état de chaque synchro qu'elle exécute (scellé : Fil
 | `extdb_def_invalid` | Boîte noire seulement : la définition échoue à la validation (le détail liste les codes, comme `host_mismatch`). | Corrigez la définition dans Filarr. |
 | `extdb_not_runner` | Boîte noire seulement : un import ponctuel (`once`) n'est jamais exécuté par une boîte noire ; il tourne dans l'appli Filarr. | Lancez l'import depuis Filarr. |
 | `extdb_relay_limited` | Web seulement : le débit du relais pour les bases externes est épuisé. | Attendez, ou lancez la synchro depuis l'appli de bureau ou une boîte noire. |
-| `extdb_web_unsupported` | Web seulement : ce connecteur ne se joint pas depuis un navigateur (PostgreSQL, MySQL). | Lancez la synchro depuis l'appli de bureau ou une boîte noire. |
+| `extdb_web_unsupported` | Web seulement : ce connecteur ne peut pas joindre sa base depuis un navigateur (PostgreSQL, MySQL). | Lancez la synchro depuis l'appli de bureau ou une boîte noire. |

@@ -23,17 +23,17 @@ l'interface de gestion est sous `/admin/`. Les clés d'application s'y créent.
 
 ## Comment elle tourne
 
-- Un Durable Object (adossé à SQLite, le seul genre permis par l'offre Free) garde l'état, le cache de blocs chiffrés,
+- Un Durable Object (adossé à SQLite, le seul type permis par l'offre Free) garde l'état, le cache de blocs chiffrés,
   le journal et l'état chiffré des synchros, dans son propre stockage.
-- Pas de boucle : l'objet dort entre deux **alarmes**. Toutes les `FILARR_GATE_POLL_SECONDS` (300 s au moins), il
+- Pas de boucle : l'objet dort entre deux **alarmes**. Toutes les `FILARR_GATE_POLL_SECONDS` secondes (300 au moins), il
   relève Filarr ; une synchro, un nouvel essai de webhook ou un passage planifié avance l'alarme.
 - **Réveils poussés** : donnez `https://<votre worker>/_filarr/notify` comme adresse de réveil de l'accès dans Filarr.
   Filarr signe chaque réveil d'une clé tirée du jeton (`A_notify`) ; la boîte noire vérifie la signature et une fenêtre
-  de 5 minutes, puis relit. Avec elle, un changement dans Filarr arrive à la boîte noire en quelques secondes au lieu de
-  la relève suivante.
+  de 5 minutes, puis relit. Avec les réveils poussés, un changement dans Filarr arrive à la boîte noire en quelques
+  secondes au lieu d'attendre la relève suivante.
 - Bases externes : les connecteurs HTTPS (D1, Supabase, Airtable, Google Sheets, Notion, CSV/JSON par URL).
   PostgreSQL et MySQL demandent TCP : prenez pour eux la version Node ou Docker. Leurs clés se donnent dans l'interface
-  (rangées chiffrées) ou comme secrets du Worker `FILARR_GATE_EXTDB_<ID>`.
+  (conservées chiffrées) ou comme secrets du Worker `FILARR_GATE_EXTDB_<ID>`.
 
 ## Réglages
 
@@ -63,7 +63,7 @@ réveil poussé signé, l'état qui survit à un redémarrage).
 
 - Un Worker, une boîte noire, un jeton. Plusieurs boîtes noires : plusieurs Workers (changez `name` dans
   `wrangler.jsonc`).
-- La taille d'un corps de requête de Worker dépend de votre offre (100 Mo en Free et en Pro) : c'est aussi le plus gros
-  fichier que prend la fente.
+- La taille maximale d'un corps de requête de Worker dépend de votre offre (100 Mo en Free et en Pro) : c'est aussi le
+  plus gros fichier que prend la fente.
 - Les nouveaux essais de webhooks et les passages qui tomberaient pendant que l'objet dort tournent à l'alarme
   suivante.

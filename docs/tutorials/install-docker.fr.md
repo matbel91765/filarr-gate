@@ -67,7 +67,7 @@ gate:
   # The API is not published: only Caddy reaches it (port 8443 inside the network)
 ```
 
-et Caddy, qui obtient et renouvelle le certificat et transmet à la boîte noire :
+et Caddy, qui obtient et renouvelle le certificat et transmet les requêtes à la boîte noire :
 
 <!-- snippet: examples/docker/docker-compose.yml#caddy -->
 ```yaml
@@ -96,9 +96,9 @@ Remplacez `gate.example.com` par votre nom. Ce que fait chaque choix :
 
 - **L'API n'est pas publiée** sur l'hôte : seul Caddy, sur le réseau Compose, joint le port 8443. Vos logiciels
   appellent `https://gate.example.com`.
-- **`FILARR_GATE_TRUST_PROXY`** : la boîte noire ne croit l'adresse de l'appelant que Caddy transmet
-  (`X-Forwarded-For`) que si elle vient des réseaux Docker. Les clés d'application limitées à certaines adresses, et le
-  journal, voient alors le vrai appelant.
+- **`FILARR_GATE_TRUST_PROXY`** : la boîte noire ne se fie à l'adresse de l'appelant transmise par Caddy
+  (`X-Forwarded-For`) que si la requête vient des réseaux Docker. Les clés d'application limitées à certaines adresses,
+  et le journal, voient alors le vrai appelant.
 - **L'interface de gestion** n'est publiée que sur `127.0.0.1:8787` du serveur : qui y entre lit les données.
   Joignez-la par un tunnel SSH : `ssh -L 8787:127.0.0.1:8787 vous@serveur`, puis <http://127.0.0.1:8787/admin/> sur
   votre ordinateur.
@@ -132,8 +132,8 @@ docker compose exec gate filarr-gate keys create --name ERP --sql
 ```
 
 Dans le conteneur, la commande passe par la boîte noire en marche (un canal local dont le secret est dans le volume,
-lisible par l'utilisateur de la boîte noire seulement) : pas de mot de passe, et la clé sert tout de suite. Elle ne
-s'affiche qu'une fois.
+lisible par l'utilisateur de la boîte noire seulement) : pas de mot de passe, et la clé est utilisable tout de suite.
+Elle ne s'affiche qu'une fois.
 
 ## 5. Premier appel, depuis n'importe où
 
@@ -166,10 +166,10 @@ Sauvegardez le volume pendant que la boîte noire est arrêtée, ou acceptez que
 docker run --rm -v docker_gate-data:/data -v "$PWD":/backup alpine tar czf /backup/gate-data.tgz -C /data .
 ```
 
-(Le volume porte le nom du projet Compose : `docker volume ls` donne son nom exact.) L'archive ne contient le jeton
-que si vous l'avez donné par `init` plutôt que par `.env`, plus des blocs chiffrés, des empreintes de clés et les
-secrets des webhooks : rangez-la comme un secret. Pour déménager la boîte noire sur un autre serveur, préférez le
-paquet de réglages : `filarr-gate export` ([migration](../explain/migration.fr.md)).
+(Le volume porte le nom du projet Compose : `docker volume ls` donne son nom exact.) L'archive contient des blocs
+chiffrés, des empreintes de clés et les secrets des webhooks, ainsi que le jeton si vous l'avez donné par `init` plutôt
+que par `.env` : conservez-la comme un secret. Pour déménager la boîte noire sur un autre serveur, préférez le paquet de
+réglages : `filarr-gate export` ([migration](../explain/migration.fr.md)).
 
 ## Sans Compose
 

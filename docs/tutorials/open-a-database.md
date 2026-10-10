@@ -41,9 +41,9 @@ databases are switched off on this device, or when you are not the vault's owner
 ## 2. Fill it in
 
 - **Access name**: who will use it ("ERP Atelier", "Website"). It names the gate in Filarr and in its logs.
-- **Databases opened**: the database you started from is ticked; tick others to open them with the same token.
-  For each one, choose **Read** or **Read and write**. (Writing also needs a plan with API writes; otherwise the
-  choice says "not in your plan".)
+- **Databases opened**: the database you started from is ticked; tick others to open them with the same token. For each
+  one, choose **Read** or **Read and write**. (Writing also needs a plan with API writes; otherwise the choice reads
+  "Read and write (not in your plan)".)
 - **Slugs**: the names of each database and each view in the gate's API, proposed from their titles (lower case,
   no accents, dashes): `clients`, `clients-actifs`. **They can only be chosen now.** Afterwards they never change,
   even when you rename the database or a view in Filarr, so your integrations do not break. A view created later
@@ -89,8 +89,8 @@ appears in Filarr under **Settings › API access**, with its version, its addre
 
 ## Check that it works
 
-In the gate's UI, **Databases** lists each database with its address, its views, its fields and the keys allowed to
-read it. Or:
+In the gate's UI, **Databases and endpoints** lists each database with its address, its views, its fields and the keys
+allowed to read it. Or:
 
 ```sh
 curl -s http://127.0.0.1:8443/openapi.json | head -c 400

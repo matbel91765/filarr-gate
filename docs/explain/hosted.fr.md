@@ -22,7 +22,7 @@ gestion signé qu'emploient les applis de Filarr (pas d'interface de gestion), l
 { "version": "…", "codeHash": "sha256:…", "buildRef": "…", "deployedAt": "…", "keyId": "h1", "sig": "…" }
 ```
 
-signé par la clé du service (`HOST_SIG`), dont la moitié publique est inscrite dans les applis de Filarr, publiée par
+signé par la clé du service (`HOST_SIG`), dont la clé publique est inscrite dans les applis de Filarr, publiée par
 Filarr à `GET /public/gate-host` (et par ce dépôt dans `docs/hosted-keys.json`, quand le service ouvrira). À chaque
 mise en service, le service l'écrit aussi au journal de chaque accès hébergé ; les applis de Filarr comparent
 `codeHash` à la version publiée et disent « la même que la version publiée » ou, en rouge, « différente de la version
@@ -44,7 +44,7 @@ npm ci
 node scripts/pack-check.mjs release     # construit et empaquette deux fois, compare, écrit release/SHA256SUMS
 ```
 
-puis comparez `release/SHA256SUMS` au `SHA256SUMS` de la release GitHub ([release.fr.md](../release.fr.md)).
+puis comparez `release/SHA256SUMS` au `SHA256SUMS` de la version publiée sur GitHub ([release.fr.md](../release.fr.md)).
 
 Ce qui n'existe pas encore dans ce dépôt : la construction du paquet propre au service hébergé et le calcul de son
 `codeHash`, pour que chacun puisse reconstruire l'empreinte exacte qu'annonce une boîte hébergée. Ils doivent arriver
@@ -52,6 +52,6 @@ avec le service, avant son ouverture ; d'ici là, la vérification ci-dessus cou
 
 ## Partir
 
-Reprendre la clé vers une boîte noire à vous emporte les clés d'application, les webhooks et les requêtes enregistrées
-avec le paquet de réglages, bascule l'identité, efface la copie hébergée avec un reçu signé, et change les clés des
-bases : voyez [le tutoriel](../tutorials/hosted-and-back.fr.md#revenir-chez-vous).
+Reprendre la clé pour revenir à une boîte noire à vous transfère les clés d'application, les webhooks et les requêtes
+enregistrées avec le paquet de réglages, bascule l'identité, efface la copie hébergée avec un reçu signé, et change les
+clés des bases : voyez [le tutoriel](../tutorials/hosted-and-back.fr.md#revenir-chez-vous).

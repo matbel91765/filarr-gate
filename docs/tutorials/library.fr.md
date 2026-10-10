@@ -2,9 +2,9 @@
 
 [Read in English](library.md)
 
-**À la fin**, votre propre programme ouvrira les bases d'un accès avec `@filarr/gate`, lira des lignes, des vues et du
-SQL, recevra chaque changement fait dans Filarr au moment où il arrive, écrira des lignes, et s'arrêtera proprement :
-pas de serveur HTTP, pas de clé d'application, la boîte noire dans votre processus.
+**À la fin**, votre propre programme ouvrira les bases d'un accès avec `@filarr/gate`, lira des lignes et des vues,
+exécutera du SQL, recevra chaque changement fait dans Filarr au moment où il arrive, écrira des lignes, et s'arrêtera
+proprement : pas de serveur HTTP, pas de clé d'application, la boîte noire dans votre processus.
 
 **Palier :** la lecture à tous les paliers ; les changements en direct et l'écriture à partir de Solo.
 
@@ -15,7 +15,7 @@ pas de serveur HTTP, pas de clé d'application, la boîte noire dans votre proce
 | qui lit | un programme, le vôtre | n'importe quel logiciel, par HTTP |
 | clés | votre programme tient le jeton | chaque programme reçoit sa clé d'application ; le jeton reste dans la boîte noire |
 | en plus | rien | webhooks, MCP, SQL par HTTP, fente à fichiers par HTTP, interface de gestion, synchros externes |
-| où | Node 20+ (éprouvé) ; des API web standard seulement, donc Deno, Bun et les Workers devraient la faire tourner (sans essai) | Node, Docker, Cloudflare |
+| où | Node 20+ (éprouvé) ; des API web standard seulement, donc Deno, Bun et les Workers devraient la faire tourner (non éprouvé) | Node, Docker, Cloudflare |
 
 Le jeton ouvre les bases : ne le donnez qu'à un programme auquel vous donneriez les données.
 
@@ -31,7 +31,7 @@ Pas encore publiée sur npm : depuis un clone de ce dépôt, `npm ci && npm run 
 ## 2. Ouvrir, lire
 
 Le programme complet est [examples/library-node/index.mjs](../../examples/library-node/index.mjs) ; la suite d'essais
-l'exécute contre le Filarr en mémoire d'une boîte noire, et fait un changement dans Filarr pendant qu'il écoute.
+l'exécute face au Filarr en mémoire d'une boîte noire, et fait un changement dans Filarr pendant qu'il écoute.
 
 <!-- snippet: examples/library-node/index.mjs#open -->
 ```js
@@ -118,7 +118,7 @@ Les événements `status` disent l'état de la liaison.
 
 L'extrait ajoute une ligne (les colonnes non données prennent leur valeur par défaut, ici le statut « Prospect »),
 puis plusieurs lignes en UNE validation, change quelques champs (les autres restent tels quels) et supprime ce qu'il a
-créé (la suppression se restaure dans Filarr) :
+créé (une ligne supprimée peut être restaurée dans Filarr) :
 
 <!-- snippet: examples/library-node/write.mjs#write -->
 ```js
@@ -183,8 +183,8 @@ télécharge que ce qui a changé. Par défaut, le cache est en mémoire.
 - `close()` arrête la réplique et efface les clés et les lignes de la mémoire. Appelez-la en sortant.
 - Les relations vers une base que l'accès n'ouvre pas rendent des identifiants bruts, les agrégats sur elle rendent
   `null`, et le champ est listé dans `unresolved`.
-- La bibliothèque ne parle qu'à Filarr : ses requêtes à Filarr comptent dans le palier (requêtes de synchro, volume
-  téléchargé, validations) ; vos lectures dans la copie ne sont jamais comptées.
+- La bibliothèque ne parle qu'à Filarr : ses requêtes à Filarr sont décomptées des limites du palier (requêtes de
+  synchro, volume téléchargé, validations) ; vos lectures dans la copie ne sont jamais comptées.
 - Toute l'API : [reference/library.fr.md](../reference/library.fr.md).
 
 ## Si ça ne marche pas

@@ -31,7 +31,7 @@ Rend la main une fois la première copie prête. Lève une `GateError` : `token_
 | `bases(): BaseSummary[]` | les bases ouvertes : `slug`, `title`, `rights` (`r` ou `rw`), `status`, `version`, `rows`, `fields`, `views` |
 | `base(slug): Base` | une base ; lève `base_not_found`, ou `503` tant qu'elle n'est pas chargée |
 | `sql(query, { bases? }): Promise<SqlResult>` | une requête en lecture seule ; `bases` limite les tables à certains slugs |
-| `on('change', fn)`, `on('status', fn)` | écouter ; rend une fonction qui désabonne |
+| `on('change', fn)`, `on('status', fn)` | écouter ; rend une fonction qui annule l'abonnement |
 | `status(): GateStatus` | `link`, `detail`, `accessId`, `accessName`, `tier`, `filarrWrite`, `creator`, `files`, `bases`, `lastChangeAt`, `quota` |
 | `files.deposit(data, { name, mimeType?, path?, tags?, source? })` | déposer un fichier dans la boîte de dépôt liée : `{ depositId, seq, status, depositedAt, sizeBytes, sha256 }` |
 | `files.status(depositId)` | `{ status, depositedAt, filedAt }` |
@@ -44,7 +44,7 @@ Rend la main une fois la première copie prête. Lève une `GateError` : `token_
 
 | membre | |
 |---|---|
-| `slug`, `title`, `rights`, `version`, `fields`, `views` | relus à chaque accès (ils suivent la copie) |
+| `slug`, `title`, `rights`, `version`, `fields`, `views` | relus à chaque lecture (ils suivent la copie) |
 | `rows(options?): Promise<RowList>` | `where`, `sort`, `limit`, `cursor`, `fields`, `q`, `since` ; un tableau avec `next`, `total`, `version`, `unresolved?` |
 | `row(id): Promise<Row \| null>` | une ligne |
 | `view(slug): View` | `view.rows({ limit, cursor })` ; lève `view_not_found` |
@@ -66,6 +66,6 @@ Une `Error` avec `status` (le statut HTTP que rendrait l'API locale), `code` (le
 
 ## Où elle tourne
 
-Node 20 et plus récent, éprouvé. Elle n'emploie que des API web standard (WebCrypto, `fetch`, WebSocket) : Deno, Bun et
+Node 20 ou plus récent : éprouvé. Elle n'emploie que des API web standard (WebCrypto, `fetch`, WebSocket) : Deno, Bun et
 Cloudflare Workers devraient donc la faire tourner ; ils ne sont pas éprouvés. Ses dépendances : `@noble/curves`,
 `@noble/hashes` et `fflate`. La version qu'elle déclare à Filarr est `lib-<version>`.

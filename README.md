@@ -23,7 +23,7 @@ blocks only.
                                          sees nothing                     yours
 ```
 
-In Filarr: "···" on a database › **Open to an API** gives a token (`flr_live_…`), shown once.
+In Filarr: "···" on a database › **Open to an API…** gives a token (`flr_live_…`), shown once.
 
 ## Try it in five minutes, without an account
 
@@ -78,8 +78,8 @@ const active = await gate.base('clients').view('clients-actifs').rows();
   `/openapi.json` and `/docs`.
 - **App keys.** Your software never gets the Filarr token: each program gets its own `gk_…` key (stored as a
   fingerprint), limited to databases, views, queries or the file slot, with a rate, allowed addresses and an expiry.
-- **Writes** (off by default): `POST`, `PATCH`, `DELETE`, idempotent with `Idempotency-Key`, committed to Filarr like any
-  device's writes.
+- **Writes** (off by default): `POST`, `PATCH`, `DELETE`, idempotent with `Idempotency-Key`, committed to Filarr like
+  any device's writes.
 - **Signed webhooks** on row changes (HMAC-SHA256 on the raw body, 8 attempts over about 10.5 hours).
 - **A file slot** (`POST /v1/files`): files sealed for the deposit box the creator linked and signed in Filarr;
   executables and oversized files refused before anything leaves. The Filarr app files them; neither Filarr nor the
@@ -104,7 +104,8 @@ Every page also exists in French, linked at the top of the page.
 - **Reference**: [API](docs/reference/api.md) · [OpenAPI](docs/openapi/filarr-gate.v1.json) ·
   [configuration](docs/reference/configuration.md) · [command line](docs/reference/cli.md) ·
   [codes](docs/reference/errors.md) · [webhooks](docs/reference/webhooks.md) · [MCP](docs/reference/mcp.md) ·
-  [library](docs/reference/library.md) · [connectors](docs/reference/sync-connectors.md) · [limits](docs/reference/limits.md)
+  [library](docs/reference/library.md) · [connectors](docs/reference/sync-connectors.md) ·
+  [limits](docs/reference/limits.md)
 - **Security**: [who sees what, in each mode](docs/security-and-trust.md) · [architecture](docs/architecture.md) ·
   [report a vulnerability](SECURITY.md)
 - Everything: [docs/](docs/README.md)

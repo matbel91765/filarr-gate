@@ -13,11 +13,11 @@ never reach Filarr.
   unsigned or foreign definition is shown "waiting for the creator's signature" and never runs.
 - It is valid (connector, host matching the connection, `SELECT`-only queries, key columns mapped, a conflict policy for
   two-way columns…), the plan allows scheduled syncs (Solo and above), and the key is present.
-- It holds the **lease** of the definition on Filarr: two processes started with the same token never pass together.
-  Each process draws its own instance id at startup and sends it with the lease; the second one waits, and its journal
-  says "another instance of this black box is already running this sync". A process stopped cleanly gives its lease
-  back. The Cloudflare variant keeps a single instance id in its Durable Object, which stays the same runner across
-  evictions.
+- The gate holds the **lease** of the definition on Filarr: two processes started with the same token never pass
+  together. Each process draws its own instance id at startup and sends it with the lease; the second one waits, and its
+  journal says "another instance of this black box is already running this sync". A process stopped cleanly gives its
+  lease back. The Cloudflare variant keeps a single instance id in its Durable Object, which stays the same runner
+  across evictions.
 - A source column that is a relation (a Notion relation, Airtable linked records) is refused (`unsupported_column`):
   incoming relations are not supported yet, and they are never imported as text.
 

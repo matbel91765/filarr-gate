@@ -8,7 +8,7 @@ Un réglage vient, dans cet ordre (le premier trouvé l'emporte) :
 
 1. d'une **variable d'environnement** (sur Cloudflare : une variable ou un secret du Worker) ;
 2. du fichier **`gate.toml`** : `$FILARR_GATE_STATE_DIR/gate.toml`, ou le fichier que nomme `FILARR_GATE_CONFIG` ;
-3. de l'**interface de gestion** (écran Réglages), enregistrée dans le répertoire d'état ;
+3. de l'**interface de gestion** (écran Réglages), où il est enregistré dans le répertoire d'état ;
 4. de la valeur par défaut.
 
 Un réglage fixé par l'environnement ou par `gate.toml` apparaît **verrouillé** dans l'interface.
@@ -46,11 +46,11 @@ La liste d'office des extensions refusées (`files_deny`) : `.exe`, `.msi`, `.ba
 
 | variable | ce qu'elle fait |
 |---|---|
-| `FILARR_GATE_TOKEN` | Le jeton de l'accès (`flr_live_…`). Donné ainsi, il n'est jamais écrit sur le disque. Sinon, `filarr-gate init` ou l'écran de mise en route le range dans le répertoire d'état (fichier `token`, mode 0600). |
+| `FILARR_GATE_TOKEN` | Le jeton de l'accès (`flr_live_…`). Donné ainsi, il n'est jamais écrit sur le disque. Sinon, `filarr-gate init` ou l'écran de mise en route l'enregistre dans le répertoire d'état (fichier `token`, mode 0600). |
 | `FILARR_GATE_ADMIN_PASSWORD` | Le mot de passe de gestion, à la place de celui choisi à l'écran de mise en route (10 caractères au moins). |
 | `FILARR_GATE_STATE_DIR` | Le répertoire d'état : `~/.filarr-gate` par défaut, `/data` dans l'image Docker. |
-| `FILARR_GATE_CONFIG` | Le chemin d'un `gate.toml` rangé ailleurs que dans le répertoire d'état. |
-| `FILARR_GATE_EXTDB_<ID>` | La clé d'une base externe que nomme une définition de synchro : `<ID>` est fait des 8 premiers caractères après `xs_` de l'identifiant de la définition, en majuscules. Le nom exact s'affiche sur l'écran **Sources** et dans `filarr-gate sources list`. |
+| `FILARR_GATE_CONFIG` | Le chemin d'un `gate.toml` placé ailleurs que dans le répertoire d'état. |
+| `FILARR_GATE_EXTDB_<ID>` | La clé d'une base externe que nomme une définition de synchro : `<ID>` est formé des 8 premiers caractères après `xs_` de l'identifiant de la définition, en majuscules. Le nom exact s'affiche sur l'écran **Sources** et dans `filarr-gate sources list`. |
 | `FILARR_GATE_LOG_LEVEL` | `debug`, `info` (par défaut), `warn`, `error`. |
 | `FILARR_GATE_PUBLIC_URL` | Variante Cloudflare : l'adresse à afficher et à donner, quand ce n'est pas celle où arrivent les requêtes. |
 | `FILARR_GATE_ADMIN_URL` | Ligne de commande : l'interface de gestion d'une boîte noire d'une autre machine (comme `--remote`). |
@@ -72,4 +72,4 @@ files_allow = [".pdf", ".csv", ".xlsx"]
 secret = "…"
 ```
 
-Seule une partie de TOML est lue : `clé = valeur` (chaîne, nombre, booléen, tableau de chaînes), les en-têtes `[section]` et les commentaires `#`.
+Seul un sous-ensemble de TOML est pris en charge : `clé = valeur` (chaîne, nombre, booléen, tableau de chaînes), les en-têtes `[section]` et les commentaires `#`.

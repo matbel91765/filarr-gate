@@ -2,10 +2,10 @@
 
 [Read in English](first-calls.md)
 
-**À la fin**, vous saurez lister des lignes avec des filtres, un tri et des pages, lire une vue, exécuter du SQL,
+**À la fin**, vous saurez lister des lignes avec des filtres, un tri et une pagination, lire une vue, exécuter du SQL,
 créer, modifier et supprimer une ligne sans risque, et traiter un refus et un `429`, dans les trois langages côte à
 côte. Chaque bloc ci-dessous est recopié d'[examples/first-calls](../../examples/first-calls), que la suite d'essais
-exécute contre une boîte noire avant chaque version : ce que vous copiez est ce qui a tourné. Les commentaires des
+exécute face à une boîte noire avant chaque version : ce que vous copiez est ce qui a tourné. Les commentaires des
 extraits restent donc en anglais ; le texte autour dit ce que fait chacun.
 
 **Palier :** la lecture est offerte à tous les paliers. L'écriture demande un palier qui comprend l'écriture par l'API
@@ -106,7 +106,7 @@ def gate(method, path, body=None, headers=None, retries=3):
 
 | paramètre | exemple | |
 |---|---|---|
-| `champ=valeur` | `statut=Client` | égal (les textes se comparent sans casse ni accents) |
+| `champ=valeur` | `statut=Client` | égal (les textes se comparent sans tenir compte de la casse ni des accents) |
 | `champ[op]=valeur` | `ca[gte]=1000` | `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `contains`, `in` (valeurs séparées par des virgules), `empty` (`true` ou `false`) |
 | `sort` | `-ca,nom` | un `-` trie par ordre décroissant ; les valeurs vides viennent en dernier |
 | `fields` | `nom,ville` | les champs à rendre (`id` toujours) |
@@ -240,7 +240,7 @@ s'appeler à `GET /v1/q/<slug>`, les lignes en objets, avec `limit` et `cursor`.
   une seule validation dans Filarr. Les colonnes que vous omettez reçoivent leur valeur par défaut, comme le fait
   « Nouvelle ligne » dans Filarr.
 - `PATCH /v1/<base>/rows/<id>` change les champs donnés ; `null` vide un champ.
-- `DELETE /v1/<base>/rows/<id>` supprime la ligne (elle se restaure dans Filarr).
+- `DELETE /v1/<base>/rows/<id>` supprime la ligne (elle peut être restaurée dans Filarr).
 - Les champs de sélection prennent le libellé d'une option (`"statut": "Client"`) ; les champs de relation, une liste
   d'identifiants de lignes.
 - **`Idempotency-Key`** : donnez n'importe quelle chaîne unique. Si la même requête revient avec la même clé (après un
@@ -371,6 +371,6 @@ La description des routes communes à toutes les boîtes noires est dans
 
 ## Et ensuite
 
-- [Recevoir les changements par webhook](webhooks.fr.md) au lieu de relever.
+- [Recevoir les changements par webhook](webhooks.fr.md) au lieu d'interroger l'API en boucle.
 - [La bibliothèque](library.fr.md) : la même chose, dans votre programme Node, sans serveur HTTP.
 - Tout ce que fait l'API : [reference/api.fr.md](../reference/api.fr.md).
