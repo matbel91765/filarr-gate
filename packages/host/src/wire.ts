@@ -7,7 +7,8 @@
  *  - reçu d'effacement : `sig = b64url(Ed25519(HOST_SIG, "filarr/gate-host/v1|receipt|" + JSON canonique))` ;
  *  - annonce de version : `sig = b64url(Ed25519(HOST_SIG, "filarr/gate-host/v1|version|" + JSON canonique sans sig))` ;
  *  - canal de gestion : `Filarr-Creator: t=<secondes>,s=<b64url Ed25519>` sur
- *    `"filarr/gate-host/v1|admin|" + méthode + "|" + chemin + "|" + t + "|" + hex(SHA-256(corps))`,
+ *    `"filarr/gate-host/v1|admin|" + méthode + "|" + chemin AVEC requête + "|" + t + "|" + hex(SHA-256(corps))`
+ *    (PH11 : le chemin comme au § 2.2),
  *    vérifié avec la clé de signature du créateur authentifiée par `creatorTag`.
  *
  * Fonctions pures : Ed25519 par `@noble/curves` (le `crypto.subtle` de Workers n'a pas Ed25519 partout),
@@ -84,8 +85,12 @@ export function verifyHostRequestHeader(args: {
 
 // ==================== Reçu d'effacement (§ 8.5) ====================
 
-export type ReceiptReason = 'revoked' | 'migrated' | 'withdrawn' | 'billing' | 'tier' | 'policy' | 'consent';
-export const RECEIPT_REASONS: readonly ReceiptReason[] = ['revoked', 'migrated', 'withdrawn', 'billing', 'tier', 'policy', 'consent'];
+/** Les raisons d'un reçu ; `pending_expired` vient de l'API (PH9 : une identité en attente échue). */
+export type ReceiptReason = 'revoked' | 'migrated' | 'withdrawn' | 'billing' | 'tier' | 'policy' | 'consent' | 'pending_expired';
+export const RECEIPT_REASONS: readonly ReceiptReason[] = ['revoked', 'migrated', 'withdrawn', 'billing', 'tier', 'policy', 'consent', 'pending_expired'];
+/** La cause d'un retrait partiel (PH10), facultative, DANS le message signé. */
+export type WithdrawCause = 'creator' | 'vault_admin' | 'consent';
+export const WITHDRAW_CAUSES: readonly WithdrawCause[] = ['creator', 'vault_admin', 'consent'];
 export const ERASED_ALL = ['token', 'dbKeys', 'copy', 'state', 'extdbKeys'] as const;
 
 export interface ErasureReceipt {
@@ -95,6 +100,8 @@ export interface ErasureReceipt {
   accessId: string;
   hostName: string;
   reason: ReceiptReason;
+  /** Retrait partiel seulement (`reason: "withdrawn"`), quand la cause est connue (PH10). */
+  cause?: WithdrawCause;
   stores: Array<{ storeId: string; g: number }>;
   erased: string[];
   requestedAt: string;
@@ -142,8 +149,8 @@ export function signVersion(signKey: { privateKey: Uint8Array }, announcement: V
 
 // ==================== Canal de gestion (§ 7.2) ====================
 
-export const adminMessage = (method: string, path: string, t: number, bodySha256Hex: string): string =>
-  `${HOST_INFO}|admin|${method.toUpperCase()}|${path}|${t}|${bodySha256Hex}`;
+export const adminMessage = (method: string, pathWithQuery: string, t: number, bodySha256Hex: string): string =>
+  `${HOST_INFO}|admin|${method.toUpperCase()}|${pathWithQuery}|${t}|${bodySha256Hex}`;
 
 /** `Filarr-Creator: t=<secondes>,s=<b64url>` ; l'ordre est libre, chacun une fois. */
 export function parseCreatorHeader(header: string | null | undefined): { t: number; s: Uint8Array } | null {
@@ -174,7 +181,8 @@ export type AdminVerdict = 'ok' | 'missing' | 'malformed' | 'clock' | 'signature
 export function verifyAdminRequest(args: {
   header: string | null | undefined;
   method: string;
-  path: string;
+  /** Le chemin AVEC sa requête (`url.pathname + url.search`, PH11). */
+  pathWithQuery: string;
   body: Uint8Array;
   creatorSigningPublicKey: Uint8Array | null;
   nowS: number;
@@ -184,7 +192,7 @@ export function verifyAdminRequest(args: {
   if (!h) return 'malformed';
   if (Math.abs(args.nowS - h.t) > SKEW_SECONDS) return 'clock';
   if (!args.creatorSigningPublicKey) return 'no_creator';
-  const message = adminMessage(args.method, args.path, h.t, bodyHashHex(args.body));
+  const message = adminMessage(args.method, args.pathWithQuery, h.t, bodyHashHex(args.body));
   return curves.ed25519Verify(h.s, utf8Encode(message), args.creatorSigningPublicKey) ? 'ok' : 'signature';
 }
 

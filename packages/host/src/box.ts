@@ -43,7 +43,7 @@ import { corsHeaders, gateAsleep, json, nextMonthUtc, notFound, periodOf } from 
 import { loadKeyring, signingKey, type HostKeyring } from './keys';
 import { opsError } from './ops';
 import { HOST_PREFIX, SealedStorage } from './sealedStorage';
-import { CREATOR_HEADER, ERASED_ALL, RECEIPT_REASONS, parseCreatorHeader, signReceipt, verifyAdminRequest, type ErasureReceipt, type ReceiptReason } from './wire';
+import { CREATOR_HEADER, ERASED_ALL, RECEIPT_REASONS, parseCreatorHeader, signReceipt, verifyAdminRequest, type ErasureReceipt, type ReceiptReason, type WithdrawCause } from './wire';
 
 /** Le stockage brut de l'objet durable. */
 export interface RawStorage extends DoStorage {
@@ -124,8 +124,12 @@ const PIN_CREATOR = 'pin:creator';
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** La raison d'un effacement complet, lue dans la réponse de l'API (voir l'écart noté dans docs/explain/hosted.md). */
-export function erasureReason(t: Pick<HostedToken, 'sleepReason' | 'redirectTo'>): ReceiptReason {
+/**
+ * La raison d'un effacement complet (PH9) : `eraseReason` de l'API, telle quelle ; une API d'avant ne la donne pas,
+ * le service la déduit alors (`sleepReason`, puis `migrated` si une redirection est posée, sinon `revoked`).
+ */
+export function erasureReason(t: Pick<HostedToken, 'sleepReason' | 'redirectTo' | 'eraseReason'>): ReceiptReason {
+  if (typeof t.eraseReason === 'string' && (RECEIPT_REASONS as readonly string[]).includes(t.eraseReason)) return t.eraseReason as ReceiptReason;
   if (t.sleepReason && (RECEIPT_REASONS as readonly string[]).includes(t.sleepReason) && t.sleepReason !== 'withdrawn') return t.sleepReason as ReceiptReason;
   if (t.redirectTo) return 'migrated';
   return 'revoked';
@@ -456,7 +460,14 @@ export class BoxRuntime {
 
   // ==================== Effacement (§ 8.1, § 8.5) ====================
 
-  private buildReceipt(meta: BoxMeta, reason: ReceiptReason, stores: Array<{ storeId: string; g: number }>, erased: readonly string[], requestedAt: string): ErasureReceipt {
+  private buildReceipt(
+    meta: BoxMeta,
+    reason: ReceiptReason,
+    stores: Array<{ storeId: string; g: number }>,
+    erased: readonly string[],
+    requestedAt: string,
+    cause?: WithdrawCause
+  ): ErasureReceipt {
     const key = signingKey(this.ring, this.now());
     return {
       v: 1,
@@ -465,6 +476,7 @@ export class BoxRuntime {
       accessId: meta.accessId,
       hostName: meta.hostName ?? '',
       reason,
+      ...(cause ? { cause } : {}),
       stores,
       erased: [...erased],
       requestedAt,
@@ -492,7 +504,9 @@ export class BoxRuntime {
   private async erase(t: HostedToken, sendReceipt: boolean): Promise<void> {
     const meta = this.meta!;
     if (meta.state !== 'erased') {
-      if (!meta.erasingSince) meta.erasingSince = new Date(this.now()).toISOString();
+      // PH9 : l'heure de la demande, telle que l'API la donne ; sinon l'heure où le service l'a vue
+      const askedAt = typeof t.eraseRequestedAt === 'string' && Number.isFinite(Date.parse(t.eraseRequestedAt)) ? t.eraseRequestedAt : null;
+      if (!meta.erasingSince) meta.erasingSince = askedAt ?? new Date(this.now()).toISOString();
       if (t.hostName) meta.hostName = t.hostName;
       const receipt = this.buildReceipt(meta, erasureReason(t), meta.stores, ERASED_ALL, meta.erasingSince);
       await this.close(false);
@@ -557,6 +571,7 @@ export class BoxRuntime {
     if (same) return;
     for (const s of gone) {
       const at = new Date(this.now()).toISOString();
+      // PH10 : `cause` (creator, vault_admin, consent) est facultative ; rien ne la dit au service aujourd'hui, elle est omise
       meta.receipts.push(this.sign({ receipt: this.buildReceipt(meta, 'withdrawn', [s], ['dbKeys', 'copy'], at), sig: null }));
     }
     meta.stores = held;
@@ -816,13 +831,14 @@ export class BoxRuntime {
       pub = null;
     }
     const nowS = Math.floor(this.now() / 1000);
-    const verdict = verifyAdminRequest({ header, method: request.method, path: url.pathname, body, creatorSigningPublicKey: pub, nowS });
+    const verdict = verifyAdminRequest({ header, method: request.method, pathWithQuery: url.pathname + url.search, body, creatorSigningPublicKey: pub, nowS });
     if (verdict !== 'ok') return json(401, { error: 'Management request refused', code: `admin_${verdict}` }, cors);
     // Une même requête signée ne passe qu'une fois
     const sig = parseCreatorHeader(header)!;
     const seenKey = Array.from(sig.s.slice(0, 16), (b) => b.toString(16).padStart(2, '0')).join('');
     for (const [k, until] of this.seenAdmin) if (until < nowS) this.seenAdmin.delete(k);
-    if (this.seenAdmin.has(seenKey)) return json(409, { error: 'Replayed management request', code: 'admin_replay' }, cors);
+    // PH11 : chaque (t, signature) une seule fois ; un rejeu est refusé `401 replay`
+    if (this.seenAdmin.has(seenKey)) return json(401, { error: 'Replayed management request', code: 'replay' }, cors);
     this.seenAdmin.set(seenKey, nowS + 2 * 300);
     const sub = url.pathname.slice('/_admin'.length).replace(/\/+$/, '') || '/';
     if (ADMIN_BLOCKED.test(sub)) return json(403, { error: 'Not available on a hosted box', code: 'admin_route_forbidden' }, cors);

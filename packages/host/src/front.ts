@@ -17,8 +17,8 @@
 import { slugBase } from '../../core/src/engine/store/apiAccess';
 import { INTERNAL } from './box';
 import type { DirectoryClient, DirectoryEntry } from './directory';
-import { appOriginOf, CONTROL_LABEL, domainOf, HOST_VERSION, type HostEnv } from './env';
-import { corsHeaders, json, notFound, withHeaders } from './http';
+import { CONTROL_LABEL, domainOf, HOST_VERSION, type HostEnv } from './env';
+import { json, notFound } from './http';
 import { loadKeyring, type HostKeyring } from './keys';
 import { announcement } from './version';
 
@@ -102,12 +102,9 @@ export async function handleFront(request: Request, env: HostEnv, deps: FrontDep
     if (url.pathname === '/health' && request.method === 'GET') return json(200, { status: 'ok', version: HOST_VERSION });
     const m = /^\/_filarr\/notify\/([A-Za-z0-9_-]{22})$/.exec(url.pathname);
     if (m && ACCESS_ID_RE.test(m[1]!)) {
-      // Le réveil de l'API, ou le premier réveil que l'appli du créateur envoie à la création (CORS du web et du bureau)
-      const cors = corsHeaders(request.headers.get('origin'), appOriginOf(env), 'Content-Type, Filarr-Notify');
-      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-      if (request.method !== 'POST') return json(405, { error: 'Method not allowed', code: 'method_not_allowed' }, { Allow: 'POST', ...cors });
-      const res = await deps.box(m[1]!).fetch(forward(request, { [INTERNAL.route]: 'notify', [INTERNAL.access]: m[1]! }));
-      return withHeaders(res, cors);
+      // Le réveil de l'API (PH8 : elle envoie aussi le premier, après la création, puis un à chaque changement d'état)
+      if (request.method !== 'POST') return json(405, { error: 'Method not allowed', code: 'method_not_allowed' }, { Allow: 'POST' });
+      return deps.box(m[1]!).fetch(forward(request, { [INTERNAL.route]: 'notify', [INTERNAL.access]: m[1]! }));
     }
     return notFound();
   }

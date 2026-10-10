@@ -164,6 +164,9 @@ export interface MockHosting {
   sleepUntil: string | null;
   redirectTo: string | null;
   redirectUntil: string | null;
+  /** PH9 : la raison et l'heure de l'effacement demandé (absentes : une API d'avant). */
+  eraseReason?: string | null;
+  eraseRequestedAt?: string | null;
 }
 
 export interface MockDeposit {
@@ -606,7 +609,7 @@ export class MockFilarr {
   }
 
   /** Révocation, sommeil échu, migration basculée : le jeton scellé est effacé, le service réveillé. */
-  hostingErase(accessId: string, opts: { revoke?: boolean; redirectTo?: string } = {}): void {
+  hostingErase(accessId: string, opts: { revoke?: boolean; redirectTo?: string; reason?: string; legacy?: boolean } = {}): void {
     const access = this.accesses.get(accessId)!;
     const h = access.hosting!;
     if (opts.revoke !== false) access.revoked = true;
@@ -616,6 +619,11 @@ export class MockFilarr {
     }
     h.state = 'erasing';
     h.sealedToken = null;
+    // PH9 : une API à jour dit pourquoi et depuis quand ; `legacy` joue une API d'avant (le service déduit)
+    if (!opts.legacy) {
+      h.eraseReason = opts.reason ?? (opts.redirectTo ? 'migrated' : h.sleepReason ?? 'revoked');
+      h.eraseRequestedAt = new Date(Date.now() - 1000).toISOString();
+    }
     this.signal(access, { t: 'hosting', state: 'erasing' });
   }
 
@@ -696,6 +704,7 @@ export class MockFilarr {
         redirectTo: h.redirectTo,
         redirectUntil: h.redirectUntil,
         exportPending: p?.target === 'self' && p.exportSealed === null,
+        ...(h.state === 'erasing' && h.eraseReason ? { eraseReason: h.eraseReason, eraseRequestedAt: h.eraseRequestedAt ?? null } : {}),
       });
     }
     if (m[2] === 'pending' && method === 'GET') {

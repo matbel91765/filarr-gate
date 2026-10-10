@@ -20,7 +20,8 @@ import { HOST_VERSION } from '../packages/host/src/env';
 import { HostApi } from '../packages/host/src/hostApi';
 import { loadKeyring, signingKey } from '../packages/host/src/keys';
 import { announcement } from '../packages/host/src/version';
-import { adminMessage, bodyHashHex, ERASED_ALL, receiptMessage, verifyHostSignature, versionMessage } from '../packages/host/src/wire';
+import { erasureReason } from '../packages/host/src/box';
+import { adminMessage, bodyHashHex, ERASED_ALL, receiptMessage, signReceipt, verifyHostSignature, versionMessage, type ErasureReceipt } from '../packages/host/src/wire';
 import { CLIENTS_DB, COMMANDES_DB, demoStores } from './support/demoData';
 import { HostHarness, MemoryDoStorage, TEST_DOMAIN } from './support/hostHarness';
 import { MockFilarr } from './support/mockFilarr';
@@ -39,7 +40,7 @@ const hostName = 'site-vitrine-7qm2';
 const box = (path: string) => `https://${hostName}.${TEST_DOMAIN}${path}`;
 const bearer = (key: string) => ({ headers: { Authorization: `Bearer ${key}` } });
 
-/** Le réveil que l'appli du créateur (ou l'API) signe sous `A_notify`, envoyé à l'adresse de contrôle. */
+/** Un réveil de l'API, signé sous `A_notify` (clé de l'accès), envoyé à l'adresse de contrôle (PH8). */
 async function wake(tok: string, body: Record<string, unknown>, opts: { at?: number; forge?: boolean } = {}): Promise<Response> {
   const parsed = parseAccessToken(tok)!;
   const { aNotify } = await deriveAccessKeys3(storeCrypto, parsed.accessIdBytes, parsed.secret);
@@ -93,6 +94,7 @@ describe('service hébergé, en mémoire', () => {
     expect((await h.fetch(box('/health'))).status).toBe(404);
     // L'adresse de contrôle est posée : les réveils de l'API y arrivent désormais
     mock.hostControlUrl = CTL;
+    // Le premier réveil, que l'API envoie juste après la création (PH8)
     expect((await wake(token, { t: 'hosting', state: 'running' })).status).toBe(202);
     await h.settle();
     await until(async () => ((await (await h.fetch(box('/health'))).json()) as { status: string }).status === 'ok', 15_000, 'boîte prête');
@@ -158,10 +160,18 @@ describe('service hébergé, en mémoire', () => {
     // Rejeu, sans signature, mauvaise clé, horloge, route fermée
     const t = Math.floor(Date.now() / 1000);
     expect((await admin('GET', '/_admin/keys', undefined, { t })).status).toBe(200);
-    expect(((await (await admin('GET', '/_admin/keys', undefined, { t })).json()) as { code: string }).code).toBe('admin_replay');
+    const replay = await admin('GET', '/_admin/keys', undefined, { t });
+    expect(replay.status).toBe(401);
+    expect(((await replay.json()) as { code: string }).code).toBe('replay');
     expect(((await (await admin('GET', '/_admin/keys', undefined, { header: null })).json()) as { code: string }).code).toBe('admin_missing');
     expect(((await (await admin('GET', '/_admin/keys', undefined, { key: new Uint8Array(32).fill(3) })).json()) as { code: string }).code).toBe('admin_signature');
     expect(((await (await admin('GET', '/_admin/keys', undefined, { t: t - 600 })).json()) as { code: string }).code).toBe('admin_clock');
+    // PH11 : la chaîne signée porte le chemin AVEC sa requête
+    expect((await admin('GET', '/_admin/journal?limit=5')).status).toBe(200);
+    const tq = Math.floor(Date.now() / 1000) - 1;
+    const noQuery = toBase64Url(curves.ed25519Sign(mock.creatorSigningKey, utf8Encode(adminMessage('GET', '/_admin/journal', tq, bodyHashHex('')))));
+    const cut = await h.fetch(box('/_admin/journal?limit=5'), { headers: { 'Filarr-Creator': `t=${tq},s=${noQuery}` } });
+    expect(((await cut.json()) as { code: string }).code).toBe('admin_signature');
     for (const path of ['/_admin/token', '/_admin/password', '/_admin/forget', '/_admin/export', '/_admin/setup/token']) {
       const res = await admin('POST', path, {});
       expect(res.status, path).toBe(403);
@@ -271,11 +281,13 @@ describe('service hébergé, en mémoire', () => {
   });
 
   it('révocation : tout le stockage effacé, reçu signé remis, l’adresse ne répond plus', async () => {
-    mock.hostingErase(accessId);
+    mock.hostingErase(accessId, { reason: 'revoked' });
     await h.settle();
     await until(() => mock.hostedReceipts.some((r) => !r.partial && r.accessId === accessId), 15_000, 'reçu d’effacement');
     const r = mock.hostedReceipts.find((x) => !x.partial && x.accessId === accessId)!;
     expect(r.receipt).toMatchObject({ reason: 'revoked', stores: [{ storeId: clients, g: 0 }], erased: [...ERASED_ALL], hostName, codeHash: `sha256:${'ab'.repeat(32)}` });
+    // PH9 : l'heure de la demande est celle que l'API donne, telle quelle
+    expect(r.receipt.requestedAt).toBe(mock.accesses.get(accessId)!.hosting!.eraseRequestedAt);
     expect(Date.parse(r.receipt.erasedAt as string)).toBeGreaterThanOrEqual(Date.parse(r.receipt.requestedAt as string));
     expect(mock.accesses.get(accessId)!.hosting!.state).toBe('erased');
     const storage = h.storages.get(accessId)!;
@@ -293,7 +305,8 @@ describe('service hébergé, en mémoire', () => {
     await until(async () => (await h.fetch(`https://deux-ab12.${TEST_DOMAIN}/health`)).status === 200, 15_000, 'deux prête');
     mock.hostingSleep(two.accessId, 'tier');
     await h.settle();
-    mock.hostingErase(two.accessId);
+    // Une API d'avant (sans eraseReason) : le service déduit la raison du sommeil
+    mock.hostingErase(two.accessId, { legacy: true });
     await h.settle();
     await until(() => mock.hostedReceipts.some((r) => r.accessId === two.accessId), 15_000, 'reçu deux');
     expect(mock.hostedReceipts.find((r) => r.accessId === two.accessId)!.receipt.reason).toBe('tier');
@@ -302,7 +315,7 @@ describe('service hébergé, en mémoire', () => {
     await mock.grant(three.accessId, clients, 'r');
     await h.settle();
     await until(async () => (await h.fetch(`https://trois-cd34.${TEST_DOMAIN}/health`)).status === 200, 15_000, 'trois prête');
-    mock.hostingErase(three.accessId, { redirectTo: 'https://gate.example.org/' });
+    mock.hostingErase(three.accessId, { redirectTo: 'https://gate.example.org/', legacy: true });
     await h.settle();
     await until(() => mock.hostedReceipts.some((r) => r.accessId === three.accessId), 15_000, 'reçu trois');
     expect(mock.hostedReceipts.find((r) => r.accessId === three.accessId)!.receipt.reason).toBe('migrated');
@@ -320,6 +333,27 @@ describe('service hébergé, en mémoire', () => {
     expect((await h.fetch(`${CTL}/_filarr/notify/court`, { method: 'POST' })).status).toBe(404);
     // Une clé publique du service n'est jamais une clé privée : rien d'autre que la liste publique n'est servi
     expect(toBase64Std(new Uint8Array(32))).toHaveLength(44);
+  });
+});
+
+describe('le reçu (PH9, PH10)', () => {
+  it('la raison de l’API telle quelle ; sinon la déduction d’avant', () => {
+    expect(erasureReason({ eraseReason: 'pending_expired', sleepReason: 'billing', redirectTo: null })).toBe('pending_expired');
+    expect(erasureReason({ eraseReason: 'migrated', sleepReason: null, redirectTo: null })).toBe('migrated');
+    expect(erasureReason({ eraseReason: 'inconnue', sleepReason: 'tier', redirectTo: null })).toBe('tier');
+    expect(erasureReason({ sleepReason: null, redirectTo: 'https://x.example.org' })).toBe('migrated');
+    expect(erasureReason({ sleepReason: null, redirectTo: null })).toBe('revoked');
+  });
+
+  it('un retrait partiel porte sa cause DANS le message signé', () => {
+    const sigKey = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
+    const receipt: ErasureReceipt = { v: 1, kind: 'filarr-gate-host/erasure', keyId: 'h', accessId: 'AAAAAAAAAAAAAAAAAAAAAA', hostName: 'x-ab12', reason: 'withdrawn', cause: 'vault_admin', stores: [{ storeId: 'BBBBBBBBBBBBBBBBBBBBBB', g: 2 }], erased: ['dbKeys', 'copy'], requestedAt: '2026-10-10T00:00:00.000Z', erasedAt: '2026-10-10T00:00:01.000Z', version: '0.2.0', codeHash: '' };
+    const sig = signReceipt({ privateKey: sigKey }, receipt);
+    const pub = curves.ed25519PublicKey(sigKey);
+    expect(receiptMessage(receipt)).toContain('"cause":"vault_admin"');
+    expect(verifyHostSignature(receiptMessage(receipt), sig, pub)).toBe(true);
+    const { cause: _c, ...without } = receipt;
+    expect(verifyHostSignature(receiptMessage(without), sig, pub)).toBe(false);
   });
 });
 

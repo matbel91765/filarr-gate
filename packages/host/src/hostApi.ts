@@ -68,6 +68,9 @@ export interface HostedToken {
   redirectTo: string | null;
   redirectUntil: string | null;
   exportPending: boolean;
+  /** PH9 : la raison et l'heure de l'effacement demandé, quand `state = "erasing"` (absents d'une API d'avant). */
+  eraseReason?: string | null;
+  eraseRequestedAt?: string | null;
 }
 
 /** Ce que rend `GET /api-access/hosted/:id/pending`. */
