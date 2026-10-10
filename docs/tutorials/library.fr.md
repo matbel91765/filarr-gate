@@ -25,8 +25,8 @@ Le jeton ouvre les bases : ne le donnez qu'à un programme auquel vous donneriez
 npm install @filarr/gate
 ```
 
-Pas encore publiée sur npm : depuis un clone de ce dépôt, `npm ci && npm run build`, puis employez `packages/gate`
-(par exemple `npm install /chemin/vers/filarr-gate/packages/gate`).
+Pour essayer un changement pas encore publié : depuis un clone de ce dépôt, `npm ci && npm run build`, puis
+`npm install /chemin/vers/filarr-gate/packages/gate`.
 
 ## 2. Ouvrir, lire
 

@@ -15,18 +15,23 @@ chaque palier change).
 - Un nom DNS qui pointe vers le serveur (`gate.example.com` ci-dessous), et les ports 80 et 443 ouverts, pour le
   certificat.
 - Le jeton `flr_live_…` de l'accès ([ouvrir une base à une API](open-a-database.fr.md)).
-- Aucune image n'est encore publiée : vous la construisez depuis un clone de ce dépôt. Son `Dockerfile` fait une petite
-  image (Node 22, Alpine) qui tourne sous l'utilisateur non root `node`, garde tout dans `/data`, et contrôle sa propre
-  santé.
+- L'image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64) : `:0.2` suit les correctifs 0.2.x, `:0.2.0` fige
+  cette version exacte. Elle est petite (Node 22, Alpine), tourne sous l'utilisateur non root `node`, garde tout dans
+  `/data`, et contrôle sa propre santé. Elle est signée (cosign) et construite par la chaîne de publication du dépôt
+  ([plan de publication](../release.fr.md)).
 
 ## 1. Récupérer les fichiers
 
 ```sh
-git clone https://github.com/filarr-work/filarr-gate.git
-cd filarr-gate/examples/docker
+mkdir filarr-gate && cd filarr-gate
+for f in docker-compose.yml Caddyfile example.env; do
+  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.2.0/examples/docker/$f"
+done
 cp example.env .env
 chmod 600 .env
 ```
+
+(Ou `git clone https://github.com/filarr-work/filarr-gate.git`, puis `cd filarr-gate/examples/docker`.)
 
 Modifiez `.env` : collez le jeton, et choisissez un mot de passe de gestion (dix caractères ou plus).
 
@@ -40,7 +45,8 @@ jamais `.env`.
 
 ## 2. Le fichier Compose
 
-`examples/docker/docker-compose.yml`, la boîte noire (les commentaires de l'exemple disent, en anglais : Caddy, sur le
+`examples/docker/docker-compose.yml`, la boîte noire (les commentaires de l'exemple disent, en anglais : `:0.2` suit les
+correctifs 0.2.x et `:0.2.0` fige cette version ; la variante qui construit l'image depuis un clone ; Caddy, sur le
 même réseau Docker, transmet l'adresse de l'appelant ; gardez ce volume, il tient l'état, le cache de blocs chiffrés,
 le journal et l'état chiffré des synchros ; l'interface de gestion sur CETTE machine seulement, car qui y entre lit les
 données ; l'API n'est pas publiée, seul Caddy la joint, sur le port 8443 du réseau) :
@@ -48,9 +54,13 @@ données ; l'API n'est pas publiée, seul Caddy la joint, sur le port 8443 du r�
 <!-- snippet: examples/docker/docker-compose.yml#gate -->
 ```yaml
 gate:
-  build:
-    context: ../..
-  image: filarr-gate:local
+  # `:0.2` follows the 0.2.x fixes; `:0.2.0` pins this exact version.
+  image: ghcr.io/filarr-work/gate:0.2
+  # Variant, from a clone of the repository: replace the line above with
+  #   build:
+  #     context: ../..
+  #   image: filarr-gate:local
+  # and start with `docker compose up -d --build`.
   restart: unless-stopped
   environment:
     FILARR_GATE_TOKEN: ${FILARR_GATE_TOKEN:?paste the token in .env}
@@ -112,7 +122,7 @@ Remplacez `gate.example.com` par votre nom. Ce que fait chaque choix :
 ## 3. Démarrer
 
 ```sh
-docker compose up -d --build
+docker compose up -d
 docker compose logs -f gate
 ```
 
@@ -151,9 +161,12 @@ docker compose exec gate filarr-gate doctor
 ## Mettre à jour
 
 ```sh
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+`:0.2` apporte les correctifs 0.2.x ; pour une nouvelle version mineure, changez l'étiquette dans `docker-compose.yml`
+après avoir lu les [changements](https://github.com/filarr-work/filarr-gate/blob/main/CHANGELOG.fr.md).
 
 Le volume garde les clés, les webhooks et les réglages. Les livraisons de webhooks en attente vivent en mémoire et un
 redémarrage les abandonne (le journal dit combien).
@@ -174,16 +187,28 @@ réglages : `filarr-gate export` ([migration](../explain/migration.fr.md)).
 ## Sans Compose
 
 ```sh
-docker build -t filarr-gate .
 docker run -d --name filarr-gate --restart unless-stopped \
   -e FILARR_GATE_TOKEN=flr_live_… \
   -p 8443:8443 -v filarr-gate:/data \
-  filarr-gate
+  ghcr.io/filarr-work/gate:0.2
 docker exec filarr-gate filarr-gate keys create --name ERP
 ```
 
 Ici, l'API est publiée en HTTP simple sur le port 8443 de l'hôte : gardez-la sur un réseau privé, ou ajoutez
 `FILARR_GATE_TLS_CERT` et `FILARR_GATE_TLS_KEY` (des chemins dans le conteneur) pour du HTTPS sans mandataire.
+
+## Construire l'image vous-même
+
+Depuis un clone de ce dépôt, la même image que celle publiée :
+
+```sh
+git clone https://github.com/filarr-work/filarr-gate.git && cd filarr-gate
+git checkout v0.2.0
+docker build -t filarr-gate:local .
+```
+
+Puis, dans `docker-compose.yml`, remplacez `image: ghcr.io/filarr-work/gate:0.2` par les lignes `build:` en
+commentaire et démarrez avec `docker compose up -d --build` ; ou donnez `filarr-gate:local` à `docker run`.
 
 ## Et ensuite
 

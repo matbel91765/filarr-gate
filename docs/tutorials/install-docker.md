@@ -13,17 +13,23 @@ will know how to update it and back it up.
 - A Linux server with Docker and the Compose plugin (`docker compose version`).
 - A DNS name pointing at the server (`gate.example.com` below) and ports 80 and 443 open, for the certificate.
 - The token `flr_live_…` of the access ([open a database to an API](open-a-database.md)).
-- No image is published yet: you build it from a clone of this repository. Its `Dockerfile` makes a small image
-  (Node 22, Alpine) that runs as the non-root user `node`, keeps everything in `/data`, and checks its own health.
+- The image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64): `:0.2` follows the 0.2.x fixes, `:0.2.0` pins
+  this exact version. It is small (Node 22, Alpine), runs as the non-root user `node`, keeps everything in `/data`, and
+  checks its own health. It is signed (cosign) and built by the repository's release chain
+  ([release plan](../release.md)).
 
 ## 1. Get the files
 
 ```sh
-git clone https://github.com/filarr-work/filarr-gate.git
-cd filarr-gate/examples/docker
+mkdir filarr-gate && cd filarr-gate
+for f in docker-compose.yml Caddyfile example.env; do
+  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.2.0/examples/docker/$f"
+done
 cp example.env .env
 chmod 600 .env
 ```
+
+(Or `git clone https://github.com/filarr-work/filarr-gate.git` then `cd filarr-gate/examples/docker`.)
 
 Edit `.env`: paste the token, and choose a management password (ten characters or more).
 
@@ -42,9 +48,13 @@ Given this way, the token is never written to the volume; it lives in `.env`, re
 <!-- snippet: examples/docker/docker-compose.yml#gate -->
 ```yaml
 gate:
-  build:
-    context: ../..
-  image: filarr-gate:local
+  # `:0.2` follows the 0.2.x fixes; `:0.2.0` pins this exact version.
+  image: ghcr.io/filarr-work/gate:0.2
+  # Variant, from a clone of the repository: replace the line above with
+  #   build:
+  #     context: ../..
+  #   image: filarr-gate:local
+  # and start with `docker compose up -d --build`.
   restart: unless-stopped
   environment:
     FILARR_GATE_TOKEN: ${FILARR_GATE_TOKEN:?paste the token in .env}
@@ -104,7 +114,7 @@ Replace `gate.example.com` with your name. What each choice does:
 ## 3. Start
 
 ```sh
-docker compose up -d --build
+docker compose up -d
 docker compose logs -f gate
 ```
 
@@ -142,9 +152,12 @@ docker compose exec gate filarr-gate doctor
 ## Update
 
 ```sh
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+`:0.2` brings the 0.2.x fixes; for a new minor version, change the tag in `docker-compose.yml` after reading the
+[changes](https://github.com/filarr-work/filarr-gate/blob/main/CHANGELOG.md).
 
 The volume keeps the keys, webhooks and settings. Pending webhook deliveries live in memory and are dropped by a
 restart (the log says how many).
@@ -165,16 +178,28 @@ like a secret. To move the gate to another server, prefer the settings package: 
 ## Without Compose
 
 ```sh
-docker build -t filarr-gate .
 docker run -d --name filarr-gate --restart unless-stopped \
   -e FILARR_GATE_TOKEN=flr_live_… \
   -p 8443:8443 -v filarr-gate:/data \
-  filarr-gate
+  ghcr.io/filarr-work/gate:0.2
 docker exec filarr-gate filarr-gate keys create --name ERP
 ```
 
 Here the API is published as plain HTTP on port 8443 of the host: keep it on a private network, or add
 `FILARR_GATE_TLS_CERT` and `FILARR_GATE_TLS_KEY` (paths inside the container) for HTTPS without a proxy.
+
+## Build the image yourself
+
+From a clone of this repository, the same image as the published one:
+
+```sh
+git clone https://github.com/filarr-work/filarr-gate.git && cd filarr-gate
+git checkout v0.2.0
+docker build -t filarr-gate:local .
+```
+
+Then, in `docker-compose.yml`, replace `image: ghcr.io/filarr-work/gate:0.2` with the commented `build:` lines and
+start with `docker compose up -d --build`; or give `filarr-gate:local` to `docker run`.
 
 ## Next
 

@@ -25,8 +25,8 @@ The token opens the databases: give it only to a program you would give the data
 npm install @filarr/gate
 ```
 
-Not published on npm yet: from a clone of this repository, `npm ci && npm run build`, then use
-`packages/gate` (for instance `npm install /path/to/filarr-gate/packages/gate`).
+To try a change that is not released yet: from a clone of this repository, `npm ci && npm run build`, then
+`npm install /path/to/filarr-gate/packages/gate`.
 
 ## 2. Open, read
 

@@ -3,7 +3,7 @@
 [Lire en français](release.fr.md)
 
 What a release publishes, in which order, and how anyone can check that what was published is what this repository
-builds. **Nothing here has been published yet**; the steps marked *decision* wait for the maintainer.
+builds. The first release is **0.2.0**; how the maintainer publishes, step by step: [RELEASING.md](RELEASING.md).
 
 ## What is published
 
@@ -69,11 +69,10 @@ All of it is `.github/workflows/release.yml`; the step-by-step procedure for the
 5. Check: `npm view @filarr/gate dist.integrity` against the archive; `npm audit signatures`; `cosign verify` on the
    image; the Deploy button on a test account (never the maintainer's production one).
 
-## Decisions waiting for the maintainer
+## Names
 
-- **Image name.** Decided: `ghcr.io/filarr-work/gate`, the repository moving to the GitHub organisation
-  `filarr-work`. The Filarr app still shows `ghcr.io/filarr/gate:1`: its text must change.
-- **Image tag.** `:1` does not exist before a 1.0; until then the app should show `ghcr.io/filarr-work/gate:0.2`.
-- **Volume.** Aligned on the app: `/data` (it was `/var/lib/filarr-gate` in 0.1, never published).
-- **npm scope.** `@filarr` must be an npm organisation owned by the maintainer before the first publish; otherwise,
-  what to rename: [RELEASING.md](RELEASING.md#5-npm-the-filarr-organisation-and-trusted-publishing).
+- **Image.** `ghcr.io/filarr-work/gate`: `:0.2.0`, `:0.2` (follows the 0.2.x fixes) and `latest`; `:<major>` from
+  1.0 on.
+- **Volume.** `/data`, as in the Filarr app.
+- **npm.** `@filarr/gate` (the library) and `filarr-gate` (the command). If the scope ever changes, what to rename:
+  [RELEASING.md](RELEASING.md#5-npm-the-filarr-organisation-and-trusted-publishing).

@@ -15,10 +15,18 @@ dans **Paramètres › Accès API**.
 - **Un jeton** `flr_live_…` : Filarr le montre une seule fois, quand vous ouvrez une base à une API
   ([ouvrir une base à une API](open-a-database.fr.md)). Pas de compte Filarr sous la main ? L'étape 2 vous donne un
   Filarr en mémoire avec trois bases de démonstration, de quoi suivre chaque tutoriel.
-- La boîte noire n'est pas encore publiée sur npm : elle se lance depuis un clone de ce dépôt. Une fois publiée,
-  `npx filarr-gate` remplacera partout ci-dessous `node packages/cli/dist/cli.js`.
+- La boîte noire est le paquet npm `filarr-gate` ; les commandes ci-dessous l'appellent `filarr-gate`.
 
 ## 1. Récupérer la boîte noire
+
+```sh
+npm install -g filarr-gate@0.2
+filarr-gate version
+```
+
+(Ou, sans l'installer : `npx filarr-gate@0.2 <commande>`.)
+
+**Ou depuis un clone** de ce dépôt, qui donne aussi le Filarr en mémoire de l'étape 2 :
 
 ```sh
 git clone https://github.com/filarr-work/filarr-gate.git
@@ -27,8 +35,8 @@ npm ci
 npm run build
 ```
 
-`npm run build` construit la bibliothèque, la commande et l'interface de gestion. Pour taper moins, faites un alias
-pour ce terminal :
+`npm run build` construit la bibliothèque, la commande et l'interface de gestion. Faites ensuite un alias pour ce
+terminal :
 
 ```sh
 alias filarr-gate="node $PWD/packages/cli/dist/cli.js"
@@ -43,7 +51,7 @@ $gateCli = "$PWD\packages\cli\dist\cli.js"; function filarr-gate { node $gateCli
 
 ## 2. (Facultatif) Un Filarr pour essayer
 
-Dans un deuxième terminal, depuis le même dossier :
+Dans un deuxième terminal, depuis un clone (étape 1) :
 
 ```sh
 npm run mock-filarr

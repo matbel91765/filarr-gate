@@ -1,17 +1,21 @@
 # Filarr Gate on a server, with Docker Compose, behind Caddy for HTTPS.
 #
 #   cp example.env .env      # then paste the token and a password in .env
-#   docker compose up -d --build
+#   docker compose up -d
 #   docker compose exec gate filarr-gate keys create --name ERP
 #
-# The image is built from the repository (no image is published yet): run this from a clone,
-# or set `build.context` to the clone's path.
+# The gate runs the published image ghcr.io/filarr-work/gate (linux/amd64, linux/arm64). To build it yourself from a
+# clone instead, see the comment in the service below.
 services:
   # region gate
   gate:
-    build:
-      context: ../..
-    image: filarr-gate:local
+    # `:0.2` follows the 0.2.x fixes; `:0.2.0` pins this exact version.
+    image: ghcr.io/filarr-work/gate:0.2
+    # Variant, from a clone of the repository: replace the line above with
+    #   build:
+    #     context: ../..
+    #   image: filarr-gate:local
+    # and start with `docker compose up -d --build`.
     restart: unless-stopped
     environment:
       FILARR_GATE_TOKEN: ${FILARR_GATE_TOKEN:?paste the token in .env}

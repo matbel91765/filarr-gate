@@ -5,7 +5,7 @@
 [Lire en français](cli.fr.md)
 
 ```sh
-npx filarr-gate <command> [options]       # once published on npm
+npx filarr-gate <command> [options]       # or filarr-gate, after npm install -g filarr-gate
 node packages/cli/dist/cli.js <command>   # from a clone, after npm ci && npm run build
 docker exec <container> filarr-gate <command>
 ```

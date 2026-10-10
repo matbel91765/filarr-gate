@@ -311,7 +311,7 @@ function cliMd(help: string, lang: Lang, problems: string[]): string {
 ${langLink('fr', 'cli.md')}
 
 \`\`\`sh
-npx filarr-gate <commande> [options]      # une fois publiée sur npm
+npx filarr-gate <commande> [options]      # ou filarr-gate, après npm install -g filarr-gate
 node packages/cli/dist/cli.js <commande>  # depuis un clone, après npm ci && npm run build
 docker exec <conteneur> filarr-gate <commande>
 \`\`\`
@@ -352,7 +352,7 @@ ${help}
 ${langLink('en', 'cli.fr.md')}
 
 \`\`\`sh
-npx filarr-gate <command> [options]       # once published on npm
+npx filarr-gate <command> [options]       # or filarr-gate, after npm install -g filarr-gate
 node packages/cli/dist/cli.js <command>   # from a clone, after npm ci && npm run build
 docker exec <container> filarr-gate <command>
 \`\`\`

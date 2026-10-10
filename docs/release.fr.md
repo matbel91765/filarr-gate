@@ -3,7 +3,8 @@
 [Read in English](release.md)
 
 Ce que publie une version, dans quel ordre, et comment chacun peut vérifier que ce qui a été publié est bien ce que ce
-dépôt construit. **Rien n'est encore publié** ; les étapes marquées *décision* attendent le mainteneur.
+dépôt construit. La première publication est la **0.2.0** ; comment le mainteneur publie, pas à pas :
+[RELEASING.fr.md](RELEASING.fr.md).
 
 ## Ce qui est publié
 
@@ -71,12 +72,10 @@ Tout cela est `.github/workflows/release.yml` ; la marche à suivre du mainteneu
 5. Vérifier : `npm view @filarr/gate dist.integrity` comparé à l'archive ; `npm audit signatures` ; `cosign verify` sur
    l'image ; le bouton Deploy sur un compte d'essai (jamais celui de production du mainteneur).
 
-## Les décisions qui attendent le mainteneur
+## Les noms
 
-- **Nom de l'image.** Décidé : `ghcr.io/filarr-work/gate`, le dépôt passant dans l'organisation GitHub `filarr-work`.
-  L'appli Filarr affiche encore `ghcr.io/filarr/gate:1` : son texte doit changer.
-- **Étiquette de l'image.** `:1` n'existe pas avant une 1.0 ; d'ici là, l'appli devrait afficher
-  `ghcr.io/filarr-work/gate:0.2`.
-- **Volume.** Aligné sur l'appli : `/data` (c'était `/var/lib/filarr-gate` en 0.1, jamais publiée).
-- **Portée npm.** `@filarr` doit être une organisation npm détenue par le mainteneur avant la première publication ;
-  sinon, ce qu'il faut renommer : [RELEASING.fr.md](RELEASING.fr.md#5-npm--lorganisation-filarr-et-la-publication-de-confiance).
+- **Image.** `ghcr.io/filarr-work/gate` : `:0.2.0`, `:0.2` (suit les correctifs 0.2.x) et `latest` ; `:<majeure>` à
+  partir de la 1.0.
+- **Volume.** `/data`, comme dans l'appli Filarr.
+- **npm.** `@filarr/gate` (la bibliothèque) et `filarr-gate` (la commande). Si la portée change un jour, ce qu'il faut
+  renommer : [RELEASING.fr.md](RELEASING.fr.md#5-npm--lorganisation-filarr-et-la-publication-de-confiance).

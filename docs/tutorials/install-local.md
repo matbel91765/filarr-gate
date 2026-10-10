@@ -14,10 +14,18 @@ minutes, no writes). The limits of each plan are on Filarr's pricing page and in
 - **A token** `flr_live_…`: Filarr shows it once when you open a database to an API
   ([open a database to an API](open-a-database.md)). No Filarr account at hand? Step 2 gives you an in-memory Filarr
   with three demo databases, enough to follow every tutorial.
-- The gate is not published on npm yet: you run it from a clone of this repository. Once it is published,
-  `npx filarr-gate` replaces `node packages/cli/dist/cli.js` everywhere below.
+- The gate is the npm package `filarr-gate`; the commands below call it `filarr-gate`.
 
 ## 1. Get the gate
+
+```sh
+npm install -g filarr-gate@0.2
+filarr-gate version
+```
+
+(Or, without installing it: `npx filarr-gate@0.2 <command>`.)
+
+**Or from a clone** of this repository, which also gives the in-memory Filarr of step 2:
 
 ```sh
 git clone https://github.com/filarr-work/filarr-gate.git
@@ -26,7 +34,7 @@ npm ci
 npm run build
 ```
 
-`npm run build` builds the library, the command and the management UI. To type less, make an alias for this shell:
+`npm run build` builds the library, the command and the management UI. Then make an alias for this shell:
 
 ```sh
 alias filarr-gate="node $PWD/packages/cli/dist/cli.js"
@@ -41,7 +49,7 @@ $gateCli = "$PWD\packages\cli\dist\cli.js"; function filarr-gate { node $gateCli
 
 ## 2. (Optional) A Filarr to try with
 
-In a second terminal, from the same folder:
+In a second terminal, from a clone (step 1):
 
 ```sh
 npm run mock-filarr
