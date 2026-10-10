@@ -3,6 +3,22 @@
   "version": "0.1.0",
   "description": "Serve a Filarr database as an API, without Filarr ever seeing your data: a customer-hosted replica of end-to-end encrypted Filarr database stores, with a local API, webhooks, MCP and a management UI.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matbel91765/filarr-gate.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/matbel91765/filarr-gate#readme",
+  "bugs": {
+    "url": "https://github.com/matbel91765/filarr-gate/issues"
+  },
+  "keywords": [
+    "filarr",
+    "end-to-end encryption",
+    "api",
+    "database",
+    "replica"
+  ],
   "type": "module",
   "bin": {
     "filarr-gate": "dist/cli.js"
@@ -23,7 +39,8 @@
     "build:server": "node scripts/build.mjs",
     "build:ui": "vite build --config ui/vite.config.ts",
     "dev:ui": "vite --config ui/vite.config.ts",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "prepack": "node ../../scripts/prepack.mjs LICENSE NOTICE README.md README.fr.md SECURITY.md"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",

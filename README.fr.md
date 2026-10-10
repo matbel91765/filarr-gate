@@ -4,201 +4,182 @@
 
 [Read in English](README.md)
 
-> **État : v0.1, en avance sur le serveur.** La boîte noire suit le contrat gelé `api-base-1` (révision 2) et le
-> protocole des magasins `db-store-1` (révision 3.9). Le côté Filarr est construit et a été éprouvé de bout en bout avec
-> cette boîte noire contre un serveur Filarr local (lecture, changements en direct, écriture, révocation), mais il
-> n'est pas encore en service (`API_BASE_SWITCH`, `API_BASE_WRITE` éteints) ; il s'ouvrira compte par compte. D'ici là,
-> essayez la boîte noire contre le Filarr en mémoire fourni dans ce dépôt (voir [Essayer sur sa machine](#essayer-sur-sa-machine)).
+> **État : v0.2, en avance sur le serveur.** La boîte noire suit les contrats gelés `api-base-1` (révisions 2 et 3),
+> `db-store-1` (3.9), `gate-fichiers-1`, `source-externe-1` et le paquet de réglages de `gate-heberge-1`. Elle est
+> éprouvée de bout en bout contre un serveur Filarr local (lecture, changements en direct, écriture, révocation, une
+> synchro PostgreSQL externe, un dépôt de fichier, la variante Cloudflare). Le côté Filarr est fusionné mais éteint
+> (`API_BASE_SWITCH`, `GATE_FILES_SWITCH`…) ; il s'ouvre compte par compte. Rien n'est encore publié (ni npm, ni image).
 
 Filarr chiffre vos notes et vos bases de bout en bout : ses serveurs gardent des blocs qu'ils ne savent pas lire.
-Pas de « clé d'API chez l'éditeur », donc. Filarr Gate prend le chemin inverse : une petite **boîte noire que vous
-faites tourner vous-même** (sur votre PC, dans Docker, sur votre serveur). Elle tient la clé des seules bases que vous
-lui ouvrez, en garde une copie déchiffrée en mémoire, et sert vos logiciels sur place.
+Filarr Gate est une petite **boîte noire que vous faites tourner vous-même** (dans votre code, sur un PC, dans Docker,
+sur votre compte Cloudflare) : elle tient la clé des bases que vous lui ouvrez, en garde une copie déchiffrée en
+mémoire, et sert vos logiciels.
 
 ```
- Filarr ──(blocs chiffrés)──▶ serveurs Filarr ──(blocs chiffrés)──▶ Filarr Gate ──(JSON en clair)──▶ ERP, BI, site, agent IA
-                                ne voient rien                       chez vous
+ Appli Filarr ──(blocs chiffrés)──▶ serveurs Filarr ──(blocs chiffrés)──▶ Filarr Gate ──(JSON en clair)──▶ votre ERP, BI, site, agent IA
+                                       ne voient rien                     chez vous
 ```
 
-## Ce qu'elle fait
+Dans Filarr : « ··· » sur une base › **Ouvrir à une API** donne un jeton (`flr_live_…`), montré une fois.
 
-- **Une vue, un point d'accès.** Chaque base devient `GET /v1/<base>`, et chacune de ses vues `GET /v1/<base>/<vue>`,
-  rejouée par le moteur de vues de Filarr lui-même (filtres, tris, colonnes affichées). Les slugs sont posés par
-  l'application à l'ouverture de la base : renommer une vue ne casse aucune intégration.
-- **SQL en lecture.** `POST /v1/sql` exécute un `SELECT` avec le moteur SQL de Filarr (sémantique de SQLite,
-  jointures, regroupements) sur les bases que la clé peut lire. Une requête enregistrée devient `GET /v1/q/<nom>`.
-- **OpenAPI 3.1** tirée des types des colonnes (`/openapi.json`, lisible sur `/docs`).
-- **Webhooks signés.** Une ligne est ajoutée, modifiée ou supprimée dans Filarr : la boîte noire la déchiffre et
-  appelle votre adresse, signée en HMAC-SHA256 (`Filarr-Gate-Signature: t=…,v1=…`), 8 essais en 24 h avec un délai
-  doublé. Un webhook peut suivre une vue, filtrer par une condition SQL, ne partir que quand la condition *devient*
-  vraie, et résoudre les relations.
-- **Clés des applications.** Vos logiciels n'ont jamais le jeton Filarr : chacun reçoit sa clé (`gk_…`, gardée en
-  empreinte), limitée à des bases, des vues ou des requêtes, en lecture ou en ajout/modification/suppression, avec un
-  débit maximal, des adresses autorisées et une échéance.
-- **Écriture** (éteinte d'office) : `POST`, `PATCH`, `DELETE` sur `/v1/<base>[/rows/<id>]` deviennent des registres
-  « dernier écrit gagne », scellés et validés chez Filarr en compare-and-swap, comme sur n'importe quel appareil.
-- **Serveur MCP** pour les assistants IA (HTTP sur `/mcp`, et stdio avec `filarr-gate mcp`), en lecture seule.
-- **Métriques Prometheus** sur `/metrics`, une sonde sur `/health`, un journal local (JSON Lines, 30 jours).
-- **Une interface de gestion complète** (français et anglais) : premier lancement, tableau de bord, bases et points
-  d'accès, explorateur SQL, clés des applications, webhooks, journal, consommation et limites, réglages.
+## Quatre façons de la faire tourner
 
-## Installer
+### 1. Dans votre code : `@filarr/gate`
 
-Node.js 20 ou plus récent.
+```js
+import { openGate } from '@filarr/gate';
+
+const gate = await openGate({ token: process.env.FILARR_GATE_TOKEN });
+const actifs = await gate.base('clients').view('clients-actifs').rows();
+```
+
+Node 20+ (éprouvé) ; seulement des API web standard (WebCrypto, `fetch`, WebSocket) : Deno, Bun et Workers devraient
+la faire tourner, sans essai là. Deux petites dépendances (`@noble/*`, `fflate`). `rows()`, `row(id)`,
+`view(slug).rows()`, `sql()`, `insert()`/`update()`/`delete()` (avec `write: true`), `on('change')`,
+`files.deposit()`, `status()`, `close()`. L'exemple complet, [examples/library-node](examples/library-node/index.mjs),
+tourne dans les essais.
+
+### 2. Sur une machine : `filarr-gate`
 
 ```sh
-# depuis npm (une fois le paquet publié)
-npx filarr-gate
-
-# depuis les sources
-git clone <ce dépôt> filarr-gate && cd filarr-gate
-npm ci && npm run build
-node dist/cli.js
+npx filarr-gate init --token flr_live_… --admin-password '<dix caractères au moins>'
+npx filarr-gate                                  # API locale sur 127.0.0.1:8443, interface sur http://127.0.0.1:8787/admin/
+npx filarr-gate keys create --name ERP --sql     # une clé d'application, montrée une fois
 ```
 
-Ouvrez ensuite l'interface de gestion sur <http://127.0.0.1:8787/admin/> et suivez les trois étapes : collez le jeton
-montré par Filarr (« ··· » › « Ouvrir à une API » sur une base), choisissez où l'API écoute, posez un mot de passe
-d'administration.
+Depuis les sources : `npm ci && npm run build`, puis `node packages/cli/dist/cli.js` au lieu de `npx filarr-gate`.
 
-Sans interface :
-
-```sh
-filarr-gate init --token flr_live_… --port 8443 --admin-password '…'
-filarr-gate                       # démarrer
-filarr-gate keys create --name ERP --sql   # une clé en lecture sur toutes les vues, montrée une fois
-```
-
-### Docker
+### 3. Dans Docker
 
 ```sh
 docker build -t filarr-gate .
-docker run -d --name filarr-gate \
-  -e FILARR_GATE_TOKEN=flr_live_… \
-  -e FILARR_GATE_ADMIN_PASSWORD='un long mot de passe' \
-  -p 8443:8443 -p 127.0.0.1:8787:8787 \
-  -v filarr-gate:/var/lib/filarr-gate \
-  filarr-gate
+docker run -d --name filarr-gate -e FILARR_GATE_TOKEN=flr_live_… -p 8443:8443 -v filarr-gate:/data filarr-gate
+docker exec filarr-gate filarr-gate keys create --name ERP
 ```
 
-L'image tourne sous l'utilisateur `node` (pas root), garde son état dans le volume `/var/lib/filarr-gate` et porte un
-`HEALTHCHECK` sur `/health`. Publiez le port de gestion sur `127.0.0.1` seulement. Si vous passez par l'interface plutôt
-que par l'environnement, la première mise en route demande le code affiché par `docker logs filarr-gate`.
+L'image tourne sous un utilisateur non root, garde tout dans le volume `/data` et a une sonde de santé. (Sa
+construction n'est pas encore jouée par les essais ; les mêmes étapes de construction et de lancement le sont.) Ajoutez
+`-p 127.0.0.1:8787:8787 -e FILARR_GATE_ADMIN_PASSWORD=…` pour l'interface de gestion (qui y entre lit les données).
 
-### Cloudflare (plus tard)
+### 4. Sur votre compte Cloudflare
 
-Une variante « sur votre propre compte Cloudflare » (un Worker et un Durable Object qui tient la copie) est prévue.
-Elle n'est pas encore construite.
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/matbel91765/filarr-gate)
+
+Ou à la main : `npm ci && npm run build && npx wrangler deploy`, puis `npx wrangler secret put FILARR_GATE_TOKEN` et
+`npx wrangler secret put FILARR_GATE_ADMIN_PASSWORD`. Un Worker et un objet durable tiennent la copie ; l'API est
+l'adresse du Worker, l'interface vit sous `/admin/`. Voir [docs/cloudflare.md](docs/cloudflare.md).
+
+## Ce qu'elle fait
+
+- **Des points d'accès tirés des vues.** `GET /v1/<base>` et `GET /v1/<base>/<vue>`, rejoués par le moteur de vues
+  de Filarr ; les slugs sont fixés par l'appli : renommer une vue ne casse aucune intégration. `POST /v1/sql` (lecture
+  seule, moteur SQL de Filarr), requêtes enregistrées, OpenAPI 3.1 (`/openapi.json`, `/docs`).
+- **Des clés d'application.** Vos logiciels n'ont jamais le jeton Filarr : chacun reçoit sa clé `gk_…` (gardée en
+  empreinte), limitée à des bases, des vues, des requêtes ou à la fente à fichiers, avec débit, adresses et expiration.
+- **L'écriture** (éteinte d'office) : `POST`, `PATCH`, `DELETE` deviennent des registres validés chez Filarr.
+- **Des webhooks signés** sur les lignes, les fichiers rangés et les synchros (HMAC-SHA256, essais pendant 24 h).
+- **La fente à fichiers** (`POST /v1/files`) : chaque fichier est scellé pour la boîte de dépôt que le créateur a liée
+  et signée dans Filarr ; exécutables et fichiers trop lourds sont refusés avant que rien ne parte. L'appli Filarr les
+  range ; ni Filarr ni la boîte noire ne savent où.
+- **Les bases externes** : les synchros que Filarr confie à cette boîte (D1, PostgreSQL, MySQL, Supabase, Airtable,
+  Google Sheets, Notion, CSV/JSON) tournent ici, avec vos clés, qui ne vont jamais chez Filarr. Voir
+  [docs/external-databases.md](docs/external-databases.md).
+- **Les réveils poussés** (`/_filarr/notify`, signés HMAC par Filarr) pour une boîte qui dort ou relève.
+- **La migration** : le paquet de réglages (clés, webhooks, requêtes, état des synchros) part scellé vers la suivante.
+- **MCP** pour les assistants IA, métriques **Prometheus**, journal local, interface de gestion en français et anglais.
+
+## Ligne de commande
+
+| commande | |
+|---|---|
+| `filarr-gate [serve]` | démarre l'API locale et l'interface de gestion |
+| `filarr-gate init --token … [--port] [--admin-port] [--admin-password] [--write] [--import FICHIER]` | range le jeton (0600) et les réglages |
+| `filarr-gate keys create --name N [--sql] [--mcp] [--files]` · `keys list` · `keys revoke ID` | clés d'application |
+| `filarr-gate sources list` · `sources key ID --stdin` · `sources run ID` · `sources pause/resume ID` | synchros externes |
+| `filarr-gate files test` · `files status ID` | la fente à fichiers |
+| `filarr-gate export --for-token … --out FICHIER` · `filarr-gate import FICHIER` | paquet de migration |
+| `filarr-gate doctor` | horloge, Filarr, jeton, clé du créateur, bases, quotas, fichiers, synchros (code 1 en cas d'échec) |
+| `filarr-gate health` · `filarr-gate mcp` · `filarr-gate version` | sonde, MCP sur stdio, version |
+
+`--json` partout. Sur la machine d'une boîte en marche (`docker exec` compris), les commandes passent par elle sans mot
+de passe ; `--remote URL --admin-password …` en atteint une sur une autre machine.
 
 ## Réglages
 
-Les variables d'environnement l'emportent sur `gate.toml` (dans le répertoire d'état, ou `FILARR_GATE_CONFIG`), qui
-l'emporte sur ce qui est réglé dans l'interface. Un réglage fixé par l'environnement ou le fichier apparaît verrouillé
-dans l'interface.
+Les variables d'environnement passent avant `gate.toml` (dans le répertoire d'état, ou `FILARR_GATE_CONFIG`), qui
+passe avant l'interface. Un réglage fixé par l'environnement ou le fichier est montré verrouillé.
 
 | variable | `gate.toml` | d'office | |
 |---|---|---|---|
-| `FILARR_GATE_TOKEN` | — | — | le jeton d'accès ; gardé en mémoire seulement, jamais écrit sur le disque |
-| `FILARR_GATE_STATE_DIR` | — | `~/.filarr-gate` | l'état : jeton (0600), `state.json` (0600), cache des blocs chiffrés, journal |
-| `FILARR_GATE_API_URL` | `api_url` | `https://api.filarr.com` | l'API Filarr (un worker local pour les essais) |
+| `FILARR_GATE_TOKEN` | — | — | le jeton ; jamais écrit sur le disque quand il est donné ici |
+| `FILARR_GATE_STATE_DIR` | — | `~/.filarr-gate` (`/data` dans Docker) | état, cache chiffré des blocs, journal, état chiffré des synchros |
+| `FILARR_GATE_API_URL` | `api_url` | `https://api.filarr.com` | l'API de Filarr |
 | `FILARR_GATE_HOST` / `_PORT` | `host` / `port` | `127.0.0.1` / `8443` | l'API locale |
 | `FILARR_GATE_ADMIN_HOST` / `_PORT` | `admin_host` / `admin_port` | `127.0.0.1` / `8787` | l'interface de gestion |
-| `FILARR_GATE_ADMIN_PASSWORD` | — | — | mot de passe d'administration sans interface |
-| `FILARR_GATE_WRITE` | `write` | `false` | l'écriture vers Filarr (§ 7 du contrat) |
-| `FILARR_GATE_TLS_CERT` / `_KEY` | `tls_cert` / `tls_key` | — | HTTPS de l'API locale (chemins PEM) |
-| `FILARR_GATE_CORS_ORIGINS` | `cors_origins` | aucune | pages web autorisées ; les autres sont refusées |
+| `FILARR_GATE_ADMIN_PASSWORD` | — | — | mot de passe d'administration sans l'écran de mise en route |
+| `FILARR_GATE_WRITE` | `write` | `false` | l'écriture vers Filarr |
+| `FILARR_GATE_TLS_CERT` / `_KEY` | `tls_cert` / `tls_key` | — | HTTPS pour l'API locale |
+| `FILARR_GATE_CORS_ORIGINS` | `cors_origins` | aucune | pages web admises à appeler l'API |
 | `FILARR_GATE_TRUST_PROXY` | `trust_proxy` | aucun | mandataires dont on croit `X-Forwarded-For` |
-| `FILARR_GATE_METRICS` / `_MCP` / `_DOCS` | `metrics` / `mcp` / `docs` | oui / non / oui | `/metrics`, `/mcp`, `/docs` et `/openapi.json` publics |
-| `FILARR_GATE_JOURNAL_DAYS` | `journal_days` | `30` | retenue du journal local |
+| `FILARR_GATE_METRICS` / `_MCP` / `_DOCS` | `metrics` / `mcp` / `docs` | oui / non / oui | `/metrics`, `/mcp`, `/docs` |
+| `FILARR_GATE_NOTIFY` | `notify` | oui | accepter les réveils poussés de Filarr |
+| `FILARR_GATE_FILES_DENY` / `_ALLOW` / `_MAX_BYTES` | `files_deny` / `files_allow` / `files_max_bytes` | liste du contrat / aucune / 100 Mio | le filtre des fichiers |
+| `FILARR_GATE_JOURNAL_DAYS` | `journal_days` | `30` | durée du journal local |
 | `FILARR_GATE_CACHE` | `cache` | `disk` | `memory` : rien sur le disque, pas même les blocs chiffrés |
-| `FILARR_GATE_POLL_SECONDS` | `poll_seconds` | `300` | relève sans le flux en direct (jamais sous 300) |
+| `FILARR_GATE_POLL_SECONDS` | `poll_seconds` | `300` | relève sans flux (jamais moins de 300) |
+| `FILARR_GATE_EXTDB_<ID>` | `[extdb."xs_…"] secret` | — | la clé d'une base externe (voir son écran) |
+| `FILARR_GATE_LOG_LEVEL` | — | `info` | `debug`, `info`, `warn`, `error` |
 
-## Essayer sur sa machine
+## API (résumé)
 
-Le dépôt fournit le Filarr en mémoire des essais : il sert les routes du contrat destinées à la boîte noire, avec trois
-bases de démonstration, et fait un geste de l'application toutes les 20 secondes.
-
-```sh
-npm ci
-npm run mock-filarr                     # affiche un jeton ; MOCK_TIER=free pour le palier Free
-FILARR_GATE_API_URL=http://127.0.0.1:8790 FILARR_GATE_TOKEN=flr_live_… npm start
-```
-
-Pour éprouver le vrai worker : `wrangler dev` dans le worker de Filarr, `API_BASE_SWITCH` (et `API_BASE_WRITE`)
-allumés pour le compte d'essai, un accès créé depuis l'application, et `FILARR_GATE_API_URL` vers le worker local.
-`wrangler dev` écoute sur 8787 d'office : déplacez l'interface de gestion avec `FILARR_GATE_ADMIN_PORT`.
-
-## L'API en bref
-
-Chaque appel `/v1` porte une clé d'application : `Authorization: Bearer gk_…`.
+Chaque appel porte une clé d'application : `Authorization: Bearer gk_…`.
 
 | route | |
 |---|---|
-| `GET /v1/<base>` | les lignes : `limit` (≤ 1000), `cursor`, `fields=a,b`, `sort=a,-b`, `q=texte`, `since=<version>`, filtres `champ=valeur` ou `champ[op]=valeur` (`eq ne lt lte gt gte contains in empty`) |
-| `GET /v1/<base>/<vue>` | la vue rejouée par le moteur de Filarr (une vue Requête rend son résultat SQL) |
-| `GET /v1/<base>/rows/<id>` | une ligne |
-| `POST /v1/<base>` | ajouter une ligne (objet) ou plusieurs (tableau, ≤ 500) ; `Idempotency-Key` respecté ; un champ absent prend la valeur par défaut de sa colonne, comme **Nouvelle ligne** dans Filarr (`null` le laisse vide) |
-| `PATCH /v1/<base>/rows/<id>` | modifier des champs (`null` vide) |
-| `DELETE /v1/<base>/rows/<id>` | supprimer (la suppression l'emporte sur une modification concurrente, comme dans Filarr) |
-| `POST /v1/sql` | `{ "sql": "SELECT …" }`, en lecture seule (`400 sql_read_only` sinon) |
-| `GET /v1/q/<requête>` | une requête enregistrée |
-| `GET /openapi.json`, `GET /docs` | la description |
-| `POST /mcp` | MCP (JSON-RPC) : `list_bases`, `query_view`, `get_row`, `run_sql` |
-| `GET /health`, `GET /metrics` | sonde et Prometheus |
+| `GET /v1/<base>` | lignes : `limit` (≤ 1000), `cursor`, `fields`, `sort`, `q`, `since`, filtres `champ=valeur` ou `champ[op]=valeur` |
+| `GET /v1/<base>/<vue>` · `GET /v1/<base>/rows/<id>` | une vue, une ligne |
+| `POST /v1/<base>` · `PATCH`/`DELETE /v1/<base>/rows/<id>` | écriture (`409 field_managed` sur une colonne alimentée par une source externe) |
+| `POST /v1/sql` · `GET /v1/q/<requête>` | SQL en lecture, requêtes enregistrées |
+| `POST /v1/files` · `GET /v1/files/<id>` | déposer un fichier (multipart ou corps brut), son statut |
+| `POST /mcp` · `GET /openapi.json` · `GET /health` · `GET /metrics` | MCP, description, sonde, métriques |
 
-Une ligne vaut `{ "id", <champs>, "created_at", "updated_at" }`. Le nom d'un champ suit la colonne (`Dernier contact`
-→ `dernier_contact`) et reste le même quand la colonne est renommée. Une sélection rend le libellé de l'option, une
-relation les identifiants des lignes, un agrégat ou une formule la valeur calculée par le moteur de Filarr. Une
-relation vers une base que le jeton n'ouvre pas rend les identifiants bruts, et ses agrégats valent `null`, cités dans
-`unresolved` (contrat § 8). Une liste répond `{ rows, next, total, version }`.
+Les webhooks sont des `POST` avec `Filarr-Gate-Event`, `Filarr-Gate-Delivery` et `Filarr-Gate-Signature: t=…,v1=…`,
+où `v1 = HMAC-SHA256(secret, t + "." + corps brut)`.
 
-Une livraison de webhook est un `POST` avec `Filarr-Gate-Event`, `Filarr-Gate-Delivery` et
-`Filarr-Gate-Signature: t=<secondes>,v1=<hex>`, où `v1 = HMAC-SHA256(secret, t + "." + corps brut)`. Vérifiez sur le
-corps brut, et refusez un horodatage de plus de 5 minutes.
+## Sécurité, en bref
 
-## La sécurité, en bref
+- Un jeton n'ouvre **que les bases choisies**, jamais le compte. Il ne quitte jamais la boîte : les clés sont tirées
+  sur place et le secret effacé de la mémoire. Chaque clé scellée est vérifiée à sa place avant usage ; chaque bloc
+  contre l'empreinte de la tête avant d'être déchiffré.
+- La clé d'identité du créateur est authentifiée par une étiquette que seul le jeton sait calculer ; boîtes de dépôt,
+  définitions de synchro et cible d'une migration ne sont acceptées que signées par cette clé. Un serveur ne peut pas y
+  substituer la sienne.
+- Les lignes déchiffrées ne vivent qu'en mémoire. Le disque garde des blocs chiffrés, les empreintes des clés, les
+  secrets des webhooks, les clés des bases externes chiffrées sous une clé tirée du jeton, et l'état chiffré des
+  synchros. Une révocation efface tout.
+- Qui fait tourner la boîte, ou tient le mot de passe de gestion, tient les données. Les vues sont une commodité, pas
+  une frontière.
 
-- Un jeton d'accès n'ouvre **que les bases choisies**, jamais le compte, les notes ni les fichiers. Le jeton ne
-  quitte pas la boîte noire : elle en dérive sur place `A_auth` (la preuve que Filarr compare à une empreinte) et
-  `A_enc` (la clé qui ouvre les clés des bases scellées), puis efface le secret de sa mémoire.
-- Chaque clé de base scellée est vérifiée à sa place (accès, magasin, époque, génération) avant usage ; une clé
-  trouvée ailleurs est refusée, jamais utilisée. Chaque bloc est vérifié contre l'empreinte de la tête avant d'être
-  déchiffré.
-- Les lignes déchiffrées vivent en mémoire seulement. Le disque garde les blocs chiffrés (tels que Filarr les garde),
-  le jeton (0600), les empreintes des clés des applications et les secrets des webhooks. À la révocation, tout est
-  effacé, cache compris.
-- Révoquer un accès coupe tout de suite au serveur, et les clés des bases passent à une nouvelle génération : un jeton
-  révoqué ne lit rien de ce qui s'écrit ensuite. Une clé absente s'affiche « clé manquante pour (e, g) » ; un bloc
-  n'est jamais sauté.
-- Une boîte noire lit les bases entières : une vue est un confort, pas une frontière cryptographique. La machine qui
-  la fait tourner, et qui détient le mot de passe de gestion, détiennent les données.
-
-Détails : [docs/architecture.md](docs/architecture.md).
-
-## Paliers et limites
-
-Filarr Gate fonctionne à tous les paliers Filarr, Free compris. Filarr ne compte que ce qui passe par ses serveurs
-(requêtes de synchro, volume descendu, validations acceptées) ; les lectures servies par votre boîte noire ne sont
-jamais comptées. Les limites sont publiées par Filarr sur `/public/api-limits` et montrées dans l'écran
-« Consommation et limites » ; en Free, pas de flux en direct : la boîte noire relève toutes les 300 secondes. Une
-limite atteinte, la boîte noire sert sa dernière copie et respecte `Retry-After`.
+Détails : [docs/architecture.md](docs/architecture.md), [SECURITY.md](SECURITY.md).
 
 ## Développement
 
 ```sh
-npm test            # vitest : vecteurs dorés des deux contrats, réplique, API locale, traductions de l'interface
+npm ci
+npm test            # essais unitaires et d'intégration, contre un Filarr en mémoire (plus wrangler dev et PostgreSQL s'ils sont là)
 npm run typecheck
-npm run build       # dist/cli.js (esbuild) et dist/ui (Vite + Preact)
+npm run build
+npm run mock-filarr # un Filarr en mémoire avec des bases de démonstration, pour essayer à la main
 ```
 
-`src/core` est une copie à l'identique du cœur portable de Filarr (chiffrement et codec du magasin, registres, moteur
-de vues, moteur SQL), relicenciée Apache-2.0 par le titulaire des droits ; `src/core/PROVENANCE.json` cite chaque
-fichier et son commit d'origine, et `scripts/copy-core.mjs` la renouvelle. Seuls les imports de plateforme de deux
-fichiers pointent vers de petites cales.
+De bout en bout contre le vrai worker de Filarr, lancé en local par le banc de Filarr : voir l'en-tête de
+[test/worker.e2e.test.ts](test/worker.e2e.test.ts) (`npm run test:e2e`).
+
+Arborescence : `packages/core` (le cœur portable de Filarr, recopié tel quel et relicencié Apache-2.0, et les modules
+purs de la boîte), `packages/gate` (la bibliothèque), `packages/server` (la boîte noire sans moteur),
+`packages/cli` (Node, l'interface, Docker), `packages/cloudflare` (le Worker). Plan de publication :
+[docs/release.md](docs/release.md).
 
 ## Licence
 
-[Apache-2.0](LICENSE). Voir [NOTICE](NOTICE).
-
-## Sécurité
-
-Signalez une faille en privé : voir [SECURITY.md](SECURITY.md).
+[Apache-2.0](LICENSE). Voir [NOTICE](NOTICE). Signaler une faille en privé : [SECURITY.md](SECURITY.md).

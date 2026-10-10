@@ -11,7 +11,10 @@
  *   FILARR_E2E_ACCOUNT=C:/tmp/banc-gate/worker/comptes/gate-e2e-1@example.test.txt \
  *     npx vitest run test/worker.e2e.test.ts
  *
- * Sans ces deux variables, les essais sont sautés (`npm test` ne demande aucun banc).
+ * Facultatif : `FILARR_E2E_D1=<filarg>/scripts/banc/d1-locale.sh FILARR_E2E_WORKER_DIR=C:/tmp/banc-gate/worker`
+ * (la boîte de dépôt des fichiers, et les plafonds horaires remis à zéro sur la D1 LOCALE), `FILARR_E2E_CF_PORT=<port>`
+ * (la variante Cloudflare sous wrangler dev, sur ce port et le suivant), PostgreSQL installé (port 3070).
+ * Sans `FILARR_E2E_WORKER` et `FILARR_E2E_ACCOUNT`, les essais sont sautés (`npm test` ne demande aucun banc).
  * L'application est jouée par `test/e2e/realFilarr.ts` (réplique de l'appli recopiée de
  * filarg) : la base au magasin, l'accès (révision 3), les gestes, la révocation.
  */

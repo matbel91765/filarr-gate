@@ -1,7 +1,8 @@
 # Architecture
 
-> Follows the frozen contracts `api-base-1` (revision 2) and `db-store-1` (revision 3.9) of the Filarr apps. Where
-> this document and the contracts disagree, the contracts win.
+> Follows the frozen contracts of the Filarr apps: `api-base-1` (revisions 2 and 3), `db-store-1` (3.9),
+> `gate-fichiers-1`, `source-externe-1`, and the settings package of `gate-heberge-1`. Where this document and the
+> contracts disagree, the contracts win.
 
 ## Parts
 
@@ -51,11 +52,14 @@ gate parses views with Filarr's own reader (`parseDbData`) and replays them with
 ## Inside the gate
 
 ```
-src/core       Filarr's portable core, copied verbatim (store crypto, codec, registers, zones, view engine, SQL engine)
-src/replica    token, Filarr HTTP client, grants and manifests, block cache, store mirror, replicator (stream / polling)
-src/api        local API: rows, views, SQL, OpenAPI, app keys, webhooks, writes, MCP
-src/admin      management API behind a session, static files of the UI
-ui/            management UI (Preact, built by Vite into dist/ui)
+packages/core       Filarr's portable core, copied verbatim (store crypto, codec, registers, zones, view engine, SQL engine),
+                    plus the gate's pure modules: engine/gate (creator tag, wake-ups, files, settings package) and
+                    engine/extsrc (external sync: definitions, identity, conversions, mergeCell, planPass, seals)
+packages/gate       the library: token, Filarr HTTP client, stream openers, block cache, store mirror, replicator, openGate
+packages/server     the black box without an engine (Request/Response): local API, management API, keys, webhooks, MCP,
+                    file slot, sync runner and connectors, migration, doctor
+packages/cli        Node: configuration, state files (0600), HTTP adapter, command line, management UI (Preact), Docker
+packages/cloudflare a Worker and a Durable Object hosting the same box
 ```
 
 ### Reading
@@ -105,6 +109,50 @@ The gate never reads a database it was not given. A relation cell returns the ra
 database returns `null` and the field is listed in `unresolved`. Relations between opened databases resolve through
 the owner block id of each store (`head.dbId`). In SQL, a database that is not opened appears as a table holding only
 `id`, as in Filarr's Query view.
+
+## Revision 3
+
+### The creator's key
+
+`GET /api-access/self` returns `creator: { userId, signingPublicKey, tag }` and `access.bindSig`. The gate recomputes
+`tag = HMAC(A_mac, "filarr/api/v1|creator|" + accessId + "|" + signingPublicKey)` with `A_mac` derived from the token, and
+checks `bind_sig` (the creator's signature of the access public key). Only then is the key **authenticated**: deposit
+boxes (`boxSig`), sync definitions and a migration target are accepted only when signed by it. A server cannot forge the
+tag, nor substitute its own key.
+
+### Push wake-ups
+
+When the creator gives an address, Filarr posts `{ a, t, storeId?, seq?, state?, at }` to `/_filarr/notify`, signed
+`Filarr-Notify: t=<s>,v1=HMAC-SHA256(A_notify, t + "." + body)`. The gate checks the signature on the raw body and a
+300-second window, answers 202, then re-reads through its usual routes: a wake-up carries no content. Close code 4308
+(hosted box asleep) is not an error.
+
+### File slot
+
+`POST /v1/files` → the filter (extension list, executable signatures MZ/ELF/Mach-O/`#!`, size) refuses before anything
+leaves → a fresh `K_file`, chunks of 16 MiB (`IV ‖ AES-GCM`), the manifest encrypted under `K_file`, and `K_file` sealed
+to the deposit box (`filarr.filerequest.seal.v1`) → `self/files/init`, `chunk`, `finalize`. The app opens and files
+it; the gate only learns `filed` or `rejected` (and `file.filed` webhooks fire).
+
+### External databases
+
+The sync runner reads the definitions in `schema.extra.extSource` of the opened stores that name this access, checks
+their signature, and runs a pass under a lease: mailbox decisions, source read, `planPass` (pure, the same code the
+apps run), conditional writes to the source, one Filarr commit, then the encrypted shadow (`K_shadow`) and the published
+status and queue (`K_xs`, readable by the database's members). See [external-databases.md](external-databases.md).
+
+### Migration
+
+The settings package (`gate-settings-1`: app key hashes, webhooks and secrets, saved queries, sync shadows, file filter,
+CORS, write) is sealed to the next gate's public key after checking its `bind_sig`, online (`self/export`, then the
+pending identity reads `self/import`) or as a file (`filarr-gate export` / `init --import`). It never carries the admin
+password nor an external database key.
+
+### Where it runs
+
+The box is written against `Request`/`Response` and small storage interfaces (state, journal, block cache, blobs). Node
+adds files, ports and the `ws` stream; the Cloudflare variant adds a Durable Object, alarms instead of timers, and no
+stream (polling plus wake-ups). The library uses the replicator alone.
 
 ## Revocation
 

@@ -7,3 +7,9 @@ dist/
 .DS_Store
 .dev.vars
 .wrangler/
+packages/*/LICENSE
+packages/*/NOTICE
+packages/cli/README.md
+packages/cli/README.fr.md
+packages/cli/SECURITY.md
+/release/
