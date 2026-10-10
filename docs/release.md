@@ -16,12 +16,14 @@ builds. The first release is **0.2.0**; how the maintainer publishes, step by st
 | checksums and attestations | `SHA256SUMS`, npm provenance, image provenance and SBOM | GitHub release of the tag |
 
 `packages/core`, `packages/server` and `packages/cloudflare` are private: bundled, never published on their own.
+`packages/host` (the hosted service) is private too: its module is attached to the GitHub release and goes into
+service only through the release chain.
 
 ## Versions
 
 One version for the whole repository, set by the maintainer only, in `packages/gate/package.json`,
 `packages/cli/package.json` (and the private packages, to keep them aligned). The library reports it as
-`lib-<version>` to Filarr, the server as `<version>`. This release: **0.2.0**.
+`lib-<version>` to Filarr, the server as `<version>`. This release: **0.3.0**.
 
 ## Before tagging
 
@@ -73,7 +75,7 @@ All of it is `.github/workflows/release.yml`; the step-by-step procedure for the
 
 ## Names
 
-- **Image.** `ghcr.io/filarr-work/gate`: `:0.2.0`, `:0.2` (follows the 0.2.x fixes) and `latest`; `:<major>` from
+- **Image.** `ghcr.io/filarr-work/gate`: `:0.3.0`, `:0.3` (follows the 0.3.x fixes) and `latest`; `:<major>` from
   1.0 on.
 - **Volume.** `/data`, as in the Filarr app.
 - **npm.** `@filarr/gate` (the library) and `filarr-gate` (the command). If the scope ever changes, what to rename:

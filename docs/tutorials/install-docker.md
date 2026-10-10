@@ -13,7 +13,7 @@ will know how to update it and back it up.
 - A Linux server with Docker and the Compose plugin (`docker compose version`).
 - A DNS name pointing at the server (`gate.example.com` below) and ports 80 and 443 open, for the certificate.
 - The token `flr_live_…` of the access ([open a database to an API](open-a-database.md)).
-- The image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64): `:0.2` follows the 0.2.x fixes, `:0.2.0` pins
+- The image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64): `:0.3` follows the 0.3.x fixes, `:0.3.0` pins
   this exact version. It is small (Node 22, Alpine), runs as the non-root user `node`, keeps everything in `/data`, and
   checks its own health. It is signed (cosign) and built by the repository's release chain
   ([release plan](../release.md)).
@@ -23,7 +23,7 @@ will know how to update it and back it up.
 ```sh
 mkdir filarr-gate && cd filarr-gate
 for f in docker-compose.yml Caddyfile example.env; do
-  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.2.0/examples/docker/$f"
+  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.3.0/examples/docker/$f"
 done
 cp example.env .env
 chmod 600 .env
@@ -48,8 +48,8 @@ Given this way, the token is never written to the volume; it lives in `.env`, re
 <!-- snippet: examples/docker/docker-compose.yml#gate -->
 ```yaml
 gate:
-  # `:0.2` follows the 0.2.x fixes; `:0.2.0` pins this exact version.
-  image: ghcr.io/filarr-work/gate:0.2
+  # `:0.3` follows the 0.3.x fixes; `:0.3.0` pins this exact version.
+  image: ghcr.io/filarr-work/gate:0.3
   # Variant, from a clone of the repository: replace the line above with
   #   build:
   #     context: ../..
@@ -156,7 +156,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`:0.2` brings the 0.2.x fixes; for a new minor version, change the tag in `docker-compose.yml` after reading the
+`:0.3` brings the 0.3.x fixes; for a new minor version, change the tag in `docker-compose.yml` after reading the
 [changes](https://github.com/filarr-work/filarr-gate/blob/main/CHANGELOG.md).
 
 The volume keeps the keys, webhooks and settings. Pending webhook deliveries live in memory and are dropped by a
@@ -181,7 +181,7 @@ like a secret. To move the gate to another server, prefer the settings package: 
 docker run -d --name filarr-gate --restart unless-stopped \
   -e FILARR_GATE_TOKEN=flr_live_… \
   -p 8443:8443 -v filarr-gate:/data \
-  ghcr.io/filarr-work/gate:0.2
+  ghcr.io/filarr-work/gate:0.3
 docker exec filarr-gate filarr-gate keys create --name ERP
 ```
 
@@ -194,11 +194,11 @@ From a clone of this repository, the same image as the published one:
 
 ```sh
 git clone https://github.com/filarr-work/filarr-gate.git && cd filarr-gate
-git checkout v0.2.0
+git checkout v0.3.0
 docker build -t filarr-gate:local .
 ```
 
-Then, in `docker-compose.yml`, replace `image: ghcr.io/filarr-work/gate:0.2` with the commented `build:` lines and
+Then, in `docker-compose.yml`, replace `image: ghcr.io/filarr-work/gate:0.3` with the commented `build:` lines and
 start with `docker compose up -d --build`; or give `filarr-gate:local` to `docker run`.
 
 ## Next

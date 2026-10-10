@@ -1,6 +1,6 @@
 {
   "name": "filarr-gate",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Serve a Filarr database as an API, without Filarr ever seeing your data: a customer-hosted replica of end-to-end encrypted Filarr database stores, with a local API, webhooks, MCP and a management UI.",
   "license": "Apache-2.0",
   "repository": {

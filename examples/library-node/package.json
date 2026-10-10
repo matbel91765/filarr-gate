@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@filarr/gate": "^0.2.0"
+    "@filarr/gate": "^0.3.0"
   }
 }

@@ -5,6 +5,52 @@
 Les changements notables de chaque version. Avant la 1.0, une version mineure peut changer l'API ; les notes de version
 le disent.
 
+## 0.3.0 : le service hébergé, construit
+
+Datée par l'entrée « published » du journal public des mises en service (branche `release-journal`), écrite à la
+réception de l'étiquette signée.
+
+Pour une boîte noire que vous faites tourner vous-même (bibliothèque, commande, image Docker, variante Cloudflare),
+rien ne change depuis la 0.2.0 : même API, mêmes réglages, mêmes contrats.
+
+### Le service hébergé : construit, pas encore ouvert
+
+Le service qui fera tourner la boîte hébergée par Filarr est dans ce dépôt, `packages/host` (le Worker
+`filarr-gate-host`, contrat `gate-heberge-1`). Il n'est pas en service : l'offre hébergée de Filarr ouvrira plus tard,
+après une revue de sécurité externe. Comment il est monté, ce qui n'est plus chiffré de bout en bout dans ce mode et ce
+qui le protège : [le service hébergé](docs/explain/hosted.fr.md).
+
+- Une boîte par accès hébergé, un Durable Object créé dans la juridiction UE, qui fait tourner le même cœur de Filarr
+  Gate qu'à la maison, par l'adaptateur Cloudflare.
+- Son état au repos chiffré avec une clé tirée du jeton de l'accès (`K_box`, AES-256-GCM) : une fois le jeton scellé
+  effacé, ce qui est stocké ne peut plus être déchiffré.
+- Son cycle de vie : des réveils signés par Filarr, le sommeil sans perdre l'état chiffré (`503 gate_asleep`), les
+  appels du mois comptés jusqu'au plafond de l'offre (`429 hosted_quota_calls`), le retour à la maison avec le paquet de
+  réglages, une redirection `308` pendant 30 jours après un déménagement.
+- L'effacement avec un reçu signé par le service (raison et heure de la demande, bases et génération tenues, ce qui a
+  été effacé, version, `codeHash`), et un reçu partiel pour une base retirée seule, avec sa cause.
+- Un canal de gestion `/_admin/…` et aucune interface web : chaque requête signée par la clé d'identité du créateur
+  (méthode, chemin avec sa requête, heure, empreinte du corps) et acceptée une seule fois (`401 admin_replay`).
+- Une annonce de version signée, `/.well-known/filarr-gate-host.json`, dont chacun peut comparer le `codeHash` à la
+  version publiée.
+- Aucun journal : le bloc `observability` est présent et éteint tout, vérifié par un essai.
+- Éprouvé en mémoire et sous workerd, avec les vecteurs de `gate-heberge-1` des familles 2, 3, 4, 5, 7 et 8 rejoués par
+  le code que le service exécute.
+
+### Chaîne de publication
+
+- Le module du service, `host/filarr-gate-host-X.Y.Z.js`, est construit deux fois et comparé comme les archives npm,
+  compté dans `SHA256SUMS` et joint à la publication GitHub.
+- `.github/workflows/deploy-host.yml` met ce fichier même en service (`wrangler deploy --no-bundle`), lancé à la main
+  depuis une étiquette signée, au plus tôt **sept jours** après son entrée « published », sauf correctif de sécurité
+  accepté ; il écrit l'entrée « deployed » (ou « security ») du journal public. Les versions publiées avant que le
+  module existe (0.2.0) ne se mettent pas en service. La marche à suivre :
+  [docs/RELEASING.fr.md](docs/RELEASING.fr.md#le-service-hébergé).
+- `scripts/host-keys.mjs` tire une fois les clés du service (`HOST_ENC`, X25519 ; `HOST_SIG`, Ed25519) et ne remet les
+  moitiés privées à Cloudflare que par l'entrée standard ; `--rotate` ajoute la paire suivante.
+- Les clés publiques `h1` (valables jusqu'au 2028-10-09) dans [`docs/hosted-keys.json`](docs/hosted-keys.json),
+  embarquées dans le service et dans les applis Filarr.
+
 ## 0.2.0 : première publication
 
 Datée par l'entrée « published » du journal public des mises en service (branche `release-journal`), écrite à la

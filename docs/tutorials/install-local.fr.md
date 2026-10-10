@@ -20,11 +20,11 @@ dans **Paramètres › Accès API**.
 ## 1. Récupérer la boîte noire
 
 ```sh
-npm install -g filarr-gate@0.2
+npm install -g filarr-gate@0.3
 filarr-gate version
 ```
 
-(Ou, sans l'installer : `npx filarr-gate@0.2 <commande>`.)
+(Ou, sans l'installer : `npx filarr-gate@0.3 <commande>`.)
 
 **Ou depuis un clone** de ce dépôt, qui donne aussi le Filarr en mémoire de l'étape 2 :
 

@@ -19,11 +19,11 @@ minutes, no writes). The limits of each plan are on Filarr's pricing page and in
 ## 1. Get the gate
 
 ```sh
-npm install -g filarr-gate@0.2
+npm install -g filarr-gate@0.3
 filarr-gate version
 ```
 
-(Or, without installing it: `npx filarr-gate@0.2 <command>`.)
+(Or, without installing it: `npx filarr-gate@0.3 <command>`.)
 
 **Or from a clone** of this repository, which also gives the in-memory Filarr of step 2:
 

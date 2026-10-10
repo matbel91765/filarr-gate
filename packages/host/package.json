@@ -1,6 +1,6 @@
 {
   "name": "@filarr/gate-host",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "The Filarr-hosted service of Filarr Gate (contract gate-heberge-1): one Durable Object per hosted box, in the EU jurisdiction. Deployed only by the release chain (.github/workflows/deploy-host.yml).",
   "license": "Apache-2.0",

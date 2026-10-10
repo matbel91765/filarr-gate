@@ -9,8 +9,8 @@
 services:
   # region gate
   gate:
-    # `:0.2` follows the 0.2.x fixes; `:0.2.0` pins this exact version.
-    image: ghcr.io/filarr-work/gate:0.2
+    # `:0.3` follows the 0.3.x fixes; `:0.3.0` pins this exact version.
+    image: ghcr.io/filarr-work/gate:0.3
     # Variant, from a clone of the repository: replace the line above with
     #   build:
     #     context: ../..

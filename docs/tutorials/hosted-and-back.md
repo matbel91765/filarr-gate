@@ -107,7 +107,7 @@ another gate cannot open it. More: [explain/migration.md](../explain/migration.m
 ```json
 { "v": 1, "kind": "filarr-gate-host/erasure", "keyId": "h1", "accessId": "…", "hostName": "site-vitrine-7qm2",
   "reason": "migrated", "stores": [{ "storeId": "…", "g": 4 }], "erased": ["token", "dbKeys", "copy", "state", "extdbKeys"],
-  "requestedAt": "…", "erasedAt": "…", "version": "0.2.0", "codeHash": "sha256:…" }
+  "requestedAt": "…", "erasedAt": "…", "version": "0.3.0", "codeHash": "sha256:…" }
 ```
 
 signed by the hosted service's key, kept 5 years in the access's log, shown by the apps with the generation after the

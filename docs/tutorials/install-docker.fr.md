@@ -15,7 +15,7 @@ chaque palier change).
 - Un nom DNS qui pointe vers le serveur (`gate.example.com` ci-dessous), et les ports 80 et 443 ouverts, pour le
   certificat.
 - Le jeton `flr_live_…` de l'accès ([ouvrir une base à une API](open-a-database.fr.md)).
-- L'image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64) : `:0.2` suit les correctifs 0.2.x, `:0.2.0` fige
+- L'image `ghcr.io/filarr-work/gate` (linux/amd64, linux/arm64) : `:0.3` suit les correctifs 0.3.x, `:0.3.0` fige
   cette version exacte. Elle est petite (Node 22, Alpine), tourne sous l'utilisateur non root `node`, garde tout dans
   `/data`, et contrôle sa propre santé. Elle est signée (cosign) et construite par la chaîne de publication du dépôt
   ([plan de publication](../release.fr.md)).
@@ -25,7 +25,7 @@ chaque palier change).
 ```sh
 mkdir filarr-gate && cd filarr-gate
 for f in docker-compose.yml Caddyfile example.env; do
-  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.2.0/examples/docker/$f"
+  curl -fsSLO "https://raw.githubusercontent.com/filarr-work/filarr-gate/v0.3.0/examples/docker/$f"
 done
 cp example.env .env
 chmod 600 .env
@@ -45,8 +45,8 @@ jamais `.env`.
 
 ## 2. Le fichier Compose
 
-`examples/docker/docker-compose.yml`, la boîte noire (les commentaires de l'exemple disent, en anglais : `:0.2` suit les
-correctifs 0.2.x et `:0.2.0` fige cette version ; la variante qui construit l'image depuis un clone ; Caddy, sur le
+`examples/docker/docker-compose.yml`, la boîte noire (les commentaires de l'exemple disent, en anglais : `:0.3` suit les
+correctifs 0.3.x et `:0.3.0` fige cette version ; la variante qui construit l'image depuis un clone ; Caddy, sur le
 même réseau Docker, transmet l'adresse de l'appelant ; gardez ce volume, il tient l'état, le cache de blocs chiffrés,
 le journal et l'état chiffré des synchros ; l'interface de gestion sur CETTE machine seulement, car qui y entre lit les
 données ; l'API n'est pas publiée, seul Caddy la joint, sur le port 8443 du réseau) :
@@ -54,8 +54,8 @@ données ; l'API n'est pas publiée, seul Caddy la joint, sur le port 8443 du r�
 <!-- snippet: examples/docker/docker-compose.yml#gate -->
 ```yaml
 gate:
-  # `:0.2` follows the 0.2.x fixes; `:0.2.0` pins this exact version.
-  image: ghcr.io/filarr-work/gate:0.2
+  # `:0.3` follows the 0.3.x fixes; `:0.3.0` pins this exact version.
+  image: ghcr.io/filarr-work/gate:0.3
   # Variant, from a clone of the repository: replace the line above with
   #   build:
   #     context: ../..
@@ -165,7 +165,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`:0.2` apporte les correctifs 0.2.x ; pour une nouvelle version mineure, changez l'étiquette dans `docker-compose.yml`
+`:0.3` apporte les correctifs 0.3.x ; pour une nouvelle version mineure, changez l'étiquette dans `docker-compose.yml`
 après avoir lu les [changements](https://github.com/filarr-work/filarr-gate/blob/main/CHANGELOG.fr.md).
 
 Le volume garde les clés, les webhooks et les réglages. Les livraisons de webhooks en attente vivent en mémoire et un
@@ -190,7 +190,7 @@ réglages : `filarr-gate export` ([migration](../explain/migration.fr.md)).
 docker run -d --name filarr-gate --restart unless-stopped \
   -e FILARR_GATE_TOKEN=flr_live_… \
   -p 8443:8443 -v filarr-gate:/data \
-  ghcr.io/filarr-work/gate:0.2
+  ghcr.io/filarr-work/gate:0.3
 docker exec filarr-gate filarr-gate keys create --name ERP
 ```
 
@@ -203,11 +203,11 @@ Depuis un clone de ce dépôt, la même image que celle publiée :
 
 ```sh
 git clone https://github.com/filarr-work/filarr-gate.git && cd filarr-gate
-git checkout v0.2.0
+git checkout v0.3.0
 docker build -t filarr-gate:local .
 ```
 
-Puis, dans `docker-compose.yml`, remplacez `image: ghcr.io/filarr-work/gate:0.2` par les lignes `build:` en
+Puis, dans `docker-compose.yml`, remplacez `image: ghcr.io/filarr-work/gate:0.3` par les lignes `build:` en
 commentaire et démarrez avec `docker compose up -d --build` ; ou donnez `filarr-gate:local` à `docker run`.
 
 ## Et ensuite

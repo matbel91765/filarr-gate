@@ -1,6 +1,6 @@
 {
   "name": "@filarr/gate",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Read and write the rows of a Filarr database opened to an API, from your own Node, Deno, Bun or Cloudflare Worker code, without Filarr ever seeing your data.",
   "license": "Apache-2.0",
   "repository": {

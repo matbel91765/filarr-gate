@@ -6,12 +6,14 @@
 
 [Read in English](README.md)
 
-> **0.2.0 : première publication** ([changements](CHANGELOG.fr.md)), sur npm (`@filarr/gate`, `filarr-gate`) et sur
-> GHCR (`ghcr.io/filarr-work/gate`). La boîte noire suit les contrats gelés `api-base-1` (révisions 2 et 3), `db-store-1`
+> **0.3.0** ([changements](CHANGELOG.fr.md)), sur npm (`@filarr/gate`, `filarr-gate`) et sur GHCR
+> (`ghcr.io/filarr-work/gate`). La boîte noire suit les contrats gelés `api-base-1` (révisions 2 et 3), `db-store-1`
 > (3.9), `gate-fichiers-1`, `source-externe-1` et le paquet de réglages de `gate-heberge-1`, et elle est éprouvée de bout
 > en bout face à un serveur Filarr local (lecture, changements en direct, écriture, révocation, une synchro PostgreSQL
-> externe, un dépôt de fichier, la variante Cloudflare). Dans Filarr, les accès API s'ouvrent compte par compte ; la
-> boîte hébergée par Filarr n'est pas encore ouverte.
+> externe, un dépôt de fichier, la variante Cloudflare). Dans Filarr, les accès API s'ouvrent compte par compte. Cette
+> version contient aussi le service qui fera tourner la boîte hébergée par Filarr ([le service
+> hébergé](docs/explain/hosted.fr.md)) ; il est construit mais pas encore ouvert : l'offre hébergée ouvrira plus tard,
+> après une revue de sécurité externe.
 
 Filarr chiffre vos notes et vos bases de bout en bout : ses serveurs gardent des blocs qu'ils ne savent pas lire.
 Filarr Gate est une petite **boîte noire que vous faites tourner vous-même** (dans votre code, sur un PC, dans Docker,
