@@ -30,6 +30,7 @@ import { setLogLevel } from '../packages/server/src/log';
 import { RealFilarr } from './e2e/realFilarr';
 import { CLIENTS_DB, demoStores } from './support/demoData';
 import { startPostgres } from './support/postgres';
+import { D1Sim, routeFetch } from './support/simulators';
 import { tempDir, until } from './support/util';
 
 const WORKER = process.env.FILARR_E2E_WORKER ?? '';
@@ -175,6 +176,75 @@ describe.skipIf(!on)('de bout en bout contre le worker local de Filarr', () => {
       pg.stop();
     }
   }, 120_000);
+  it('P1 : deux exécutants du même accès (deux processus, une instance chacun) — le second reçoit 409 du worker, le dit au journal sans planter ; le premier arrêté rend son bail, le second passe', async () => {
+    // La source : une base D1 simulée (aucun service extérieur), lue par les deux boîtes
+    const d1 = new D1Sim();
+    d1.exec('CREATE TABLE produits (id INTEGER PRIMARY KEY, nom TEXT)');
+    d1.exec("INSERT INTO produits VALUES (1, 'Vis'), (2, 'Écrou')");
+    const store = await filarr.createStore({
+      dbId: 'db-produits-p1-e2e',
+      title: 'Produits',
+      properties: [
+        { id: 'p_id', name: 'Id', type: 'number' },
+        { id: 'p_nom', name: 'Nom', type: 'text' },
+      ],
+      rows: [],
+    });
+    const access = await filarr.createAccess('Deux instances', store, 'rw');
+    const def = await filarr.appSetExtSource(store, {
+      v: 1,
+      id: 'xs_P1P1P1P1P1P1P1P1P1P1P1',
+      rev: 1,
+      name: 'Produits (D1)',
+      connector: 'd1',
+      conn: { account: 'compte-banc', database: 'base-banc' },
+      host: 'api.cloudflare.com',
+      from: { table: 'produits' },
+      key: { cols: ['id'], gen: 'source' },
+      marker: null,
+      mode: 'mirror',
+      map: [
+        { col: 'id', prop: 'p_id', dir: 'in', type: 'number' },
+        { col: 'nom', prop: 'p_nom', dir: 'in', type: 'text' },
+      ],
+      onGone: 'mark',
+      guard: { pct: 50, min: 5 },
+      runner: { kind: 'gate', accessId: access.accessId, name: 'Banc' },
+      schedule: { every: 'manual' },
+    } as never);
+    // Deux processus lancés avec le MÊME jeton (deux répertoires d'état)
+    const open = () => {
+      const g = new Gate({
+        env: { FILARR_GATE_STATE_DIR: tempDir(), FILARR_GATE_API_URL: WORKER, FILARR_GATE_TOKEN: access.token, FILARR_GATE_PORT: '0', FILARR_GATE_ADMIN_PORT: '0', FILARR_GATE_CACHE: 'memory' },
+        sync: { timers: false, fetch: routeFetch({ 'api.cloudflare.com': d1.handler }), externalSecret: () => d1.token },
+      });
+      gates.push(g);
+      return g;
+    };
+    const a = open();
+    const b = open();
+    await a.start();
+    await b.start();
+    await a.sync!.scan();
+    await b.sync!.scan();
+    expect(a.sync!.get(def.id)?.blocked).toBeNull();
+    expect(a.sync!.instance).not.toBe(b.sync!.instance);
+    expect(await a.sync!.runPass(def.id)).toMatchObject({ state: 'ok' });
+    await until(async () => (await filarr.appRows(store)).map((r) => r.cells.p_nom).sort().join(',') === 'Vis,Écrou', 20_000, 'lignes importées');
+    // Le second processus : le worker refuse le bail (409 extdb_lease_held), la boîte attend et le dit
+    const calls = d1.calls;
+    const st = await b.sync!.runPass(def.id);
+    expect(st).toMatchObject({ state: 'waiting', code: 'extdb_lease_held' });
+    expect(d1.calls).toBe(calls);
+    const note = b.journal.list().find((e) => e.code === 'extdb_lease_held');
+    expect(note?.note).toMatch(/une autre instance de cette boîte noire exécute déjà cette synchro \(bail tenu jusqu’à \d{4}-/);
+    // L'état publié par le second le dit aussi (§ 6.8 : « l'état dit … »), lu par un membre sous K_xs
+    expect(await filarr.appReadStatus(store, `a:${access.accessId}`)).toMatchObject({ state: 'waiting', code: 'extdb_lease_held' });
+    // Le premier s'arrête proprement : il rend SON bail (DELETE ?instance=) ; le second passe
+    await a.stop();
+    expect(await b.sync!.runPass(def.id)).toMatchObject({ state: 'ok' });
+  }, 120_000);
+
   it.skipIf(!D1 || !WORKER_DIR)('la fente à fichiers : boîte de dépôt signée, dépôt scellé reçu par le worker, que la boîte de l’appli ouvre', async () => {
     const box = filarr.createDepositBox();
     const access = await filarr.createAccess('Fichiers du banc', clients, 'r', { files: box });

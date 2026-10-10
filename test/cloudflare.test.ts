@@ -144,12 +144,20 @@ describe('variante Cloudflare (wrangler dev, local)', () => {
     await until(async () => (await mock.appRows(clients)).some((r) => JSON.stringify(r).includes('Hooli')), 20_000, 'écriture reçue par Filarr');
   }, 60_000);
 
-  it('l’état survit au redémarrage : la clé sert encore, la copie revient du cache', async () => {
+  it('l’état survit au redémarrage : la clé sert encore, la copie revient du cache ; l’instance de l’exécutant aussi (P1)', async () => {
+    const instanceOf = async (): Promise<string> => {
+      const view = (await (await fetch(`${base()}/admin/api/sources`, { headers: { Cookie: await login() } })).json()) as { instance: string | null };
+      return view.instance ?? '';
+    };
+    const before = await instanceOf();
+    expect(before).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
     await killTree(worker!);
     await startWorker();
     await until(async () => {
       const res = await fetch(`${base()}/v1/clients?limit=1`, { headers: { Authorization: `Bearer ${key}` } });
       return res.status === 200;
     }, 30_000, 'clé encore valable');
+    // L'objet rechargé reste le même exécutant : sinon il serait refusé par son propre bail
+    expect(await instanceOf()).toBe(before);
   }, 150_000);
 });

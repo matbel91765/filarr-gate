@@ -187,4 +187,32 @@ describe('filarr-gate (ligne de commande)', () => {
       server?.kill('SIGTERM');
     }
   }, 90_000);
+
+  it('sources run : un bail tenu par une autre instance du même accès (P1) est dit, rien n’est lu ni écrit, code de sortie 1', async () => {
+    const storeId = await mock.createStore({ dbId: 'db-cli-bail', title: 'Produits', properties: [{ id: 'p_id', name: 'Id', type: 'number' }, { id: 'p_nom', name: 'Nom', type: 'text' }], rows: [] });
+    const { token, accessId } = await mock.createAccess('Bail', 'pro');
+    await mock.grant(accessId, storeId, 'rw');
+    const defId = 'xs_CLIbail000000000000001';
+    await mock.appSetExtSource(storeId, {
+      v: 1, id: defId, rev: 1, name: 'Produits (D1)', connector: 'd1', conn: { account: 'acc', database: 'db' }, host: 'api.cloudflare.com',
+      from: { table: 'produits' }, key: { cols: ['id'], gen: 'source' }, marker: null, mode: 'mirror',
+      map: [{ col: 'id', prop: 'p_id', dir: 'in', type: 'number' }, { col: 'nom', prop: 'p_nom', dir: 'in', type: 'text' }],
+      onGone: 'mark', guard: { pct: 50, min: 5 }, runner: { kind: 'gate', accessId }, schedule: { every: 'manual' },
+    });
+    // Un autre processus lancé avec ce jeton tient le bail
+    mock.extOf(storeId).leases.set(defId, { runnerId: `a:${accessId}`, instance: 'autre-processus-000001', until: Date.now() + 600_000 });
+    const dir = tempDir();
+    expect((await gate(dir, ['init', '--token', token, '--api-url', mock.url])).code).toBe(0);
+    // La clé de la source par l'environnement : le passage s'arrête au bail, AVANT de joindre la source
+    const run = await gate(dir, ['sources', 'run', defId], { FILARR_GATE_EXTDB_CLIBAIL0: 'cle-de-banc' });
+    expect(run.code, `${run.out}
+${run.err}`).toBe(1);
+    expect(run.out).toContain('Passage : waiting (extdb_lease_held)');
+    expect(run.out).toContain('Une autre instance de cette boîte noire');
+    // La demande portait l'instance du processus de la ligne de commande, distincte de l'autre
+    const asked = mock.leaseRequests.filter((r) => r.defId === defId);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.instance).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(mock.extOf(storeId).leases.get(defId)).toMatchObject({ instance: 'autre-processus-000001' });
+  }, 60_000);
 });
