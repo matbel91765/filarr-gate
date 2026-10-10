@@ -1,14 +1,12 @@
 /**
  * Garde des essais : aucune requête ne part vers les serveurs de Filarr (production).
  * Tout essai parle au Filarr en mémoire, ou au worker local du banc.
+ *
+ * La garde vit dans `noProduction.cjs` (CommonJS, pour que les processus Node ENFANTS la chargent
+ * aussi, par `NODE_OPTIONS=--require`) : `fetch`, chaque socket TCP ou TLS, la résolution des noms,
+ * les processus enfants et `wrangler dev`. Voir son en-tête ; `test/guard.test.ts` la vérifie.
  */
 
-const realFetch = globalThis.fetch;
+import { createRequire } from 'node:module';
 
-globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-  const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
-  if (url.hostname === 'filarr.com' || url.hostname.endsWith('.filarr.com')) {
-    throw new Error(`essai : requête vers la production refusée (${url.origin})`);
-  }
-  return realFetch(input, init);
-}) as typeof fetch;
+createRequire(import.meta.url)('./noProduction.cjs');
