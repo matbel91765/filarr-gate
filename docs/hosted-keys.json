@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "id": "h1",
+    "encPublicKey": "Wu1Ex56R/D6u6LEz0CLU1uAHmb/SZMFta3H+5vNhSHs=",
+    "signPublicKey": "WTsW5SNC10P8Zek65/JmPRVvqDqD5fBoehwNsM1/FwQ=",
+    "notBefore": "2026-10-10T22:01:09.000Z",
+    "notAfter": "2028-10-09T22:01:09.000Z"
+  }
+]
