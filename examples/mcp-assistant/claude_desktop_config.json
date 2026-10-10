@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "filarr": {
+      "command": "npx",
+      "args": ["filarr-gate", "mcp", "--gate", "http://127.0.0.1:8443"],
+      "env": { "FILARR_GATE_KEY": "gk_mcp_replace_with_your_key" }
+    }
+  }
+}

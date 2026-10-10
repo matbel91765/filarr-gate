@@ -1,40 +1,44 @@
-// La bibliothèque @filarr/gate dans un programme Node : lire une vue, écouter les
-// changements, s'arrêter proprement.
+// The library @filarr/gate in a Node program: read a view, listen to changes, stop cleanly.
 //
 //   npm install @filarr/gate
 //   FILARR_GATE_TOKEN=flr_live_… node index.mjs
 //
-// FILARR_GATE_API_URL ne sert qu'aux essais (un Filarr local) ; d'office, l'API de Filarr.
+// FILARR_GATE_API_URL only serves the tests (a local Filarr); by default, Filarr's API.
 import { openGate } from '@filarr/gate';
 
+// region open
 const gate = await openGate({
   token: process.env.FILARR_GATE_TOKEN,
   ...(process.env.FILARR_GATE_API_URL ? { apiUrl: process.env.FILARR_GATE_API_URL } : {}),
 });
+// endregion
 
-// Les bases que le jeton ouvre, et leurs vues
+// region read
+// The databases the token opens, and their views
 for (const base of gate.bases()) {
-  console.log(`base ${base.slug} (${base.rows} lignes) : vues ${base.views.map((v) => v.slug).join(', ')}`);
+  console.log(`database ${base.slug} (${base.rows} rows): views ${base.views.map((v) => v.slug).join(', ')}`);
 }
 
-// Une vue, rejouée par le moteur de vues de Filarr
-const actifs = await gate.base('clients').view('clients-actifs').rows();
-for (const row of actifs) console.log(`actif : ${row.nom} (${row.ville})`);
+// A view, replayed by Filarr's own view engine
+const active = await gate.base('clients').view('clients-actifs').rows();
+for (const row of active) console.log(`active: ${row.nom} (${row.ville})`);
 
-// Des lignes filtrées et triées, page par page
+// Rows filtered and sorted, page by page
 const page = await gate.base('clients').rows({ where: { ca: { gte: 1000 } }, sort: '-ca', limit: 2 });
-console.log(`premières : ${page.map((r) => r.nom).join(', ')} · ${page.total} au total · suite : ${page.next ?? 'aucune'}`);
+console.log(`first: ${page.map((r) => r.nom).join(', ')} · ${page.total} in all · next: ${page.next ?? 'none'}`);
 
-// SQL en lecture seule
+// Read-only SQL
 const { rows } = await gate.sql('SELECT ville, count(*) AS n FROM clients GROUP BY ville ORDER BY ville');
-console.log(`par ville : ${rows.map(([ville, n]) => `${ville}=${n}`).join(' ')}`);
+console.log(`per city: ${rows.map(([ville, n]) => `${ville}=${n}`).join(' ')}`);
+// endregion
 
-// Les changements faits dans Filarr, en direct
+// region live
+// The changes made in Filarr, live
 const off = gate.on('change', (event) => {
-  for (const { after } of event.changed) console.log(`changé dans ${event.base} : ${after.nom} → ${after.ville}`);
+  for (const { after } of event.changed) console.log(`changed in ${event.base}: ${after.nom} → ${after.ville}`);
 });
 
-// Arrêt propre (Ctrl+C) ; EXAMPLE_SECONDS limite la durée pour les essais
+// Stop cleanly (Ctrl+C): the keys and the rows are wiped from memory
 const stop = async () => {
   off();
   await gate.close();
@@ -42,5 +46,7 @@ const stop = async () => {
 };
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
-console.log('prêt');
+// endregion
+console.log('ready');
+// EXAMPLE_SECONDS limits the run, for the tests
 if (process.env.EXAMPLE_SECONDS) setTimeout(stop, Number(process.env.EXAMPLE_SECONDS) * 1000);

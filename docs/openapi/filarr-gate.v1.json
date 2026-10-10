@@ -1,0 +1,2637 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Filarr Gate local API",
+    "version": "v1",
+    "summary": "The routes every Filarr Gate serves from its decrypted copy of the Filarr databases opened to it.",
+    "description": "This is the GENERIC description: it holds for every gate. A running gate serves its EXACT description at `/openapi.json` (its databases, their typed fields, its views and saved queries), which is what client generators should read. Every call to `/v1/*` carries an app key (`Authorization: Bearer gk_…`); the Filarr token never leaves the gate. Errors are `{ \"error\": \"<message>\", \"code\": \"<code>\" }` plus details; match on `code`, the message is for people. See docs/reference/api.md and docs/reference/errors.md in the repository.",
+    "license": {
+      "name": "Apache-2.0",
+      "identifier": "Apache-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8443",
+      "description": "A gate on this machine, default port"
+    }
+  ],
+  "security": [
+    {
+      "appKey": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Rows",
+      "description": "Read and write the rows of a database"
+    },
+    {
+      "name": "Views",
+      "description": "A view of a database, replayed by Filarr's own view engine"
+    },
+    {
+      "name": "SQL",
+      "description": "Read-only SQL over the opened databases"
+    },
+    {
+      "name": "Files",
+      "description": "Deposit files into the deposit box linked to the access"
+    },
+    {
+      "name": "Gate",
+      "description": "Health, metrics, descriptions, MCP, Filarr's wake-ups"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Gate"
+        ],
+        "operationId": "health",
+        "summary": "Health of the gate (no key)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "`ok` when the link with Filarr is up and every database is ready, `degraded` otherwise",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "Gate"
+        ],
+        "operationId": "metrics",
+        "summary": "Prometheus metrics (no key; the `metrics` setting, on by default)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Prometheus text format",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Metrics switched off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "Gate"
+        ],
+        "operationId": "openapi",
+        "summary": "The exact description of THIS gate (public when the `docs` setting is on, the default; otherwise with a key)",
+        "security": [
+          {},
+          {
+            "appKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 of this gate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`docs` is off and no key was given",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/docs": {
+      "get": {
+        "tags": [
+          "Gate"
+        ],
+        "operationId": "docs",
+        "summary": "The same description, as a readable page",
+        "security": [
+          {},
+          {
+            "appKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "HTML page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`docs` is off and no key was given",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mcp": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "operationId": "mcp",
+        "summary": "Model Context Protocol server (JSON-RPC 2.0, streamable HTTP, JSON answers), read only",
+        "description": "The `mcp` setting must be on (off by default) and the key needs the MCP right. Protocol versions: 2025-06-18, 2025-03-26, 2024-11-05. Tools: `list_bases`, `query_view`, `get_row`, `run_sql` (the last one needs the SQL right too). See docs/reference/mcp.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": [
+                  "object",
+                  "array"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON-RPC answer; `Mcp-Session-Id` on `initialize`",
+            "headers": {
+              "Mcp-Session-Id": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": [
+                    "object",
+                    "array"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "A notification: no answer"
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The key has no MCP right",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MCP switched off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only POST",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/_filarr/notify": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "operationId": "notify",
+        "summary": "Push wake-up from Filarr (not for your software)",
+        "description": "Filarr posts `{ \"a\", \"t\", \"storeId\"?, \"seq\"?, \"at\" }` signed `Filarr-Notify: t=<seconds>,v1=<HMAC-SHA256 hex>` with a key derived from the token. The gate checks the signature on the raw body and a 300-second window, answers 202, and re-reads through its usual routes: a wake-up carries no content.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Filarr-Notify",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted; the gate re-reads",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`notify_malformed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`notify_bad_signature`, `notify_stale`, `notify_malformed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Wake-ups switched off (`notify`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body over 8 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No token in service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sql": {
+      "post": {
+        "tags": [
+          "SQL"
+        ],
+        "operationId": "sql",
+        "summary": "A read-only SQL query (SQLite dialect) over the databases the key can read",
+        "description": "The key needs the SQL right. Only `SELECT` and `WITH … SELECT`. One table per database (its slug), one column per field; a database that is not opened appears with its `id` only. At most 10000 rows are returned (`truncated` says when there were more); queries of 64 KiB at most.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "sql"
+                ],
+                "properties": {
+                  "sql": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "sql": "SELECT ville, count(*) AS n FROM clients GROUP BY ville"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Columns and rows (arrays, in column order)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SqlResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`sql_empty`, `sql_syntax` (with `position`), `sql_error` (with `sqlCode`), `sql_read_only`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The key has no SQL right",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Query over 64 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/q/{query}": {
+      "get": {
+        "tags": [
+          "SQL"
+        ],
+        "operationId": "savedQuery",
+        "summary": "Run a saved query (saved in the management UI), rows as objects, paginated",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "path",
+            "required": true,
+            "description": "The slug of the saved query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Rows per page, 100 by default, 1000 at most (a larger number is served as 1000).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next` of the previous page, as received.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the query's rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The key cannot run this query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`query_not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files": {
+      "post": {
+        "tags": [
+          "Files"
+        ],
+        "operationId": "depositFile",
+        "summary": "Deposit a file into the deposit box linked to the access; the Filarr app files it",
+        "description": "The key needs the `files` scope. The gate filters first (executables and scripts by extension and by signature, size up to the limit Filarr gives and never above 104857600 bytes), then seals the file for the box, sends it in chunks, and returns at once. Neither Filarr nor the gate learns where the file is filed. Send `multipart/form-data` with a `file` part (and optional `path`, `tags`, `name`), or the raw bytes with `?name=` (or an `X-File-Name` header), `&path=` and `&tags=`. Tags: 10 at most, 40 characters each.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "description": "Raw body only: the file name, with its extension",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "description": "Raw body only: the path requested inside the target folder (the Filarr app applies it if the box accepts requested paths)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "description": "Raw body only: tags, repeated or separated by commas",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "string",
+                    "description": "Repeated, or separated by commas"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Overrides the file name of the part"
+                  }
+                }
+              }
+            },
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Deposited: Filarr holds the sealed file until a device of the owner files it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deposit"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`file_required`, `name_required`, `bad_tags`, `bad_path`, `bad_multipart`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`scope_files`, or a Filarr refusal (`api_tier_files`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`box_not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`files_not_linked`, `box_not_signed`, `creator_unauthenticated`, `box_full`, `files_not_switched`, `box_not_permanent`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`file_too_large` (with `limit`), `box_storage_full`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`file_type_refused` (with `reason` and `detail`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Filarr's monthly file quotas (`api_quota_files`, `api_quota_file_bytes`) or rate; `Retry-After`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Filarr unreachable: nothing was deposited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/{id}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "operationId": "depositStatus",
+        "summary": "The status of a deposit (never where or under which name it was filed)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The `id` returned by `POST /v1/files` (`dp_…`)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The status, re-read from Filarr while it is `deposited`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`scope_files`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`deposit_not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/{base}": {
+      "parameters": [
+        {
+          "name": "base",
+          "in": "path",
+          "required": true,
+          "description": "The slug of the database (fixed by Filarr when the database was opened to the access; renaming the database does not change it).",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "listRows",
+        "summary": "The rows of a database: filters, sort, fields, search, pagination",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Rows per page, 100 by default, 1000 at most (a larger number is served as 1000).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next` of the previous page, as received.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Fields to return, separated by commas (`id` is always returned).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "nom,ville"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort keys separated by commas; a leading `-` sorts in descending order. Empty values sort last.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "-ca,nom"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Quick search in the text of the rows (the same search as in Filarr).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Only the rows changed after this version (the `version` of a page you already read).",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "description": "Any other parameter is a filter: `field=value` (equals) or `field[op]=value` with op in `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `contains`, `in`, `empty`. Filters combine with AND. `in` takes values separated by commas; `empty=true` or `empty=false`. Texts compare without case or accents.",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "example": {
+              "statut": "Client",
+              "ca[gte]": "1000"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            },
+            "headers": {
+              "X-Filarr-Version": {
+                "description": "The version (`seq`) of the database served.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Gate-Base-Status": {
+                "description": "Present when the database is served from its last complete copy while something is wrong (for instance `missing_key`).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`bad_filter`, `unknown_field` (with `field`), `bad_limit`, `bad_cursor`, `bad_since`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`forbidden`, `key_paused`, `key_expired`, `ip_forbidden`, `origin_forbidden`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`base_not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`key_rate`; `Retry-After`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is not loaded yet, or not served (`code` says why: `base_loading`, `key_missing`…)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "createRows",
+        "summary": "Create one row (an object) or several (an array, 500 at most): one commit in Filarr",
+        "description": "Writing needs the `write` setting of the gate (off by default), a `rw` right from Filarr, and an app key with the create right on this database. A new row gets the default values of its columns, as \"New row\" does in Filarr; a field given as `null` stays empty.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Any unique string: the same request sent again with the same key (same app key, method and path) within 24 hours returns the first answer, with `Idempotency-Replayed: true`, and writes nothing twice. Kept in memory: a restart forgets it.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RowInput"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/RowInput"
+                    },
+                    "maxItems": 500
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Accepted by Filarr",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Created"
+                }
+              }
+            },
+            "headers": {
+              "X-Filarr-Version": {
+                "description": "The version (`seq`) of the database served.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body or field (`bad_body`, `unknown_field`, `bad_value`, `unknown_option`, `field_read_only`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Write refused: `write_disabled`, `filarr_write_unavailable`, `base_read_only`, `forbidden`, or a Filarr refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown database or row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`field_managed`, `rows_managed`, `key_missing` (the gate lacks the key of the current generation), `vault_frozen`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More than 500 rows, or a body over the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The key's rate limit, or a Filarr limit (`api_quota_writes`, `api_rate`); `Retry-After` gives the seconds to wait",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Filarr unreachable: nothing was written; or the database is not loaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/{base}/rows": {
+      "parameters": [
+        {
+          "name": "base",
+          "in": "path",
+          "required": true,
+          "description": "The slug of the database (fixed by Filarr when the database was opened to the access; renaming the database does not change it).",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "listRowsAlias",
+        "summary": "Same as `GET /v1/{base}`",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Rows per page, 100 by default, 1000 at most (a larger number is served as 1000).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next` of the previous page, as received.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Fields to return, separated by commas (`id` is always returned).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "nom,ville"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort keys separated by commas; a leading `-` sorts in descending order. Empty values sort last.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "-ca,nom"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Quick search in the text of the rows (the same search as in Filarr).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Only the rows changed after this version (the `version` of a page you already read).",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "description": "Any other parameter is a filter: `field=value` (equals) or `field[op]=value` with op in `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `contains`, `in`, `empty`. Filters combine with AND. `in` takes values separated by commas; `empty=true` or `empty=false`. Texts compare without case or accents.",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "example": {
+              "statut": "Client",
+              "ca[gte]": "1000"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "As `GET /v1/{base}`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "createRowsAlias",
+        "summary": "Same as `POST /v1/{base}`",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Any unique string: the same request sent again with the same key (same app key, method and path) within 24 hours returns the first answer, with `Idempotency-Replayed: true`, and writes nothing twice. Kept in memory: a restart forgets it.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RowInput"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/RowInput"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Accepted by Filarr",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Created"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body or field (`bad_body`, `unknown_field`, `bad_value`, `unknown_option`, `field_read_only`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Write refused: `write_disabled`, `filarr_write_unavailable`, `base_read_only`, `forbidden`, or a Filarr refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown database or row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`field_managed`, `rows_managed`, `key_missing` (the gate lacks the key of the current generation), `vault_frozen`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More than 500 rows, or a body over the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The key's rate limit, or a Filarr limit (`api_quota_writes`, `api_rate`); `Retry-After` gives the seconds to wait",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Filarr unreachable: nothing was written; or the database is not loaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/{base}/{view}": {
+      "parameters": [
+        {
+          "name": "base",
+          "in": "path",
+          "required": true,
+          "description": "The slug of the database (fixed by Filarr when the database was opened to the access; renaming the database does not change it).",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "view",
+          "in": "path",
+          "required": true,
+          "description": "The slug of the view (fixed when the database was opened; renaming the view does not change it)",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Views"
+        ],
+        "operationId": "viewRows",
+        "summary": "A view, replayed by Filarr's view engine: its filters, sort and visible columns",
+        "description": "The query parameters of `GET /v1/{base}` apply too, AFTER the view's own filters and on its visible fields. A Query view (SQL) returns its result as objects and takes `limit` and `cursor` only.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Rows per page, 100 by default, 1000 at most (a larger number is served as 1000).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The `next` of the previous page, as received.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Fields to return, separated by commas (`id` is always returned).",
+            "schema": {
+              "type": "string"
+            },
+            "example": "nom,ville"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Sort keys separated by commas; a leading `-` sorts in descending order. Empty values sort last.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "-ca,nom"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Quick search in the text of the rows (the same search as in Filarr).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "Only the rows changed after this version (the `version` of a page you already read).",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "filters",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "description": "Any other parameter is a filter: `field=value` (equals) or `field[op]=value` with op in `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `contains`, `in`, `empty`. Filters combine with AND. `in` takes values separated by commas; `empty=true` or `empty=false`. Texts compare without case or accents.",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "example": {
+              "statut": "Client",
+              "ca[gte]": "1000"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the view's rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewPage"
+                }
+              }
+            },
+            "headers": {
+              "X-Filarr-Version": {
+                "description": "The version (`seq`) of the database served.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Gate-Base-Status": {
+                "description": "Present when the database is served from its last complete copy while something is wrong (for instance `missing_key`).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "As `GET /v1/{base}`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The key cannot read this view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`base_not_found`, `view_not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is not loaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "updateRowShort",
+        "summary": "Same as `PATCH /v1/{base}/rows/{id}` (here `{view}` is the row id)",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Any unique string: the same request sent again with the same key (same app key, method and path) within 24 hours returns the first answer, with `Idempotency-Replayed: true`, and writes nothing twice. Kept in memory: a restart forgets it.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted by Filarr",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body or field (`bad_body`, `unknown_field`, `bad_value`, `unknown_option`, `field_read_only`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Write refused: `write_disabled`, `filarr_write_unavailable`, `base_read_only`, `forbidden`, or a Filarr refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown database or row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`field_managed`, `rows_managed`, `key_missing` (the gate lacks the key of the current generation), `vault_frozen`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More than 500 rows, or a body over the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The key's rate limit, or a Filarr limit (`api_quota_writes`, `api_rate`); `Retry-After` gives the seconds to wait",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Filarr unreachable: nothing was written; or the database is not loaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "deleteRowShort",
+        "summary": "Same as `DELETE /v1/{base}/rows/{id}` (here `{view}` is the row id)",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Any unique string: the same request sent again with the same key (same app key, method and path) within 24 hours returns the first answer, with `Idempotency-Replayed: true`, and writes nothing twice. Kept in memory: a restart forgets it.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accepted by Filarr",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body or field (`bad_body`, `unknown_field`, `bad_value`, `unknown_option`, `field_read_only`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Write refused: `write_disabled`, `filarr_write_unavailable`, `base_read_only`, `forbidden`, or a Filarr refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown database or row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`field_managed`, `rows_managed`, `key_missing` (the gate lacks the key of the current generation), `vault_frozen`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More than 500 rows, or a body over the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The key's rate limit, or a Filarr limit (`api_quota_writes`, `api_rate`); `Retry-After` gives the seconds to wait",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Filarr unreachable: nothing was written; or the database is not loaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/{base}/rows/{id}": {
+      "parameters": [
+        {
+          "name": "base",
+          "in": "path",
+          "required": true,
+          "description": "The slug of the database (fixed by Filarr when the database was opened to the access; renaming the database does not change it).",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The row's identifier (`db-…`, or `ext-…` for a row created by an external sync)",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "getRow",
+        "summary": "One row",
+        "responses": {
+          "200": {
+            "description": "The row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OneRow"
+                }
+              }
+            },
+            "headers": {
+              "X-Filarr-Version": {
+                "description": "The version (`seq`) of the database served.",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-Gate-Base-Status": {
+                "description": "Present when the database is served from its last complete copy while something is wrong (for instance `missing_key`).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The key cannot read this database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`base_not_found`, `row_not_found`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "updateRow",
+        "summary": "Change some fields of a row (the others are untouched); `null` empties a field",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Any unique string: the same request sent again with the same key (same app key, method and path) within 24 hours returns the first answer, with `Idempotency-Replayed: true`, and writes nothing twice. Kept in memory: a restart forgets it.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted by Filarr",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body or field (`bad_body`, `unknown_field`, `bad_value`, `unknown_option`, `field_read_only`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Write refused: `write_disabled`, `filarr_write_unavailable`, `base_read_only`, `forbidden`, or a Filarr refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown database or row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`field_managed`, `rows_managed`, `key_missing` (the gate lacks the key of the current generation), `vault_frozen`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More than 500 rows, or a body over the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The key's rate limit, or a Filarr limit (`api_quota_writes`, `api_rate`); `Retry-After` gives the seconds to wait",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Filarr unreachable: nothing was written; or the database is not loaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Rows"
+        ],
+        "operationId": "deleteRow",
+        "summary": "Delete a row (it can be restored in Filarr)",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Any unique string: the same request sent again with the same key (same app key, method and path) within 24 hours returns the first answer, with `Idempotency-Replayed: true`, and writes nothing twice. Kept in memory: a restart forgets it.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Accepted by Filarr",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body or field (`bad_body`, `unknown_field`, `bad_value`, `unknown_option`, `field_read_only`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No app key, or an unknown one",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Write refused: `write_disabled`, `filarr_write_unavailable`, `base_read_only`, `forbidden`, or a Filarr refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown database or row",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`field_managed`, `rows_managed`, `key_missing` (the gate lacks the key of the current generation), `vault_frozen`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "More than 500 rows, or a body over the limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The key's rate limit, or a Filarr limit (`api_quota_writes`, `api_rate`); `Retry-After` gives the seconds to wait",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Filarr unreachable: nothing was written; or the database is not loaded yet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "appKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "gk_…",
+        "description": "An app key created on the gate (management UI or `filarr-gate keys create`). `X-Gate-Key: gk_…` works too. Never the Filarr token."
+      }
+    },
+    "schemas": {
+      "Row": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true,
+        "description": "One field per column, named after the column (lower case, no accents, `_` between words; `Dernier contact` → `dernier_contact`). A select gives the option's label, a relation the raw ids of the linked rows, a rollup its value (`null` when its database is not opened). The exact fields of each database are in the gate's own `/openapi.json`."
+      },
+      "RowInput": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "The fields to write, by their JSON name; `null` empties a field. `id`, `created_at` and `updated_at` are ignored. Select fields take an option label."
+      },
+      "Page": {
+        "type": "object",
+        "required": [
+          "rows",
+          "next",
+          "total",
+          "version"
+        ],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            }
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The cursor of the next page, or `null`"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Rows that match, all pages together"
+          },
+          "version": {
+            "type": "integer",
+            "description": "The version (`seq`) of the database served"
+          },
+          "unresolved": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Fields whose linked database is not opened to this access"
+          }
+        }
+      },
+      "ViewPage": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Page"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "view": {
+                "type": "object",
+                "properties": {
+                  "slug": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Query views only"
+              }
+            }
+          }
+        ]
+      },
+      "QueryPage": {
+        "type": "object",
+        "required": [
+          "columns",
+          "rows",
+          "next",
+          "total"
+        ],
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total": {
+            "type": "integer"
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "ms": {
+            "type": "number"
+          }
+        }
+      },
+      "SqlResult": {
+        "type": "object",
+        "required": [
+          "columns",
+          "rows",
+          "ms",
+          "scanned",
+          "truncated"
+        ],
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {}
+            }
+          },
+          "ms": {
+            "type": "number"
+          },
+          "scanned": {
+            "type": "integer",
+            "description": "Rows read from the tables named by the query"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More than 10000 rows: only the first ones are returned"
+          }
+        }
+      },
+      "OneRow": {
+        "type": "object",
+        "required": [
+          "row",
+          "version"
+        ],
+        "properties": {
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "unresolved": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Created": {
+        "type": "object",
+        "required": [
+          "version",
+          "validated"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Row"
+            },
+            "description": "When an array was sent"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "validated": {
+            "const": true
+          }
+        }
+      },
+      "Updated": {
+        "type": "object",
+        "required": [
+          "id",
+          "row",
+          "version",
+          "validated"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "row": {
+            "$ref": "#/components/schemas/Row"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "validated": {
+            "const": true
+          }
+        }
+      },
+      "Deleted": {
+        "type": "object",
+        "required": [
+          "id",
+          "deleted",
+          "version",
+          "validated"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "deleted": {
+            "const": true
+          },
+          "version": {
+            "type": "integer"
+          },
+          "validated": {
+            "const": true
+          }
+        }
+      },
+      "Deposit": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "`dp_…`, this gate's identifier"
+          },
+          "status": {
+            "const": "deposited"
+          },
+          "depositedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "seq": {
+            "type": "integer",
+            "description": "Number of the deposit in the month, for this box"
+          }
+        }
+      },
+      "DepositStatus": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "sending",
+              "deposited",
+              "filed",
+              "rejected",
+              "expired",
+              "failed"
+            ]
+          },
+          "depositedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "filedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": [
+          "status",
+          "link",
+          "version",
+          "bases"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "link": {
+            "type": "string",
+            "description": "The state of the link with Filarr (see docs/reference/errors.md, link states)"
+          },
+          "version": {
+            "type": "string"
+          },
+          "bases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slug": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error",
+          "code"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "A message for people (it may change; match on `code`)"
+          },
+          "code": {
+            "type": "string",
+            "description": "A stable code. The local API's own codes are listed here; codes passed on from Filarr keep Filarr's name.",
+            "examples": [
+              "aborted",
+              "bad_body",
+              "bad_cursor",
+              "bad_filter",
+              "bad_ip",
+              "bad_json",
+              "bad_limit",
+              "bad_multipart",
+              "bad_package",
+              "bad_password",
+              "bad_path",
+              "bad_request",
+              "bad_response",
+              "bad_since",
+              "bad_tags",
+              "bad_value",
+              "base_not_found",
+              "base_read_only",
+              "body_too_large",
+              "box_full",
+              "box_not_signed",
+              "confirm_required",
+              "creator_unauthenticated",
+              "csrf",
+              "deposit_failed",
+              "deposit_not_found",
+              "field_managed",
+              "field_read_only",
+              "filarr_unreachable",
+              "filarr_write_unavailable",
+              "file_required",
+              "file_too_large",
+              "file_type_refused",
+              "files_not_linked",
+              "forbidden",
+              "internal",
+              "ip_forbidden",
+              "key_expired",
+              "key_missing",
+              "key_not_found",
+              "key_paused",
+              "key_rate",
+              "key_unknown",
+              "login_required",
+              "method_not_allowed",
+              "name_required",
+              "no_token",
+              "not_found",
+              "notify_bad_signature",
+              "notify_malformed",
+              "notify_stale",
+              "origin_forbidden",
+              "other_access",
+              "package_unreadable",
+              "password_from_env",
+              "query_not_found",
+              "row_not_found",
+              "rows_managed",
+              "same_token",
+              "scope_files",
+              "scope_required",
+              "settings_refused",
+              "setup_code_required",
+              "setup_done",
+              "source_not_found",
+              "sql_empty",
+              "sql_error",
+              "sql_read_only",
+              "sql_syntax",
+              "sql_too_long",
+              "tls_missing",
+              "token_from_env",
+              "token_refused",
+              "token_required",
+              "too_many_attempts",
+              "too_many_rows",
+              "unknown_field",
+              "unknown_option",
+              "view_not_found",
+              "weak_password",
+              "webhook_not_found",
+              "write_disabled",
+              "write_failed"
+            ]
+          },
+          "retryAfter": {
+            "type": "integer",
+            "description": "429: seconds to wait (also in `Retry-After`)"
+          },
+          "field": {
+            "type": "string",
+            "description": "The field concerned"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "`file_too_large`: the size allowed, in bytes"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "`key_missing`: the `(e, g)` couples missing"
+          },
+          "position": {
+            "type": "integer",
+            "description": "`sql_syntax`: where parsing failed"
+          },
+          "sqlCode": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "`file_type_refused`: `extension`, `signature`…"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "x-limits": {
+    "maxJsonBodyBytes": 4194304,
+    "maxRowsPerCreate": 500,
+    "maxLimit": 1000,
+    "sqlMaxRows": 10000,
+    "maxFileBytes": 104857600
+  }
+}

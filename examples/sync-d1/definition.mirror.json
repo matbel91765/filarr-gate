@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "id": "xs_DemoClientsBoutique000",
+  "rev": 1,
+  "name": "Clients de la boutique (miroir)",
+  "connector": "d1",
+  "conn": { "account": "0123456789abcdef0123456789abcdef", "database": "7c1e2b0a-0000-4000-8000-000000000000" },
+  "host": "api.cloudflare.com",
+  "from": { "table": "clients" },
+  "key": { "cols": ["id"], "gen": "source" },
+  "marker": { "col": "maj_le", "kind": "iso" },
+  "mode": "mirror",
+  "map": [
+    { "col": "id", "prop": "p_id", "dir": "in", "type": "number" },
+    { "col": "nom", "prop": "p_nom", "dir": "in", "type": "text" },
+    { "col": "ville", "prop": "p_ville", "dir": "in", "type": "text" },
+    { "col": "statut", "prop": "p_statut", "dir": "in", "type": "select" },
+    { "col": "note", "prop": "p_note", "dir": "in", "type": "text" }
+  ],
+  "onGone": "mark",
+  "guard": { "pct": 20, "min": 10 },
+  "runner": { "kind": "gate", "accessId": "<the access id>", "name": "ERP Atelier" },
+  "schedule": { "every": "1h", "tz": "Europe/Paris" },
+  "signer": "<the user id of the access creator>",
+  "sig": "<signature by the creator's identity key>"
+}

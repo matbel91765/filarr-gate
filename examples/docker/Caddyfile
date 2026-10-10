@@ -1,0 +1,8 @@
+# HTTPS for the local API of Filarr Gate. Caddy gets and renews the certificate by itself:
+# point the DNS name at this server and open ports 80 and 443.
+# region caddyfile
+gate.example.com {
+	encode gzip
+	reverse_proxy gate:8443
+}
+# endregion

@@ -1,0 +1,47 @@
+# Filarr Gate on a server, with Docker Compose, behind Caddy for HTTPS.
+#
+#   cp example.env .env      # then paste the token and a password in .env
+#   docker compose up -d --build
+#   docker compose exec gate filarr-gate keys create --name ERP
+#
+# The image is built from the repository (no image is published yet): run this from a clone,
+# or set `build.context` to the clone's path.
+services:
+  # region gate
+  gate:
+    build:
+      context: ../..
+    image: filarr-gate:local
+    restart: unless-stopped
+    environment:
+      FILARR_GATE_TOKEN: ${FILARR_GATE_TOKEN:?paste the token in .env}
+      FILARR_GATE_ADMIN_PASSWORD: ${FILARR_GATE_ADMIN_PASSWORD:?choose a password of 10 characters or more}
+      # Caddy, on the same Docker network, forwards the caller's address
+      FILARR_GATE_TRUST_PROXY: 172.16.0.0/12
+      FILARR_GATE_WRITE: "false"
+    volumes:
+      # State, encrypted block cache, log, encrypted sync state: keep this volume
+      - gate-data:/data
+    ports:
+      # The management UI on THIS machine only: whoever enters it reads the data
+      - "127.0.0.1:8787:8787"
+    # The API is not published: only Caddy reaches it (port 8443 inside the network)
+  # endregion
+
+  # region caddy
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - gate
+  # endregion
+
+volumes:
+  gate-data:
+  caddy-data:

@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "id": "xs_DemoClientsBoutique001",
+  "rev": 1,
+  "name": "Clients publiés vers la boutique",
+  "connector": "d1",
+  "conn": { "account": "0123456789abcdef0123456789abcdef", "database": "7c1e2b0a-0000-4000-8000-000000000001" },
+  "host": "api.cloudflare.com",
+  "from": { "table": "clients" },
+  "key": { "cols": ["id"], "gen": "source" },
+  "marker": { "col": "maj_le", "kind": "iso" },
+  "mode": "publish",
+  "map": [
+    { "col": "id", "prop": "p_id", "dir": "in", "type": "number" },
+    { "col": "nom", "prop": "p_nom", "dir": "out", "type": "text" },
+    { "col": "ville", "prop": "p_ville", "dir": "out", "type": "text" },
+    { "col": "statut", "prop": "p_statut", "dir": "out", "type": "select" },
+    { "col": "note", "prop": "p_note", "dir": "out", "type": "text" }
+  ],
+  "onFilarrDelete": "delete",
+  "onSourceOnly": "keep",
+  "guard": { "pct": 20, "min": 10 },
+  "runner": { "kind": "gate", "accessId": "<the access id>", "name": "ERP Atelier" },
+  "schedule": { "every": "15m", "tz": "Europe/Paris", "onChange": true },
+  "signer": "<the user id of the access creator>",
+  "sig": "<signature by the creator's identity key>"
+}

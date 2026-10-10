@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "id": "xs_DemoCommandesAtelier00",
+  "rev": 1,
+  "name": "Commandes de l'atelier (miroir)",
+  "connector": "postgres",
+  "conn": { "host": "db.lan", "port": 5432, "db": "atelier", "user": "filarr_gate", "schema": "public", "tls": "off-local" },
+  "host": "db.lan:5432",
+  "from": { "table": "commandes" },
+  "key": { "cols": ["id"], "gen": "source" },
+  "marker": { "col": "updated_at", "kind": "iso" },
+  "mode": "mirror",
+  "map": [
+    { "col": "id", "prop": "p_id", "dir": "in", "type": "number" },
+    { "col": "numero", "prop": "p_numero", "dir": "in", "type": "text" },
+    { "col": "client", "prop": "p_client", "dir": "in", "type": "text" },
+    { "col": "montant", "prop": "p_montant", "dir": "in", "type": "number" },
+    { "col": "statut", "prop": "p_statut", "dir": "in", "type": "select" }
+  ],
+  "onGone": "mark",
+  "guard": { "pct": 20, "min": 10 },
+  "runner": { "kind": "gate", "accessId": "<the access id>", "name": "Serveur de l'atelier" },
+  "schedule": { "every": "15m", "tz": "Europe/Paris" },
+  "signer": "<the user id of the access creator>",
+  "sig": "<signature by the creator's identity key>"
+}

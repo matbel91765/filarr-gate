@@ -19,7 +19,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p packages/cli/ui/tsconfig.json --noEmit && tsc -p packages/cloudflare/tsconfig.json --noEmit",
     "test": "vitest run",
     "mock-filarr": "tsx scripts/mock-filarr.ts",
-    "test:e2e": "vitest run test/worker.e2e.test.ts"
+    "test:e2e": "vitest run test/worker.e2e.test.ts",
+    "test:examples": "vitest run test/examples.test.ts test/examples-sync.test.ts",
+    "docs": "tsx scripts/docs/build.ts",
+    "docs:check": "tsx scripts/docs/build.ts --check"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",

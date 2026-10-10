@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact us</title>
+  </head>
+  <body>
+    <!-- A public form that adds a row to a Filarr database through Filarr Gate.
+         The gate must allow this page's origin (FILARR_GATE_CORS_ORIGINS) and the key must have
+         the "create" right on one database only: see README.md. -->
+    <form id="contact">
+      <label>Company <input name="nom" required maxlength="200" /></label>
+      <label>City <input name="ville" maxlength="100" /></label>
+      <button type="submit">Send</button>
+      <p id="result" role="status"></p>
+    </form>
+    <script type="module">
+      import { contactRequest } from './form.js';
+
+      // The public address of the gate (behind HTTPS) and the create-only key
+      const GATE_URL = 'https://gate.example.com';
+      const FORM_KEY = 'gk_for_replace_with_a_create_only_key';
+
+      document.getElementById('contact').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const fields = Object.fromEntries(new FormData(event.target));
+        const { url, init } = contactRequest(GATE_URL, FORM_KEY, fields);
+        const res = await fetch(url, init);
+        document.getElementById('result').textContent = res.ok ? 'Thank you, we will call you back.' : `Sorry, something went wrong (${res.status}).`;
+      });
+    </script>
+  </body>
+</html>
