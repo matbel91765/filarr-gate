@@ -1,0 +1,467 @@
+{
+  "contrat": "gate-heberge-1 § 16 (familles 2, 8, 9)",
+  "origine": "filarr-gate",
+  "lecture": "Produit par scripts/gen-gate-heberge-1-gate-vectors.mjs (référence en Node seul). Familles 1, 3, 4, 5, 7 : gate-heberge-1.vectors.json (origine filarg) ; famille 6 : gate-settings-1.vectors.json. Le jeton est celui de la famille 4. Clés de TEST seulement.",
+  "sealedToken": {
+    "famille": 2,
+    "lecture": "Clair JSON UTF-8 canonique { a, k, s?, t, v: 1 } ; sealedToken = sealToPublicKey(clair, HOST_ENC.encPublicKey) = base64std(éph_pub (32) ‖ IV (12) ‖ AES-256-GCM(KEK, IV, clair, AAD vide)), KEK = HKDF-SHA256(X25519(éph, HOST_ENC), sel = éph_pub ‖ HOST_ENC_pub, info \"filarr.userkey.seal.v1\", 32 o). L’aléa (éphémère, IV) est imposé pour les vecteurs ; on vérifie l’ouverture, et que le scellement à aléa imposé redonne les mêmes octets. Le service attend { accessId, keyId } et refuse un a, un k, un t d’un autre accès, un scellé vers une autre clé ou altéré.",
+    "token": "flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y",
+    "accessId": "jpWco6qxuL_GzdTb4unw9w",
+    "hostKey": {
+      "id": "h-scelle-test",
+      "encPrivateKeyHex": "c4cbd2d9e0e7eef5fc030a11181f262d343b424950575e656c737a81888f969d",
+      "encPublicKey": "+N5VDHV46uwLGq1T2umf0gsiUWnmr74mAd0PA6qqKGY="
+    },
+    "otherHostKey": {
+      "id": "h-autre-test",
+      "encPrivateKeyHex": "e3eaf1f8ff060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bc",
+      "encPublicKey": "CbAKtk+6kfbuc6fi+FNVs645XnrjtLg61od0kzwPFiQ="
+    },
+    "randomness": {
+      "ephemeralPrivHex": "fa01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3",
+      "ivHex": "1920272e353c434a51585f66"
+    },
+    "expected": {
+      "accessId": "jpWco6qxuL_GzdTb4unw9w",
+      "keyId": "h-scelle-test"
+    },
+    "accepted": [
+      {
+        "why": "création : s porte la première clé d’application (§ 6.1)",
+        "plain": {
+          "a": "jpWco6qxuL_GzdTb4unw9w",
+          "k": "h-scelle-test",
+          "s": {
+            "v": 1,
+            "kind": "filarr-gate/settings",
+            "accessId": "jpWco6qxuL_GzdTb4unw9w",
+            "createdAt": "2026-10-10T12:00:00.000Z",
+            "appKeys": [
+              {
+                "id": "3b0e8f4a-6c2d-4e1f-9a7b-5d4c3b2a1f0e",
+                "name": "Première clé",
+                "hash": "7b7441fd3eef7f0bf16b1e7286af6717a7f58edd8f4fe27463a29e5c3b5a5d99",
+                "scopes": [
+                  {
+                    "target": "all",
+                    "read": true
+                  }
+                ]
+              }
+            ],
+            "webhooks": [],
+            "queries": [],
+            "extdb": [],
+            "files": {
+              "filter": {
+                "deny": [],
+                "maxBytes": 104857600
+              }
+            },
+            "settings": {
+              "cors": [],
+              "write": false
+            }
+          },
+          "t": "flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y",
+          "v": 1
+        },
+        "plaintext": "{\"a\":\"jpWco6qxuL_GzdTb4unw9w\",\"k\":\"h-scelle-test\",\"s\":{\"accessId\":\"jpWco6qxuL_GzdTb4unw9w\",\"appKeys\":[{\"hash\":\"7b7441fd3eef7f0bf16b1e7286af6717a7f58edd8f4fe27463a29e5c3b5a5d99\",\"id\":\"3b0e8f4a-6c2d-4e1f-9a7b-5d4c3b2a1f0e\",\"name\":\"Première clé\",\"scopes\":[{\"read\":true,\"target\":\"all\"}]}],\"createdAt\":\"2026-10-10T12:00:00.000Z\",\"extdb\":[],\"files\":{\"filter\":{\"deny\":[],\"maxBytes\":104857600}},\"kind\":\"filarr-gate/settings\",\"queries\":[],\"settings\":{\"cors\":[],\"write\":false},\"v\":1,\"webhooks\":[]},\"t\":\"flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y\",\"v\":1}",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2amFIEw62SMZloZ4z+w1nGCin6eLgNShmt2WgRMn3hhyANLTssAHV6NVftrsa6CFfwgidTOjGH3EoCZq9XKO+mjh0YJ/46hwVWrt9xmoBcRuMsWxLJg+6wfwCA4oP4PKxQAt5L8DUQ4TgSKuuEhkg4Pm05Oz6DJw4Xl7Aluy6IaHNFNXiKejcPe59ghnzHeyqAxAeAMDDW+hle0FtdNrEkQwIq0DQE3q8PO3U8ecVAKDw92+nHgYO5uK+lgoAnj44vsSN9EkaqfYnvSyIYaDzHT06gn0nX6gCsO4kt+/ryEE9BeLgORKtWrXa7vs1O6/cjh4FODcXUBr7HwuTLUATL/U31emkH83ptAcZ2VfuhalQ47lcvpkDGl8iASith+jFme/XS7Kn1uYRNXVogTZCAmCEIOiOIzXBXmE/iNHQLEggssgiHR9y4fMbC8Xzv/Y4BevIRVdzmd96QqbToM5zXcuZBpKIsEJI0u4STUSZFFsR6OD9D6UE4o6DoYPOzKJo84uhG3Cap3YAmZ4XVrcsTKdIwXQx9K+NcNc7l2YpLaHCBAbRYBe859a3MChp7wchuvfQ89QwKm5WdGEnNtMo+LS7xxzEBD7KO9BKcxOk/qbRKxtk3ootcHQBj36oWVfIahrXLfMfJyGm6WULSct0M582BhKWV7rg/YkgMqLb/liSpIp7uoD7GcXlRXXbIjKW1Jy4JqwRMU+x+o8YYbSeymq39rENLwQG2SpHQ7OO/CbBk5InL4xMCD5S/P1vx1goJSsImR02snwdBp8jF5C/a0MVI="
+      },
+      {
+        "why": "migration vers l’hébergée : s vide",
+        "plain": {
+          "a": "jpWco6qxuL_GzdTb4unw9w",
+          "k": "h-scelle-test",
+          "s": {},
+          "t": "flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y",
+          "v": 1
+        },
+        "plaintext": "{\"a\":\"jpWco6qxuL_GzdTb4unw9w\",\"k\":\"h-scelle-test\",\"s\":{},\"t\":\"flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y\",\"v\":1}",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2amFIEw62SMZloZ4z+w1nGCin6eLgNShmt2WgRMn3hhyANLTssAHV6NVftrsa6CFfwgidTOjGH3Tc3YvJKDasar1yNH/IiT/VDtkcd82jkut+Md4fxxwbkSwmxju+ggKT02+ZatWU5yVVuH/tlTnm1pnik8k6HE7MzJvD4cyd0uLJgRXX29jpfSiJtri3DNx/B7xwV3ZUyN2XvKLRC8xZMj2w=="
+      },
+      {
+        "why": "s absent (facultatif)",
+        "plain": {
+          "a": "jpWco6qxuL_GzdTb4unw9w",
+          "k": "h-scelle-test",
+          "t": "flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y",
+          "v": 1
+        },
+        "plaintext": "{\"a\":\"jpWco6qxuL_GzdTb4unw9w\",\"k\":\"h-scelle-test\",\"t\":\"flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y\",\"v\":1}",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2amFIEw62SMZloZ4z+w1nGCin6eLgNShmt2WgRMn3hhyANLTssAHV6NVftrsa6CFfwgidTJjGGuVo2Il9zQPsWYzwx89pHA00LoivtUliwCoJs3yPEs4oRU1VEj9ewRCm5c+Y3pZ091LT2Mmc9rmEdzgzBPqtTL6ODW8QU4w9RMHNQiHj/ZzNPc4MSPBizI6ctHLz/9q02yV969"
+      }
+    ],
+    "refused": [
+      {
+        "why": "a d’un autre accès",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2amFIEw62ScWF0buGyr2D245XynMh5q+117WHNqn3hhyANLTssAHV6NVftrsa6CFfwgidTJjGGuVo2Il9zQPsWYzwx89pHA00LoivtUliwCoJs3yPEs4oRU1VEj9ewRCm5c+Y3pZ091LT2Mmc9rmEdzgzBPqtTL6ODW8QU4w9RMHNQiHj/ZzNPc4MQblKkZYVHYCX24CjnOe0ob"
+      },
+      {
+        "why": "k d’une autre clé du service",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2amFIEw62SMZloZ4z+w1nGCin6eLgNShmt2WgRMn3hhyANLTssAD0icS/Ij6L+UEqouh4KflHnqXJOlpNnPLf+t1StI+siH2k/RmeNpiBw09tos0b9iyqlE5DVj8fEuamZSotaOZykCPQu7j+Ezw2dCsEwrvvXg8eD44w4366YeTrlZEDGNmMvXrDOurzcNFOrm5JPlsRBwSww="
+      },
+      {
+        "why": "t : le jeton d’un autre accès",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2amFIEw62SMZloZ4z+w1nGCin6eLgNShmt2WgRMn3hhyANLTssAHV6NVftrsa6CFfwgidTJjGGuVo2Il9zQPsWY3zJ79MqTyEyksJRWrzAfmOYBxfNbxIQQ6E4hw94cFBk3uYuVXVp3PFyxh99F3EVZoTtJnf746t21+Aco5r9KDIMqHj/ZzNPc4MTITRPjGyEEFApjqfltqLu1"
+      },
+      {
+        "why": "v inconnu",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2amFIEw62SMZloZ4z+w1nGCin6eLgNShmt2WgRMn3hhyANLTssAHV6NVftrsa6CFfwgidTJjGGuVo2Il9zQPsWYzwx89pHA00LoivtUliwCoJs3yPEs4oRU1VEj9ewRCm5c+Y3pZ091LT2Mmc9rmEdzgzBPqtTL6ODW8QU4w9RMHNQiHj/ZzNPc48TrVUum4ZpK9Rof+AmWBo2j"
+      },
+      {
+        "why": "scellé vers une autre clé du service",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2bnz5QpU95iYCHXdyhawusHrU5kH0LQqqWi5n6SvMq7qqV/JZkjVE0I5VzwNlRuGdOMr2P8vFk/NXWCMyXjmPCluApuuh3VViOz3wgWbq6lYDnFNFasXN+2e/6ERJNwKiH6LMK5U+fgl6bXZdPiSV5mB37IS8jjFYPL9iKKO8HlBbgaVvpdmRMPeaGZlwVTOsvNj5QsRzcGd+mN"
+      },
+      {
+        "why": "scellé altéré (dernier octet de l’étiquette GCM)",
+        "sealed": "PznvXpFDb+eNUuEeNGxkwlSvrm/Tn1hg7pqw/WyHZmkZICcuNTxDSlFYX2amFIEw62SMZloZ4z+w1nGCin6eLgNShmt2WgRMn3hhyANLTssAHV6NVftrsa6CFfwgidTJjGGuVo2Il9zQPsWYzwx89pHA00LoivtUliwCoJs3yPEs4oRU1VEj9ewRCm5c+Y3pZ091LT2Mmc9rmEdzgzBPqtTL6ODW8QU4w9RMHNQiHj/ZzNPc4MSPBizI6ctHLz/9q02yV968"
+      }
+    ]
+  },
+  "box": {
+    "famille": 8,
+    "lecture": "K_box = HKDF-SHA256(ikm = secret du jeton (32 o), sel = accessId (16 o, décodé du base64url), info = \"filarr/gate-host/v1|box\", 32 o). AAD d’une entrée de l’état = UTF-8(\"filarr/gate-host/v1|state|\" + accessId (base64url, 22 car.) + \"|\" + clé). L’exemple chiffre une entrée par AES-256-GCM sous K_box (chiffré ‖ étiquette de 16 o) ; l’enveloppe de stockage (où va l’IV) n’est pas gelée.",
+    "token": "flr_live_jpWco6qxuL_GzdTb4unw9w_rbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4Y",
+    "accessId": "jpWco6qxuL_GzdTb4unw9w",
+    "secretHex": "adb4bbc2c9d0d7dee5ecf3fa01080f161d242b323940474e555c636a71787f86",
+    "kBoxHex": "d528912ed47f24a2d61894081d4dc7540aff3946a6cd76c40b9e8647b2fa3aee",
+    "otherToken": "flr_live_zNPa4ejv9v0ECxIZICcuNQ_6_L5AAcOFRwjKjE4P0ZNVFtiaXB3foWMk5qhqK-2vcQ",
+    "otherKBoxHex": "75fc95f23dfc5389556dfc42221410670a4d69e21d867e15ef64f179a52b790f",
+    "aad": [
+      {
+        "key": "appKeys",
+        "aad": "filarr/gate-host/v1|state|jpWco6qxuL_GzdTb4unw9w|appKeys",
+        "aadHex": "66696c6172722f676174652d686f73742f76317c73746174657c6a7057636f367178754c5f477a64546234756e7739777c6170704b657973"
+      },
+      {
+        "key": "webhooks",
+        "aad": "filarr/gate-host/v1|state|jpWco6qxuL_GzdTb4unw9w|webhooks",
+        "aadHex": "66696c6172722f676174652d686f73742f76317c73746174657c6a7057636f367178754c5f477a64546234756e7739777c776562686f6f6b73"
+      },
+      {
+        "key": "queries",
+        "aad": "filarr/gate-host/v1|state|jpWco6qxuL_GzdTb4unw9w|queries",
+        "aadHex": "66696c6172722f676174652d686f73742f76317c73746174657c6a7057636f367178754c5f477a64546234756e7739777c71756572696573"
+      },
+      {
+        "key": "extdb/3b0e8f4a",
+        "aad": "filarr/gate-host/v1|state|jpWco6qxuL_GzdTb4unw9w|extdb/3b0e8f4a",
+        "aadHex": "66696c6172722f676174652d686f73742f76317c73746174657c6a7057636f367178754c5f477a64546234756e7739777c65787464622f3362306538663461"
+      },
+      {
+        "key": "blocks/AAAAAAAAAAAAAAAAAAAAAA/0",
+        "aad": "filarr/gate-host/v1|state|jpWco6qxuL_GzdTb4unw9w|blocks/AAAAAAAAAAAAAAAAAAAAAA/0",
+        "aadHex": "66696c6172722f676174652d686f73742f76317c73746174657c6a7057636f367178754c5f477a64546234756e7739777c626c6f636b732f414141414141414141414141414141414141414141412f30"
+      }
+    ],
+    "state": {
+      "key": "webhooks",
+      "ivHex": "30373e454c535a61686f767d",
+      "plaintext": "[{\"id\":\"6c1f0a9e\",\"secret\":\"whsec_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"url\":\"https://erp.example.test/hooks/filarr\"}]",
+      "ciphertextHex": "ab23070ba5791c84e4da1e574f0f0b3196a57c7a51da00550e8b9f50848e68e50c6817d4e3b4259c29d0c07fed0a18d4342eb4f7b005fe04b9dd3ed9e2a514824810b4313f70ac0e55e3486507f194c1cfe8b18c836c1ebe0d1133e22bf2c544115b6198f5f3292ed6e8efc34f5ee06644b1ce8f4a5f0b059cab338e3c5f404a706561b00d638167419cb9eaf106"
+    },
+    "refused": [
+      {
+        "why": "AAD d’une autre clé de l’état",
+        "aad": "filarr/gate-host/v1|state|jpWco6qxuL_GzdTb4unw9w|queries"
+      },
+      {
+        "why": "AAD d’un autre accès",
+        "aad": "filarr/gate-host/v1|state|zNPa4ejv9v0ECxIZICcuNQ|webhooks"
+      },
+      {
+        "why": "K_box d’un autre jeton",
+        "kBoxHex": "75fc95f23dfc5389556dfc42221410670a4d69e21d867e15ef64f179a52b790f"
+      }
+    ]
+  },
+  "securityTag": {
+    "famille": 9,
+    "lecture": "Étiquette = objet d’étiquette git annoté, signé en SSH par git (gpg.format ssh) : la signature SSHSIG (Ed25519, espace « git », SHA-512, armurée à 70 colonnes) porte sur l’objet sans elle et lui est collée. release-signers = allowed_signers d’OpenSSH, principal « release:<nom> » ou « security:<nom> ». Correctif : nom vX.Y.Z-security, rôle security, dernier paragraphe du message avec Filarr-Release-Kind: security et Filarr-Advisory: <GHSA>, avis existant (knownAdvisories). Une condition manque : publication ordinaire (security.refused). Journal : une entrée par ligne en JSON canonique ; codeHash = \"sha256:\" + hex(SHA-256(SHA256SUMS)) ; deployed au moins 7 j après publishedAt ; security : publishedAt = deployedAt.",
+    "namespace": "git",
+    "hashAlgorithm": "sha512",
+    "signers": {
+      "release": {
+        "principal": "release:essai",
+        "seedHex": "666d747b828990979ea5acb3bac1c8cfd6dde4ebf2f900070e151c232a31383f",
+        "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII7UXMRDVluY6tw2f/CT9XvR5Ab2uzgDvICXPqDrLSPV"
+      },
+      "security": {
+        "principal": "security:essai",
+        "seedHex": "858c939aa1a8afb6bdc4cbd2d9e0e7eef5fc030a11181f262d343b424950575e",
+        "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDJmV4l7PGFVzwZ2xwPrUWgaUo/DOrGFKi3cuivb6DhN"
+      },
+      "intrus": {
+        "principal": null,
+        "seedHex": "a4abb2b9c0c7ced5dce3eaf1f8ff060d141b222930373e454c535a61686f767d",
+        "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOsRU0h8D4FJzXp7Nw7qlObSnQZ0NUgHqt4U9qwqR1bh"
+      }
+    },
+    "signersFile": "# Signataires de TEST (graines fixes des vecteurs gate-heberge-1, famille 9) — jamais une vraie clé.\nrelease:essai namespaces=\"git\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII7UXMRDVluY6tw2f/CT9XvR5Ab2uzgDvICXPqDrLSPV\nsecurity:essai namespaces=\"git\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDJmV4l7PGFVzwZ2xwPrUWgaUo/DOrGFKi3cuivb6DhN\n",
+    "sha256sums": "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2  library/filarr-gate-0.2.0.tgz\nc1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1  cli/filarr-gate-0.2.0.tgz\n",
+    "knownAdvisories": [
+      "GHSA-2f9x-4c7m-q8vr"
+    ],
+    "tags": {
+      "security": [
+        {
+          "why": "correctif de sécurité accepté",
+          "tag": "v0.2.1-security",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.1-security\ntagger Filarr Security Test <security@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.1 : correctif de sécurité\n\nFilarr-Release-Kind: security\nFilarr-Advisory: GHSA-2f9x-4c7m-q8vr\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgMmZXiXs8YVXPBnbHA+tRaBpSj8\nM6sYUqLdy6K9voOE0AAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQJSPM3jyPnDynphWry6212YePm4+/B2iUKDzrKDExo7YxSd+0SvnupUPxuQ9qLCE2P\nbvCmKpexj0i22a72ALFw4=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": true,
+            "tag": "v0.2.1-security",
+            "version": "0.2.1",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "principal": "security:essai",
+            "role": "security",
+            "kind": "security",
+            "security": {
+              "advisory": "GHSA-2f9x-4c7m-q8vr"
+            }
+          }
+        }
+      ],
+      "ordinary": [
+        {
+          "why": "publication ordinaire",
+          "tag": "v0.2.0",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.0\ntagger Filarr Release Test <release@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgjtRcxENWW5jq3DZ/8JP1e9HkBv\na7OAO8gJc+oOstI9UAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQHmzSKJy5RYZD4lBt/JCIR3/yFV7x4qwZLjYtQaO+QTXXL6mMPnehoDToiyk+n69H/\nLPFtvXTn5gtVz7iU2QMAM=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": true,
+            "tag": "v0.2.0",
+            "version": "0.2.0",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "principal": "release:essai",
+            "role": "release",
+            "kind": "release"
+          }
+        }
+      ],
+      "securityRefused": [
+        {
+          "why": "rôle ordinaire : signée par la clé de publication",
+          "tag": "v0.2.1-security",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.1-security\ntagger Filarr Release Test <release@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.1 : correctif de sécurité\n\nFilarr-Release-Kind: security\nFilarr-Advisory: GHSA-2f9x-4c7m-q8vr\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgjtRcxENWW5jq3DZ/8JP1e9HkBv\na7OAO8gJc+oOstI9UAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQGTqWXOzHnp6f9Mvn9QdnK/R9OJgHPK4Ndk9sVXryXE7ZYgURzQh+x72hKgHM6Vfd2\n6K6TPG+AxCTSSG4K2BGw0=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": true,
+            "tag": "v0.2.1-security",
+            "version": "0.2.1",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "principal": "release:essai",
+            "role": "release",
+            "kind": "release",
+            "security": {
+              "refused": "role"
+            }
+          }
+        },
+        {
+          "why": "avis absent du dépôt",
+          "tag": "v0.2.1-security",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.1-security\ntagger Filarr Security Test <security@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.1 : correctif de sécurité\n\nFilarr-Release-Kind: security\nFilarr-Advisory: GHSA-7hj3-xv2p-9wqc\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgMmZXiXs8YVXPBnbHA+tRaBpSj8\nM6sYUqLdy6K9voOE0AAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQDslWiJvOO8tYkaeu6haXYcu7ZLcJv4fqO5Lbaup00KqN4EtaoE8RIwY2Ox9A9cihV\n9VdNTRG62u7HY5mL1DEA0=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": true,
+            "tag": "v0.2.1-security",
+            "version": "0.2.1",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "principal": "security:essai",
+            "role": "security",
+            "kind": "release",
+            "security": {
+              "refused": "advisory-unknown"
+            }
+          }
+        },
+        {
+          "why": "ligne manquante : Filarr-Release-Kind",
+          "tag": "v0.2.1-security",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.1-security\ntagger Filarr Security Test <security@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.1 : correctif de sécurité\n\nFilarr-Advisory: GHSA-2f9x-4c7m-q8vr\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgMmZXiXs8YVXPBnbHA+tRaBpSj8\nM6sYUqLdy6K9voOE0AAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQAMlAcNmJknDR2mC7aiNpNthm+x282CnbWgNLz9eVT8s3dazgHK/TRDo2JO9dOim5c\nzzj5eV/W3nFPnUTIpRMAM=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": true,
+            "tag": "v0.2.1-security",
+            "version": "0.2.1",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "principal": "security:essai",
+            "role": "security",
+            "kind": "release",
+            "security": {
+              "refused": "kind-line-missing"
+            }
+          }
+        },
+        {
+          "why": "ligne manquante : Filarr-Advisory",
+          "tag": "v0.2.1-security",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.1-security\ntagger Filarr Security Test <security@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.1 : correctif de sécurité\n\nFilarr-Release-Kind: security\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgMmZXiXs8YVXPBnbHA+tRaBpSj8\nM6sYUqLdy6K9voOE0AAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQKpTodbGZmM/8jhxcXLUOPkf6YlKUVW9ba8xRHxTBA/PfjvBmQBnFWf40PrHc7vm46\nwj7nDn7+H7bNQs5ZD+LA0=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": true,
+            "tag": "v0.2.1-security",
+            "version": "0.2.1",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "principal": "security:essai",
+            "role": "security",
+            "kind": "release",
+            "security": {
+              "refused": "advisory-line-missing"
+            }
+          }
+        },
+        {
+          "why": "lignes hors du dernier paragraphe",
+          "tag": "v0.2.1-security",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.1-security\ntagger Filarr Security Test <security@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.1\n\nFilarr-Release-Kind: security\nFilarr-Advisory: GHSA-2f9x-4c7m-q8vr\n\nNotes de version.\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgMmZXiXs8YVXPBnbHA+tRaBpSj8\nM6sYUqLdy6K9voOE0AAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQIFBAFcIyaFLKQnFpkaSQk5fB/Z8N8jlbbjXuie0H68lUCZ4HLbOsXPCHJ8WzV/GXZ\nZjYB0TQsYBllJY/s/FlQU=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": true,
+            "tag": "v0.2.1-security",
+            "version": "0.2.1",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "principal": "security:essai",
+            "role": "security",
+            "kind": "release",
+            "security": {
+              "refused": "kind-line-missing"
+            }
+          }
+        }
+      ],
+      "refused": [
+        {
+          "why": "non signée",
+          "tag": "v0.2.0",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.0\ntagger Filarr Release Test <release@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.0\n",
+          "expected": {
+            "ok": false,
+            "tag": "v0.2.0",
+            "refused": "unsigned"
+          }
+        },
+        {
+          "why": "message modifié après signature",
+          "tag": "v0.2.0",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.0\ntagger Filarr Release Test <release@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.9\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgjtRcxENWW5jq3DZ/8JP1e9HkBv\na7OAO8gJc+oOstI9UAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQHmzSKJy5RYZD4lBt/JCIR3/yFV7x4qwZLjYtQaO+QTXXL6mMPnehoDToiyk+n69H/\nLPFtvXTn5gtVz7iU2QMAM=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": false,
+            "tag": "v0.2.0",
+            "refused": "signature-invalid"
+          }
+        },
+        {
+          "why": "clé absente de release-signers",
+          "tag": "v0.2.0",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.0\ntagger Filarr Release Test <release@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.0\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg6xFTSHwPgUnNens3DuqU5tKdBn\nQ1SAeq3hT2rCpHVuEAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQBq1U9TONhszMzHXbvupirs9C/1eAdRY83V5yooMtNNO9+vsH95DJHcX3AxlroTlke\nNyz3vZjYvXuVlzKo5UCAw=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": false,
+            "tag": "v0.2.0",
+            "refused": "signer-unknown"
+          }
+        },
+        {
+          "why": "objet signé sous un autre nom",
+          "tag": "v0.2.0",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.1.9\ntagger Filarr Release Test <release@example.test> 1792195200 +0000\n\nFilarr Gate 0.1.9\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgjtRcxENWW5jq3DZ/8JP1e9HkBv\na7OAO8gJc+oOstI9UAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQHKLPtNcd+KddAf2QCEMe2ex1p0LRn9mthqX7826sU5FiGnacCQJ1yl+7LfBbF7BC4\n3oaCzoaoHcZBT4zLrhBQQ=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": false,
+            "tag": "v0.2.0",
+            "refused": "tag-mismatch"
+          }
+        },
+        {
+          "why": "nom hors de vX.Y.Z",
+          "tag": "v0.2.0-rc.1",
+          "raw": "object 1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\ntype commit\ntag v0.2.0-rc.1\ntagger Filarr Release Test <release@example.test> 1792195200 +0000\n\nFilarr Gate 0.2.0-rc.1\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgjtRcxENWW5jq3DZ/8JP1e9HkBv\na7OAO8gJc+oOstI9UAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5\nAAAAQM8Fd1Av6wYyKQT//GiHqAfKaFh3bWvAmDTevzw05FA3FYO6Yk3pd/DiXXIBaW5GSm\nwfNWrfPf1AODykRJPkLAU=\n-----END SSH SIGNATURE-----\n",
+          "expected": {
+            "ok": false,
+            "tag": "v0.2.0-rc.1",
+            "refused": "tag-name"
+          }
+        }
+      ]
+    },
+    "journal": {
+      "published": {
+        "entry": {
+          "codeHash": "sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be",
+          "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+          "kind": "published",
+          "publishedAt": "2026-10-17T00:05:12.000Z",
+          "tag": "v0.2.0",
+          "version": "0.2.0"
+        },
+        "line": "{\"codeHash\":\"sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be\",\"commit\":\"1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\",\"kind\":\"published\",\"publishedAt\":\"2026-10-17T00:05:12.000Z\",\"tag\":\"v0.2.0\",\"version\":\"0.2.0\"}"
+      },
+      "deployed": {
+        "entry": {
+          "codeHash": "sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be",
+          "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+          "deployedAt": "2026-10-24T09:00:00.000Z",
+          "kind": "deployed",
+          "publishedAt": "2026-10-17T00:05:12.000Z",
+          "tag": "v0.2.0",
+          "version": "0.2.0"
+        },
+        "line": "{\"codeHash\":\"sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be\",\"commit\":\"1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\",\"deployedAt\":\"2026-10-24T09:00:00.000Z\",\"kind\":\"deployed\",\"publishedAt\":\"2026-10-17T00:05:12.000Z\",\"tag\":\"v0.2.0\",\"version\":\"0.2.0\"}"
+      },
+      "security": {
+        "entry": {
+          "advisory": "GHSA-2f9x-4c7m-q8vr",
+          "codeHash": "sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be",
+          "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+          "deployedAt": "2026-10-18T14:30:00.000Z",
+          "kind": "security",
+          "note": "correctif de sécurité, délai de sept jours levé",
+          "publishedAt": "2026-10-18T14:30:00.000Z",
+          "severity": "high",
+          "tag": "v0.2.1-security",
+          "version": "0.2.1"
+        },
+        "line": "{\"advisory\":\"GHSA-2f9x-4c7m-q8vr\",\"codeHash\":\"sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be\",\"commit\":\"1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c\",\"deployedAt\":\"2026-10-18T14:30:00.000Z\",\"kind\":\"security\",\"note\":\"correctif de sécurité, délai de sept jours levé\",\"publishedAt\":\"2026-10-18T14:30:00.000Z\",\"severity\":\"high\",\"tag\":\"v0.2.1-security\",\"version\":\"0.2.1\"}"
+      },
+      "refused": [
+        {
+          "why": "mise en service six jours après la publication",
+          "entry": {
+            "codeHash": "sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "deployedAt": "2026-10-23T00:05:12.000Z",
+            "kind": "deployed",
+            "publishedAt": "2026-10-17T00:05:12.000Z",
+            "tag": "v0.2.0",
+            "version": "0.2.0"
+          }
+        },
+        {
+          "why": "correctif sans avis",
+          "entry": {
+            "codeHash": "sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "deployedAt": "2026-10-18T14:30:00.000Z",
+            "kind": "security",
+            "note": "correctif de sécurité, délai de sept jours levé",
+            "publishedAt": "2026-10-18T14:30:00.000Z",
+            "severity": "high",
+            "tag": "v0.2.1-security",
+            "version": "0.2.1"
+          }
+        },
+        {
+          "why": "correctif publié sous une étiquette ordinaire",
+          "entry": {
+            "advisory": "GHSA-2f9x-4c7m-q8vr",
+            "codeHash": "sha256:331d0885f4b7c9a036120a62c32c6c9ad954bc8a85903c2823a5ece06e1e62be",
+            "commit": "1f2e3d4c5b6a79881f2e3d4c5b6a79881f2e3d4c",
+            "deployedAt": "2026-10-18T14:30:00.000Z",
+            "kind": "security",
+            "note": "correctif de sécurité, délai de sept jours levé",
+            "publishedAt": "2026-10-18T14:30:00.000Z",
+            "severity": "high",
+            "tag": "v0.2.1",
+            "version": "0.2.1"
+          }
+        }
+      ]
+    }
+  }
+}

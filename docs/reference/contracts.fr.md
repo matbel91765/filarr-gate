@@ -25,7 +25,8 @@ La suite d'essais rejoue les vecteurs partagés avec Filarr (`test/vectors/`), o
 | `api-base-1.vectors.json` | Filarr | jeton, preuve, clés scellées, manifeste, slugs |
 | `db-store-1.vectors.json` | Filarr | les clés du magasin par génération, les blocs, les têtes |
 | `boite-noire-v2-serveur.vectors.json` | le serveur de Filarr | les codes et remèdes de la révision 3, `bumpDue`, le corps de chaque réveil |
-| `gate-heberge-1.vectors.json` | Filarr et la boîte noire | les réveils (`A_notify`, en-tête, fenêtre), le paquet de réglages, le texte d'accord et son empreinte |
+| `gate-heberge-1.vectors.json` | Filarr | familles 1, 3, 4, 5, 7 : le texte d'accord et son empreinte, les requêtes signées du service, les réveils (`A_notify`, en-tête, fenêtre), le reçu d'effacement, `hostName` |
+| `gate-heberge-1-gate.vectors.json` | **la boîte noire** | familles 2, 8, 9 : le jeton scellé et son ouverture, `K_box` et l'AAD de l'état, l'étiquette de sécurité et le journal public des mises en service |
 | `source-externe-1.vectors.json` | **la boîte noire** | identité, `mergeCell`, file, `planPass`, définitions, scellés |
 | `gate-fichiers-1.vectors.json` | **la boîte noire** | le manifeste fixe, `boxSig`, le résultat, le filtre |
 | `gate-settings-1.vectors.json` | **la boîte noire** | un paquet scellé fixe et ce qu'il donne une fois ouvert |

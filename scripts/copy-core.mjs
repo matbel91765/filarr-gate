@@ -92,7 +92,10 @@ for (const name of ['gate-heberge-1.vectors.json', 'boite-noire-v2-serveur.vecto
   const src = `test-vectors/${name}`;
   const commit = execFileSync('git', ['-C', filarg, 'log', '-1', '--format=%h', '--', src], { encoding: 'utf8' }).trim();
   writeFileSync(join(process.cwd(), 'test', 'vectors', name), readFileSync(join(filarg, src)));
-  manifest.push({ file: `test/vectors/${name}`, from: src, commit, rewritten: 0 });
+  const note = name === 'gate-heberge-1.vectors.json'
+    ? { note: 'familles 1, 3, 4, 5, 7 : source de vérité filarg ; les familles 2, 8, 9 sont dans gate-heberge-1-gate.vectors.json (origine filarr-gate), la 6 dans gate-settings-1.vectors.json' }
+    : {};
+  manifest.push({ file: `test/vectors/${name}`, from: src, commit, rewritten: 0, ...note });
 }
 // Ce dont filarr-gate est l'ORIGINE (révision 3 d'api-base-1, gate-fichiers-1, source-externe-1) : jamais
 // réécrit par cette recopie ; la provenance le garde. filarg le recopiera d'ici (lot B2).

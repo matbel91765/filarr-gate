@@ -5,6 +5,9 @@
  * (gate-heberge-1, famille 6). Les essais vérifient que le cœur
  * les reproduit à l'identique et les rejoue sous deux fournisseurs de crypto.
  *
+ * Les familles 2, 8 et 9 de gate-heberge-1 (`gate-heberge-1-gate.vectors.json`) ont leur propre
+ * référence en Node seul : `node scripts/gen-gate-heberge-1-gate-vectors.mjs`.
+ *
  *   npx tsx scripts/build-vectors.ts
  */
 
