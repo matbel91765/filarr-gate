@@ -1,6 +1,6 @@
 {
   "name": "@filarr/gate-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "The portable core of Filarr (store crypto and codec, registers, view engine, SQL engine), copied verbatim from the Filarr apps and relicensed Apache-2.0, plus the pure modules of the black box (external sources, files). Bundled into @filarr/gate and filarr-gate; never published on its own.",
   "license": "Apache-2.0",

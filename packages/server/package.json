@@ -1,6 +1,6 @@
 {
   "name": "@filarr/gate-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "The black box itself, independent of the runtime: local API, management API, app keys, webhooks, MCP, file slot, external-database sync. Bundled into filarr-gate (Node) and the Cloudflare variant.",
   "license": "Apache-2.0",

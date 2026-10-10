@@ -1,16 +1,16 @@
 {
   "name": "filarr-gate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Serve a Filarr database as an API, without Filarr ever seeing your data: a customer-hosted replica of end-to-end encrypted Filarr database stores, with a local API, webhooks, MCP and a management UI.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/matbel91765/filarr-gate.git",
+    "url": "git+https://github.com/filarr-work/filarr-gate.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/matbel91765/filarr-gate#readme",
+  "homepage": "https://github.com/filarr-work/filarr-gate#readme",
   "bugs": {
-    "url": "https://github.com/matbel91765/filarr-gate/issues"
+    "url": "https://github.com/filarr-work/filarr-gate/issues"
   },
   "keywords": [
     "filarr",

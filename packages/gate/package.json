@@ -1,16 +1,16 @@
 {
   "name": "@filarr/gate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Read and write the rows of a Filarr database opened to an API, from your own Node, Deno, Bun or Cloudflare Worker code, without Filarr ever seeing your data.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/matbel91765/filarr-gate.git",
+    "url": "git+https://github.com/filarr-work/filarr-gate.git",
     "directory": "packages/gate"
   },
-  "homepage": "https://github.com/matbel91765/filarr-gate#readme",
+  "homepage": "https://github.com/filarr-work/filarr-gate#readme",
   "bugs": {
-    "url": "https://github.com/matbel91765/filarr-gate/issues"
+    "url": "https://github.com/filarr-work/filarr-gate/issues"
   },
   "keywords": [
     "filarr",
