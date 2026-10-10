@@ -8,7 +8,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -231,6 +231,39 @@ describe('examples/erp-orders-invoices', () => {
     expect(dep.status).toBe('filed');
     expect(JSON.stringify(dep)).not.toContain('facture-C-2026-1190');
     expect(JSON.stringify(dep)).not.toContain('Factures/2026');
+  }, 40_000);
+});
+
+describe('examples/receive-files', () => {
+  const pdf = () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'facture-')), 'facture-0042.pdf');
+    writeFileSync(file, '%PDF-1.4\n% Facture 0042\n%%EOF\n');
+    return file;
+  };
+  /** L'appli du propriétaire range un dépôt (ici : le Filarr en mémoire le dit). */
+  const fileIt = (localId: string) => setTimeout(() => mock.fileDeposit(gate.files.get(localId)!.depositId!, 'filed'), 300);
+
+  it.skipIf(!bash)('deposit.sh (curl) : multipart, corps brut, statut ; un exécutable refusé avant envoi', async () => {
+    const before = mock.deposits.size;
+    const out = await run(bash!, ['examples/receive-files/deposit.sh', pdf()], { FILARR_GATE_URL: api, FILARR_GATE_KEY: keys.erp });
+    const text = out.lines.join('\n');
+    expect(out.code, text).toBe(0);
+    expect(text.match(/\{"id":"dp_[^"]+","status":"deposited","depositedAt":"[^"]+","seq":\d+\}/g)).toHaveLength(2);
+    expect(text).toMatch(/\{"id":"dp_[^"]+","status":"deposited","depositedAt":"[^"]+","filedAt":null\}/);
+    expect(text).toContain('"code":"file_type_refused","reason":"signature"');
+    expect(text).toContain('HTTP 415');
+    // Deux dépôts partis chez Filarr ; l'exécutable, jamais
+    expect(mock.deposits.size - before).toBe(2);
+  }, 30_000);
+
+  it.skipIf(!python)('deposit.py (Python) : dépose, puis attend que l’appli range', async () => {
+    const out = await run(python!, ['examples/receive-files/deposit.py', pdf()], { FILARR_GATE_URL: api, FILARR_GATE_KEY: keys.erp, WAIT_SECONDS: '20' }, (line) => {
+      const m = /: deposited as (dp_\S+)$/.exec(line);
+      if (m) fileIt(m[1]!);
+    });
+    expect(out.code, out.lines.join('\n')).toBe(0);
+    expect(out.lines.some((l) => /facture-0042\.pdf: deposited as dp_/.test(l))).toBe(true);
+    expect(out.lines.some((l) => /^dp_\S+: filed$/.test(l))).toBe(true);
   }, 40_000);
 });
 

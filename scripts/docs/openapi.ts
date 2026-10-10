@@ -154,7 +154,7 @@ export function genericOpenApi(errorCodes: string[]): Obj {
           tags: ['SQL'],
           operationId: 'sql',
           summary: 'A read-only SQL query (SQLite dialect) over the databases the key can read',
-          description: `The key needs the SQL right. Only \`SELECT\` and \`WITH … SELECT\`. One table per database (its slug), one column per field; a database that is not opened appears with its \`id\` only. At most ${SQL_MAX_ROWS} rows are returned (\`truncated\` says when there were more); queries of 64 KiB at most.`,
+          description: `The key needs the SQL right. Only \`SELECT\` and \`WITH … SELECT\`. The tables are those of Filarr's Query view: one per database, named after its title (lower case, no accents, \`_\` between words), one column per column of the database (computed columns left out), a single relation as a foreign key \`<relation>_id\`, a multiple one as a junction table; a database that is not opened appears with its \`id\` only. At most ${SQL_MAX_ROWS} rows are returned (\`truncated\` says when there were more); queries of 64 KiB at most.`,
           requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['sql'], properties: { sql: { type: 'string' } } }, example: { sql: 'SELECT ville, count(*) AS n FROM clients GROUP BY ville' } } } },
           responses: {
             200: json(ref('SqlResult'), 'Columns and rows (arrays, in column order)'),

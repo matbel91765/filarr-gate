@@ -21,8 +21,8 @@ KEY = os.environ.get("FILARR_GATE_KEY") or sys.exit("Set FILARR_GATE_KEY to an a
 OUT = sys.argv[1] if len(sys.argv) > 1 else f"clients-{datetime.date.today().isoformat()}.csv"
 
 # region query
-# Each customer with its number of orders and its turnover. A relation column becomes
-# `<field>_id` in SQL (`commandes.client_id` here).
+# Each customer with its number of orders and its turnover. Tables and columns are named as in
+# Filarr's Query view; the single relation "Client" of "Commandes" is `commandes.client_id`.
 QUERY = """
 SELECT c.nom, c.ville, count(o.id) AS commandes, coalesce(sum(o.montant), 0) AS chiffre
 FROM clients AS c LEFT JOIN commandes AS o ON o.client_id = c.id

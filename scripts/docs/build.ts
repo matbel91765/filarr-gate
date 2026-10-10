@@ -388,7 +388,8 @@ export function region(file: string, name: string): string | null {
 }
 
 function fillSnippets(text: string, file: string, problems: string[]): string {
-  return text.replace(/(<!-- snippet: ([^\s#]+)(?:#([A-Za-z0-9_-]+))? -->\n```[^\n]*\n)([\s\S]*?)(\n```)/g, (all, head: string, src: string, name: string | undefined, _body: string, tail: string) => {
+  // Le bloc se ferme à la première ligne faite de ``` seuls (un bloc vide compris)
+  return text.replace(/(<!-- snippet: ([^\s#]+)(?:#([A-Za-z0-9_-]+))? -->\n```[^\n]*\n)((?:(?!```$)[^\n]*\n)*?)(```)$/gm, (all, head: string, src: string, name: string | undefined, _body: string, fence: string) => {
     if (!existsSync(join(ROOT, src))) {
       problems.push(`${file}: snippet of a missing file ${src}`);
       return all;
@@ -398,7 +399,7 @@ function fillSnippets(text: string, file: string, problems: string[]): string {
       problems.push(`${file}: no region « ${name} » in ${src}`);
       return all;
     }
-    return `${head}${content}${tail}`;
+    return `${head}${content}\n${fence}`;
   });
 }
 

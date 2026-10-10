@@ -1,0 +1,120 @@
+/**
+ * La documentation ne ment pas :
+ *  - ce qui est GÉNÉRÉ (réglages, ligne de commande, codes, OpenAPI générique, tables du
+ *    dépannage) est à jour, les blocs de code recopiés d'examples/ sont identiques, les liens
+ *    mènent quelque part, chaque variable FILARR_GATE_* existe dans le code, aucun quota de palier
+ *    n'est écrit en chiffres (`npm run docs:check`, rejoué ici) ;
+ *  - l'OpenAPI générique est éprouvée route par route contre une boîte en marche : chaque
+ *    opération décrite répond, avec un statut décrit.
+ */
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { Gate } from '../packages/cli/src/gate';
+import { setLogLevel } from '../packages/server/src/log';
+import { buildDocs } from '../scripts/docs/build';
+import { CATALOGUE_DB, CLIENTS_DB, COMMANDES_DB, demoStores } from './support/demoData';
+import { MockFilarr } from './support/mockFilarr';
+import { tempDir, until } from './support/util';
+
+setLogLevel('silent');
+
+describe('npm run docs:check', () => {
+  it('rien de généré n’a dérivé, aucun lien mort, aucune variable inconnue, aucun quota en chiffres', () => {
+    const { changed, problems } = buildDocs({ check: true });
+    expect(changed, 'lancez `npm run docs`').toEqual([]);
+    expect(problems).toEqual([]);
+  }, 60_000);
+});
+
+describe('docs/openapi/filarr-gate.v1.json, contre une boîte en marche', () => {
+  let mock: MockFilarr;
+  let gate: Gate;
+  let api = '';
+  let key = '';
+  const stores: Record<string, string> = {};
+  const spec = JSON.parse(readFileSync(join(__dirname, '..', 'docs', 'openapi', 'filarr-gate.v1.json'), 'utf8')) as {
+    paths: Record<string, Record<string, { operationId: string; responses: Record<string, unknown> }>>;
+  };
+
+  beforeAll(async () => {
+    mock = new MockFilarr({ writeSwitch: true });
+    await mock.listen();
+    for (const s of demoStores) stores[s.dbId] = await mock.createStore(s);
+    const access = await mock.createAccess('OpenAPI', 'pro');
+    await mock.grant(access.accessId, stores[CLIENTS_DB]!, 'rw');
+    await mock.grant(access.accessId, stores[COMMANDES_DB]!, 'r');
+    await mock.grant(access.accessId, stores[CATALOGUE_DB]!, 'r');
+    mock.linkFiles(access.accessId);
+    gate = new Gate({
+      env: {
+        FILARR_GATE_STATE_DIR: tempDir(),
+        FILARR_GATE_API_URL: mock.url,
+        FILARR_GATE_TOKEN: access.token,
+        FILARR_GATE_PORT: '0',
+        FILARR_GATE_ADMIN_PORT: '0',
+        FILARR_GATE_CACHE: 'memory',
+        FILARR_GATE_WRITE: 'true',
+        FILARR_GATE_MCP: 'true',
+        FILARR_GATE_ADMIN_PASSWORD: 'mot-de-passe-openapi',
+      },
+      replicaTiming: { backoffMinMs: 20, backoffMaxMs: 200 },
+    });
+    await gate.start();
+    api = `http://127.0.0.1:${gate.apiPort}`;
+    await until(() => gate.replicator.link === 'live' && gate.model.bases().length === 3, 10_000, 'boîte prête');
+    key = gate.keys.create({ name: 'openapi', scopes: [{ target: 'all', read: true }, { target: 'base', storeId: stores[CLIENTS_DB]!, read: true, create: true, update: true, delete: true }, { target: 'files', deposit: true }], sql: true, mcp: true }).key;
+    gate.state.data.queries.push({ id: '00000000-0000-4000-8000-000000000001', name: 'Par ville', slug: 'par-ville', sql: 'SELECT ville, count(*) AS n FROM clients GROUP BY ville', createdAt: '', updatedAt: '' });
+  }, 60_000);
+
+  afterAll(async () => {
+    await gate?.stop();
+    await mock?.close();
+  });
+
+  /** Une requête représentative de chaque opération décrite. */
+  const calls: Record<string, () => Promise<Response>> = {
+    health: () => fetch(`${api}/health`),
+    metrics: () => fetch(`${api}/metrics`),
+    openapi: () => fetch(`${api}/openapi.json`),
+    docs: () => fetch(`${api}/docs`),
+    mcp: () => post('/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    notify: () => fetch(`${api}/_filarr/notify`, { method: 'POST', headers: { 'Filarr-Notify': 't=1,v1=00' }, body: '{}' }),
+    sql: () => post('/v1/sql', { sql: 'SELECT count(*) FROM clients' }),
+    savedQuery: () => get('/v1/q/par-ville'),
+    depositFile: () => fetch(`${api}/v1/files?name=essai.txt`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'text/plain' }, body: 'bonjour' }),
+    depositStatus: () => get('/v1/files/dp_inconnu'),
+    listRows: () => get('/v1/clients?statut=Client&sort=-ca&limit=1'),
+    createRows: () => post('/v1/clients', { nom: 'OpenAPI SA' }),
+    listRowsAlias: () => get('/v1/clients/rows'),
+    createRowsAlias: () => post('/v1/clients/rows', [{ nom: 'Alias 1' }, { nom: 'Alias 2' }]),
+    viewRows: () => get('/v1/clients/clients-actifs'),
+    updateRowShort: () => fetch(`${api}/v1/clients/r_initech`, { method: 'PATCH', headers: h(), body: '{"ville":"Lille"}' }),
+    deleteRowShort: () => fetch(`${api}/v1/clients/db-absente`, { method: 'DELETE', headers: h() }),
+    getRow: () => get('/v1/clients/rows/r_acme'),
+    updateRow: () => fetch(`${api}/v1/clients/rows/r_acme`, { method: 'PATCH', headers: h(), body: '{"ville":"Lyon"}' }),
+    deleteRow: () => fetch(`${api}/v1/clients/rows/db-absente`, { method: 'DELETE', headers: h() }),
+  };
+  const h = () => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' });
+  const get = (path: string) => fetch(`${api}${path}`, { headers: h() });
+  const post = (path: string, body: unknown) => fetch(`${api}${path}`, { method: 'POST', headers: h(), body: JSON.stringify(body) });
+
+  it('chaque opération décrite répond, avec un statut que la description prévoit', async () => {
+    const operations = Object.values(spec.paths).flatMap((p) => Object.entries(p).filter(([m]) => m !== 'parameters').map(([, op]) => op));
+    expect(operations.map((o) => o.operationId).sort()).toEqual(Object.keys(calls).sort());
+    for (const op of operations) {
+      const res = await calls[op.operationId]!();
+      const allowed = Object.keys(op.responses);
+      expect(allowed.includes(String(res.status)) || allowed.includes('default'), `${op.operationId} : ${res.status} n'est pas décrit (${allowed.join(', ')})`).toBe(true);
+    }
+  }, 60_000);
+
+  it('les codes de refus décrits sont ceux que rend la boîte', async () => {
+    const res = await get('/v1/clients?couleur=bleu');
+    const body = (await res.json()) as { code: string; error: string; field: string };
+    const errorSchema = (JSON.parse(readFileSync(join(__dirname, '..', 'docs', 'openapi', 'filarr-gate.v1.json'), 'utf8')) as { components: { schemas: { Error: { properties: { code: { examples: string[] } } } } } }).components.schemas.Error;
+    expect(errorSchema.properties.code.examples).toContain(body.code);
+    expect(body).toMatchObject({ code: 'unknown_field', field: 'couleur' });
+  });
+});
