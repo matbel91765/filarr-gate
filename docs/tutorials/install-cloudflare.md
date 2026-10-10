@@ -22,7 +22,7 @@ Durable Object); a request body is limited by your Cloudflare plan, which bounds
 
 ## Before you start
 
-- A Cloudflare account, and Node.js 20 or newer.
+- A Cloudflare account, and Node.js 20.19 or newer.
 - The token `flr_live_…` ([open a database to an API](open-a-database.md)).
 
 ## 1. Deploy

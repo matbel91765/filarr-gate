@@ -10,7 +10,7 @@ minutes, no writes). The limits of each plan are on Filarr's pricing page and in
 
 ## Before you start
 
-- **Node.js 20 or newer** (`node --version`).
+- **Node.js 20.19 or newer** (`node --version`).
 - **A token** `flr_live_…`: Filarr shows it once when you open a database to an API
   ([open a database to an API](open-a-database.md)). No Filarr account at hand? Step 2 gives you an in-memory Filarr
   with three demo databases, enough to follow every tutorial.

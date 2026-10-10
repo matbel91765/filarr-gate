@@ -15,7 +15,7 @@ gate inside your process.
 | who reads | one program, yours | any software over HTTP |
 | keys | your program holds the token | each program gets its own app key; the token stays in the gate |
 | extras | none | webhooks, MCP, SQL over HTTP, file slot over HTTP, management UI, external syncs |
-| where | Node 20+ (tested); standard Web APIs only, so Deno, Bun and Workers should run it (untested there) | Node, Docker, Cloudflare |
+| where | Node 20.19+ (tested); standard Web APIs only, so Deno, Bun and Workers should run it (untested there) | Node, Docker, Cloudflare |
 
 The token opens the databases: give it only to a program you would give the data to.
 

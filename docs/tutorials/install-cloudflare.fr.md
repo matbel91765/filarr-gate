@@ -23,7 +23,7 @@ plus gros fichier que la boîte noire peut recevoir.
 
 ## Avant de commencer
 
-- Un compte Cloudflare, et Node.js 20 ou plus récent.
+- Un compte Cloudflare, et Node.js 20.19 ou plus récent.
 - Le jeton `flr_live_…` ([ouvrir une base à une API](open-a-database.fr.md)).
 
 ## 1. Déployer

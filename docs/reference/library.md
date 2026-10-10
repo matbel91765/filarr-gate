@@ -66,6 +66,6 @@ An `Error` with `status` (the HTTP status the local API would return), `code` (t
 
 ## Where it runs
 
-Node 20 and newer, tested. It uses standard Web APIs only (WebCrypto, `fetch`, WebSocket), so Deno, Bun and Cloudflare
+Node 20.19 and newer, tested. It uses standard Web APIs only (WebCrypto, `fetch`, WebSocket), so Deno, Bun and Cloudflare
 Workers should run it; they are not tested. Its dependencies: `@noble/curves`, `@noble/hashes` and `fflate`.
 The version it reports to Filarr is `lib-<version>`.

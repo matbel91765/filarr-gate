@@ -11,7 +11,7 @@ dans **Paramètres › Accès API**.
 
 ## Avant de commencer
 
-- **Node.js 20 ou plus récent** (`node --version`).
+- **Node.js 20.19 ou plus récent** (`node --version`).
 - **Un jeton** `flr_live_…` : Filarr le montre une seule fois, quand vous ouvrez une base à une API
   ([ouvrir une base à une API](open-a-database.fr.md)). Pas de compte Filarr sous la main ? L'étape 2 vous donne un
   Filarr en mémoire avec trois bases de démonstration, de quoi suivre chaque tutoriel.

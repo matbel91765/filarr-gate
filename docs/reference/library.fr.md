@@ -66,6 +66,6 @@ Une `Error` avec `status` (le statut HTTP que rendrait l'API locale), `code` (le
 
 ## Où elle tourne
 
-Node 20 ou plus récent : éprouvé. Elle n'emploie que des API web standard (WebCrypto, `fetch`, WebSocket) : Deno, Bun et
+Node 20.19 ou plus récent : éprouvé. Elle n'emploie que des API web standard (WebCrypto, `fetch`, WebSocket) : Deno, Bun et
 Cloudflare Workers devraient donc la faire tourner ; ils ne sont pas éprouvés. Ses dépendances : `@noble/curves`,
 `@noble/hashes` et `fflate`. La version qu'elle déclare à Filarr est `lib-<version>`.

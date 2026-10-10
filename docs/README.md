@@ -54,3 +54,10 @@ enough to follow every tutorial.
 [Architecture](architecture.md) · [how the gate runs external syncs](external-databases.md) · [the two-way sync](explain/two-way-sync.md) · [moving a gate](explain/migration.md) ·
 [the hosted service](explain/hosted.md) · [the gate on Cloudflare](cloudflare.md) · [release plan](release.md) ·
 [releasing, step by step](RELEASING.md)
+
+## Vocabulary
+
+The words of this documentation are those of the Filarr app and its help: a **database** (a Filarr database), an
+**access** (what "Open to an API…" creates), its **token** (`flr_live_…`), an **app key** (`gk_…`, one per program),
+the file **slot**, the **"ask me" queue** of conflicts, the **guard** that stops a sync pass. The full vocabulary is in
+Filarr's help: [Gate vocabulary](https://filarr.com/en/docs/gate-glossary).

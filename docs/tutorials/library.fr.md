@@ -15,7 +15,7 @@ proprement : pas de serveur HTTP, pas de clé d'application, la boîte noire dan
 | qui lit | un programme, le vôtre | n'importe quel logiciel, par HTTP |
 | clés | votre programme tient le jeton | chaque programme reçoit sa clé d'application ; le jeton reste dans la boîte noire |
 | en plus | rien | webhooks, MCP, SQL par HTTP, fente à fichiers par HTTP, interface de gestion, synchros externes |
-| où | Node 20+ (éprouvé) ; des API web standard seulement, donc Deno, Bun et les Workers devraient la faire tourner (non éprouvé) | Node, Docker, Cloudflare |
+| où | Node 20.19+ (éprouvé) ; des API web standard seulement, donc Deno, Bun et les Workers devraient la faire tourner (non éprouvé) | Node, Docker, Cloudflare |
 
 Le jeton ouvre les bases : ne le donnez qu'à un programme auquel vous donneriez les données.
 
