@@ -469,7 +469,7 @@ export const EN: Record<string, string> = {
   "écoute locale seulement": "local only",
   "époque {e} · génération {g}": "epoch {e} · generation {g}",
   "Aucun dépôt pour l’instant.": "No deposits yet.",
-  "Aucune boîte de dépôt n’est liée à cet accès. Liez-en une dans Filarr : Réglages › Accès API › Recevoir des fichiers.": "No drop box is linked to this access. Link one in Filarr: Settings › API accesses › Receive files.",
+  "Aucune boîte de dépôt n’est liée à cet accès. Liez-en une dans Filarr : Paramètres › Accès API › Recevoir des fichiers.": "No drop box is linked to this access. Link one in Filarr: Settings › API access › Receive files.",
   "Aucune synchro ne désigne cette boîte noire. Elles se créent dans Filarr : « ··· » d’une base › « Alimenter depuis une base externe… ».": "No sync points to this gate. Syncs are created in Filarr: a database’s “···” › “Feed from an external database…”.",
   "Boîte de dépôt": "Drop box",
   "Ce mois-ci (compte entier)": "This month (whole account)",

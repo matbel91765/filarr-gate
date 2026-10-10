@@ -63,7 +63,7 @@ export function Files() {
       <section class="card">
         <h2>{t('Boîte de dépôt')}</h2>
         {!link ? (
-          <p class="hint">{t('Aucune boîte de dépôt n’est liée à cet accès. Liez-en une dans Filarr : Réglages › Accès API › Recevoir des fichiers.')}</p>
+          <p class="hint">{t('Aucune boîte de dépôt n’est liée à cet accès. Liez-en une dans Filarr : Paramètres › Accès API › Recevoir des fichiers.')}</p>
         ) : (
           <dl class="kv">
             <dt>{t('Signature du créateur')}</dt>

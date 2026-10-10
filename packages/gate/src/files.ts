@@ -108,7 +108,7 @@ export async function depositFile(
   const identity = replicator.identity;
   if (!client || !identity) throw new ApiError(503, 'no_token', 'Aucun jeton en service.');
   const files = replicator.files;
-  if (!files) throw new ApiError(409, 'files_not_linked', 'Aucune boîte de dépôt n’est liée à cet accès : liez-en une dans Filarr (Réglages › Accès API).');
+  if (!files) throw new ApiError(409, 'files_not_linked', 'Aucune boîte de dépôt n’est liée à cet accès : liez-en une dans Filarr (Paramètres › Accès API).');
   if (replicator.creator.status !== 'authenticated') {
     const why =
       replicator.creator.status === 'untagged'
