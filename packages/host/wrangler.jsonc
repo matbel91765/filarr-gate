@@ -39,7 +39,7 @@
   // HOST_ENC et HOST_SIG, `wrangler secret put FILARR_API_URL` pour l'adresse de l'API). Les clés suivantes
   // d'une rotation s'appellent HOST_ENC_<id> et HOST_SIG_<id>.
   "secrets": { "required": ["HOST_ENC", "HOST_SIG", "FILARR_API_URL"] },
-  // AUCUNE TRACE (§ 10.3). Tout est éteint EXPLICITEMENT : l'absence du bloc laisserait le défaut du compte,
+  // AUCUNE TRACE (§ 10.3, lecture exacte PH12 : bloc PRÉSENT et tout éteint). L'absence du bloc laisserait le défaut du compte,
   // que Cloudflare peut changer. Ni Workers Logs, ni traces, ni Logpush, ni consommateur de traces, ni cartes
   // de source.
   "observability": {

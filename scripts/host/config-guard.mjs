@@ -3,7 +3,8 @@
 // Node seul, sans dépendance : utilisé par test/hostConfig.test.ts, et utilisable tel quel par le dépôt de l'API
 // pour la garde réciproque (son wrangler.toml ne doit rien déclarer qui mène au service).
 //
-//  - hostConfigViolations(config)         : packages/host/wrangler.jsonc n'a aucune trace activée, aucune liaison
+//  - hostConfigViolations(config)         : packages/host/wrangler.jsonc a son bloc observability PRÉSENT et tout éteint
+//                                           (PH12 : un bloc absent est refusé), aucune trace activée, aucune liaison
 //                                           hors de SES deux objets durables, aucune autre porte que sa route ;
 //  - crossBindingViolations(toml, config) : aucune liaison entre le script de l'API et celui du service, dans un
 //                                           sens comme dans l'autre (secrets, objets durables, liaisons de service).
