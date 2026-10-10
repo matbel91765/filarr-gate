@@ -10,7 +10,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { coerce, DEFAULTS, ENV, parseToml, TOML, type SettingKey, type Settings, type SettingSource } from '../../server/src/settings';
+import { parseToml, resolveSettings, type SettingKey, type Settings, type SettingSource } from '../../server/src/settings';
 
 export { coerce, DEFAULTS, ENV, ENV_NAMES, MIN_POLL_SECONDS, parseToml, type SettingKey, type Settings, type SettingSource } from '../../server/src/settings';
 
@@ -41,28 +41,7 @@ export function loadConfig(
       ? join(stateDir, 'gate.toml')
       : null;
   const file: Record<string, unknown> = configFile ? parseToml(readFileSync(configFile, 'utf8')) : {};
-  const settings = { ...DEFAULTS };
-  const sources = {} as Record<SettingKey, SettingSource>;
-  for (const key of Object.keys(DEFAULTS) as SettingKey[]) {
-    const tomlKey = Object.entries(TOML).find(([, k]) => k === key)?.[0] ?? key;
-    const fromEnv = env[ENV[key]];
-    const fromFile = file[tomlKey] ?? file[`gate.${tomlKey}`];
-    const fromSaved = saved[key];
-    let source: SettingSource = 'default';
-    let value: unknown = DEFAULTS[key];
-    if (fromEnv !== undefined && fromEnv !== '') {
-      source = 'env';
-      value = fromEnv;
-    } else if (fromFile !== undefined) {
-      source = 'file';
-      value = fromFile;
-    } else if (fromSaved !== undefined) {
-      source = 'settings';
-      value = fromSaved;
-    }
-    (settings as Record<SettingKey, unknown>)[key] = coerce(key, value);
-    sources[key] = source;
-  }
+  const { settings, sources } = resolveSettings(saved, env, file);
   return {
     settings,
     sources,

@@ -119,7 +119,9 @@ export class FilarrClient {
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly opts: FilarrClientOptions) {
-    this.fetchImpl = opts.fetchImpl ?? fetch;
+    // Jamais détachée de son `this` : sous Workers, `client.fetchImpl(…)` lèverait « Illegal invocation »
+    const impl = opts.fetchImpl ?? fetch;
+    this.fetchImpl = (input, init) => impl(input, init);
   }
 
   get baseUrl(): string {

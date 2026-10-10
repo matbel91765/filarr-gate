@@ -79,16 +79,20 @@ export class AdminApi {
     return secret !== null && given !== null && isLoopback(conn.remoteAddress ?? '') && timingSafeEqualStr(given, secret);
   }
 
+  /** `Secure` dès que l'interface est servie en HTTPS (variante Cloudflare, mandataire TLS). */
+  private secure = false;
+
   private openSession(out: Record<string, string>): void {
     const id = randomToken(24);
     this.sessions.set(id, Date.now() + SESSION_MS);
-    out['Set-Cookie'] = `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}`;
+    out['Set-Cookie'] = `${SESSION_COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/admin; Max-Age=${SESSION_MS / 1000}${this.secure ? '; Secure' : ''}`;
   }
 
   /** Le point d'entrée HTTP de l'interface de gestion (fichiers et API). */
   async handle(request: Request, conn: ConnInfo): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
+    this.secure = url.protocol === 'https:';
     if (!url.pathname.startsWith('/admin/api/')) return this.serveStatic(url.pathname);
     try {
       return await this.api(request, conn, url, method);

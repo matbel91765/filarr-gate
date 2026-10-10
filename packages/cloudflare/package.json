@@ -9,5 +9,12 @@
     "@noble/curves": "^2.2.0",
     "@noble/hashes": "^2.2.0",
     "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "wrangler": "^4.149.0"
+  },
+  "scripts": {
+    "dev": "wrangler dev --config ../../wrangler.jsonc",
+    "check": "tsc -p tsconfig.json --noEmit"
   }
 }

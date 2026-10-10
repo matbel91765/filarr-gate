@@ -176,3 +176,38 @@ export function coerce<K extends SettingKey>(key: K, value: unknown): Settings[K
   if (key === 'apiUrl' && !/^https?:\/\//.test(out as string)) throw new Error('réglage apiUrl : adresse http(s) attendue');
   return out as Settings[K];
 }
+
+/**
+ * Les réglages en vigueur et d'où vient chacun : l'environnement (ou les variables
+ * d'un Worker), puis le fichier (`gate.toml`, Node seulement), puis l'état, puis
+ * les valeurs d'office.
+ */
+export function resolveSettings(
+  saved: Partial<Settings>,
+  env: Record<string, string | undefined>,
+  file: Record<string, unknown> = {}
+): { settings: Settings; sources: Record<SettingKey, SettingSource> } {
+  const settings = { ...DEFAULTS };
+  const sources = {} as Record<SettingKey, SettingSource>;
+  for (const key of Object.keys(DEFAULTS) as SettingKey[]) {
+    const tomlKey = Object.entries(TOML).find(([, k]) => k === key)?.[0] ?? key;
+    const fromEnv = env[ENV[key]];
+    const fromFile = file[tomlKey] ?? file[`gate.${tomlKey}`];
+    const fromSaved = saved[key];
+    let source: SettingSource = 'default';
+    let value: unknown = DEFAULTS[key];
+    if (fromEnv !== undefined && fromEnv !== '') {
+      source = 'env';
+      value = fromEnv;
+    } else if (fromFile !== undefined) {
+      source = 'file';
+      value = fromFile;
+    } else if (fromSaved !== undefined) {
+      source = 'settings';
+      value = fromSaved;
+    }
+    (settings as Record<SettingKey, unknown>)[key] = coerce(key, value);
+    sources[key] = source;
+  }
+  return { settings, sources };
+}

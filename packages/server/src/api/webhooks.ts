@@ -473,4 +473,16 @@ export class WebhookService {
   get busy(): boolean {
     return this.inFlight > 0;
   }
+
+  /** La prochaine livraison due (nouvel essai compris), pour une alarme d'objet durable. */
+  nextDueAt(): number | null {
+    const next = this.queue.reduce((min, p) => Math.min(min, p.dueAt), Infinity);
+    return next === Infinity ? null : next;
+  }
+
+  /** Livre tout de suite ce qui est dû (alarme d'un objet durable, dont les minuteries ne survivent pas au sommeil). */
+  async drainDue(): Promise<void> {
+    if (this.timer) clearTimeout(this.timer);
+    await this.drain();
+  }
 }

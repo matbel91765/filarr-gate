@@ -16,7 +16,7 @@
   },
   "scripts": {
     "build": "npm run build -w @filarr/gate && npm run build -w filarr-gate",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p packages/cli/ui/tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p packages/cli/ui/tsconfig.json --noEmit && tsc -p packages/cloudflare/tsconfig.json --noEmit",
     "test": "vitest run",
     "mock-filarr": "tsx scripts/mock-filarr.ts"
   },
@@ -36,5 +36,15 @@
     "vite": "^8.3.3",
     "vitest": "^4.1.11",
     "ws": "^8.18.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "FILARR_GATE_TOKEN": {
+        "description": "The token Filarr showed once (`flr_live_…`), from \"···\" › **Open to an API** on a database. It stays a secret of YOUR Cloudflare account."
+      },
+      "FILARR_GATE_ADMIN_PASSWORD": {
+        "description": "Password of the management UI, served under `/admin/` on this Worker. Ten characters at least."
+      }
+    }
   }
 }

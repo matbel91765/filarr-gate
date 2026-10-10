@@ -1,0 +1,24 @@
+// Filarr Gate sur VOTRE compte Cloudflare : un Worker et un objet durable qui tient la copie chiffrée.
+//   npm ci && npm run build && npx wrangler deploy
+//   npx wrangler secret put FILARR_GATE_TOKEN           (le jeton montré une fois par Filarr)
+//   npx wrangler secret put FILARR_GATE_ADMIN_PASSWORD  (l'interface de gestion, sous /admin/)
+// Réglages : `vars` ci-dessous (FILARR_GATE_WRITE, FILARR_GATE_CORS_ORIGINS…), verrouillés dans l'interface.
+// Voir docs/cloudflare.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "filarr-gate",
+  "main": "packages/cloudflare/src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "packages/cli/dist/ui",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "GATE", "class_name": "FilarrGate" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FilarrGate"] }],
+  "observability": { "enabled": true }
+}

@@ -78,6 +78,8 @@ export interface GateCoreOptions {
   replicaTiming?: { pollIntervalMs?: number; backoffMinMs?: number; backoffMaxMs?: number; pausedRetryMs?: number };
   /** L'exécutant des synchros externes (source-externe-1) : où ranger les ombres, quels connecteurs. */
   sync?: SyncHostOptions;
+  /** `false` : aucune boucle de réplique (hôte qui s'endort entre deux alarmes : objet durable). */
+  live?: boolean;
 }
 
 const randomCode = (): string => String(100_000 + (globalThis.crypto.getRandomValues(new Uint32Array(1))[0]! % 900_000));
@@ -100,6 +102,8 @@ export class GateCore {
   readonly api: ApiServer;
   readonly admin: AdminApi;
   readonly version: string;
+  /** La réplique tourne-t-elle seule (flux ou relève), ou l'hôte la réveille-t-il ? */
+  readonly live: boolean;
   /** D'où vient le jeton en usage. */
   tokenSource: 'env' | 'state' | null = null;
   /** Code à usage unique, demandé pour la mise en route depuis une autre machine que celle-ci. */
@@ -122,6 +126,7 @@ export class GateCore {
     this.journal = opts.journal;
     this.cache = opts.cache;
     this.version = opts.version;
+    this.live = opts.live ?? true;
     const s = this.settings;
     this.replicator = new Replicator({
       apiUrl: s.apiUrl,
@@ -218,7 +223,7 @@ export class GateCore {
    * `requireAccepted`, un jeton que Filarr refuse (inconnu, révoqué, expiré) lève
    * et n'est pas gardé. `live: false` : aucune boucle (objet durable).
    */
-  async useToken(token: string, persist: boolean, requireAccepted = false, live = true): Promise<void> {
+  async useToken(token: string, persist: boolean, requireAccepted = false, live = this.live): Promise<void> {
     await openToken(token); // lève si ce n'est pas un jeton
     await this.replicator.start(token, { live });
     if (requireAccepted && ['unknown_access', 'revoked', 'expired'].includes(this.replicator.link)) {
@@ -331,7 +336,7 @@ export class GateCore {
   // ==================== Cycle de vie ====================
 
   /** Démarre la boîte (le jeton s'il est connu) ; `live: false` pour un hôte qui s'endort. */
-  async start(token: string | null, source: 'env' | 'state' | null, live = true): Promise<void> {
+  async start(token: string | null, source: 'env' | 'state' | null, live = this.live): Promise<void> {
     await this.journal.prune();
     this.pruneTimer = setInterval(() => void this.journal.prune(), 6 * 3_600_000);
     this.sync?.start();

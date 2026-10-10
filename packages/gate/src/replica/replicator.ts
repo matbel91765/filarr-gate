@@ -861,6 +861,36 @@ export class Replicator extends Emitter {
    */
   async wake(body: NotifyBody): Promise<void> {
     if (!this.client || TERMINAL.has(this.link)) return;
+    this.inflight += 1;
+    try {
+      await this.wakeInner(body);
+    } finally {
+      this.inflight -= 1;
+    }
+  }
+
+  /** Une relève demandée par l'hôte (alarme d'un objet durable) ; les erreurs vont où vont celles de la boucle. */
+  async pollNow(): Promise<void> {
+    if (!this.client || TERMINAL.has(this.link)) return;
+    this.inflight += 1;
+    try {
+      await this.pollOnce();
+      if (!WAITING.has(this.link) && !['offline', 'limited', 'error'].includes(this.link)) this.setLink('polling', 'Relève à la demande (réveils et alarmes)');
+    } catch (err) {
+      await this.handleError(err);
+    } finally {
+      this.inflight -= 1;
+    }
+  }
+
+  /** Une relecture (réveil, relève demandée) est en cours. */
+  get busy(): boolean {
+    return this.inflight > 0;
+  }
+
+  private inflight = 0;
+
+  private async wakeInner(body: NotifyBody): Promise<void> {
     this.lastWakeAt = new Date().toISOString();
     this.emit('wake', body);
     try {

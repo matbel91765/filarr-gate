@@ -13,8 +13,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": []
   },
-  "include": ["packages/*/src/**/*", "test/**/*", "scripts/**/*.ts", "vitest.config.ts", "examples/**/*.ts"],
-  "exclude": ["node_modules", "**/dist", "packages/cli/ui", "packages/cloudflare"]
+  "include": ["src/**/*"]
 }

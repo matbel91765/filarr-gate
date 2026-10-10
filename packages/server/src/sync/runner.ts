@@ -301,6 +301,11 @@ export class SyncRunner {
     this.timer = null;
   }
 
+  /** Un passage tourne ou attend son tour. */
+  get busy(): boolean {
+    return this.running > 0 || this.queued.size > 0;
+  }
+
   /** La prochaine heure où un passage est dû (pour une alarme d'objet durable). */
   nextWake(): number | null {
     let min: number | null = null;
@@ -465,11 +470,13 @@ export class SyncRunner {
       const props = this.props(base);
       // La source : entière, ou depuis le repère plus les lignes changées côté Filarr
       const secret = (await this.secrets.get(defId))!;
+      const fetchImpl = this.host.fetch ?? fetch;
       connector = await openConnector(
         {
           def: s.def,
           secret,
-          fetch: this.host.fetch ?? fetch,
+          // Appelée comme méthode d'un objet : enveloppée (sous Workers, `fetch` détachée lève)
+          fetch: (input, init) => fetchImpl(input, init),
           loadDriver: this.host.loadDriver ?? (async (n) => import(/* @vite-ignore */ n)),
           props,
           ...(this.host.sleep ? { sleep: this.host.sleep } : {}),
