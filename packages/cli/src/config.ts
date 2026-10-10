@@ -22,6 +22,8 @@ export interface LoadedConfig {
   /** Le jeton donné par l'environnement : jamais écrit sur le disque. */
   tokenFromEnv: string | null;
   adminPasswordFromEnv: string | null;
+  /** Clés de bases externes données par `gate.toml` (`[extdb."xs_…"] secret = "…"`), par définition. */
+  extdbSecrets: Record<string, string>;
 }
 
 export function defaultStateDir(env: NodeJS.ProcessEnv = process.env): string {
@@ -68,5 +70,10 @@ export function loadConfig(
     configFile,
     tokenFromEnv: env.FILARR_GATE_TOKEN?.trim() || null,
     adminPasswordFromEnv: env.FILARR_GATE_ADMIN_PASSWORD || null,
+    extdbSecrets: Object.fromEntries(
+      Object.entries(file)
+        .filter(([k, v]) => /^extdb.xs_[A-Za-z0-9_-]+.secret$/.test(k) && typeof v === 'string')
+        .map(([k, v]) => [k.slice('extdb.'.length, -'.secret'.length), v as string])
+    ),
   };
 }

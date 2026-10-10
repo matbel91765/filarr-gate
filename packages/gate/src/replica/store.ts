@@ -36,6 +36,7 @@ import {
   type LaidSlot,
   type SlotEntry,
   type StoreHead,
+  type StoreSchema,
 } from '../../../core/src/engine/store/codec';
 import { canonicalJson } from '../../../core/src/engine/store/canonical';
 import { fromBase64Url, toBase64Url, type StoreKeys } from '../../../core/src/engine/store/crypto';
@@ -151,6 +152,16 @@ const INLINE_MAX = 64 * 1024;
 const INLINE_BUDGET = 2 * 1024 * 1024;
 const BATCH_MAX_BYTES = 2 * 1024 * 1024;
 
+/**
+ * Un lot d'écritures recalculé à chaque essai de validation : les registres, et
+ * au besoin un schéma neuf (horodaté) tiré du schéma relu — options créées par
+ * une synchro externe. `null` : le schéma ne change pas.
+ */
+export interface CommitBatch {
+  ops: readonly StoreOp[];
+  schema?: (base: StoreSchema) => StoreSchema | null;
+}
+
 export interface MirrorDeps {
   client: FilarrClient;
   cache: BlockCache;
@@ -221,6 +232,11 @@ export class StoreMirror {
   /** Les registres d'une ligne (pour calculer une écriture). */
   registersOf(id: string) {
     return ownRow(this.registers, id);
+  }
+
+  /** Tous les registres, lignes supprimées comprises (synchros externes : la suppression est une donnée). */
+  allRegisters(): Readonly<StoreRows> {
+    return this.registers;
   }
 
   /** La plus grande position manuelle (`#o`) : une ligne ajoutée se place après elle. */
@@ -547,7 +563,7 @@ export class StoreMirror {
    * (`seq_conflict`, `stale_generation`, `slot_version`) relecture, rescellement,
    * nouvel essai.
    */
-  commit(ops: readonly StoreOp[], maxRetries = 6): Promise<{ seq: number; diff: RowDiff }> {
+  commit(input: readonly StoreOp[] | ((attempt: number) => CommitBatch), maxRetries = 6): Promise<{ seq: number; diff: RowDiff }> {
     return this.serial(async () => {
       if (this.status !== 'ready') await this.syncNow(true, 0);
       let lastCode = 'unknown';
@@ -556,8 +572,13 @@ export class StoreMirror {
         if (this.status !== 'ready') {
           throw new WriteRefusedError(this.problem?.code ?? 'not_ready', this.problem?.message ?? 'base indisponible', 503);
         }
+        // Un lot recalculé à chaque essai, sur l'état relu (synchros externes : on retire ce qui a bougé)
+        const batch: CommitBatch = typeof input === 'function' ? input(attempt) : { ops: input };
+        if (batch.ops.length === 0 && !batch.schema) {
+          return { seq: this.seq, diff: { storeId: this.storeId, seq: this.seq, origin: 'gate', created: [], updated: [], deleted: [] } };
+        }
         const keys = this.writeKeys();
-        const result = await this.tryCommit(ops, keys);
+        const result = await this.tryCommit(batch.ops, keys, batch.schema);
         if (result.ok) return { seq: result.seq, diff: result.diff };
         lastCode = result.code;
         if (['seq_conflict', 'stale_generation', 'slot_version', 'bad_cover', 'stage_unknown'].includes(result.code)) {
@@ -573,11 +594,14 @@ export class StoreMirror {
 
   private async tryCommit(
     ops: readonly StoreOp[],
-    keys: StoreKeys
+    keys: StoreKeys,
+    schemaFn?: (base: StoreSchema) => StoreSchema | null
   ): Promise<
     { ok: true; seq: number; diff: RowDiff } | { ok: false; code: string; g?: number; status?: number }
   > {
     const base = this.head!;
+    // Le schéma est UN registre (« dernier écrit gagne ») : on ne le réécrit que sur demande, sinon il reste à l'octet près
+    const nextSchema = schemaFn ? (schemaFn(base.schema) ?? base.schema) : base.schema;
     const { mac: macKey, place: placeKey } = headKeyBytes(base);
     const cover = new Set(Object.keys(base.slots));
     const byPrefix = new Map<string, StoreOp[]>();
@@ -625,14 +649,14 @@ export class StoreMirror {
     }
     const zones =
       zoneInputs.length === Object.keys(index).length
-        ? headZones(zoneInputs, base.schema.properties, this.zoneCache)
+        ? headZones(zoneInputs, nextSchema.properties, nextSchema === base.schema ? this.zoneCache : new Map())
         : undefined;
     const epochs = [...new Set(Object.values(index).map((e) => e.e))].sort((a, b) => a - b);
     const head: StoreHead = {
       v: 1,
       dbId: base.dbId,
       keys: base.keys,
-      schema: base.schema,
+      schema: nextSchema,
       slots: index,
       root: await merkleRoot(c, macKey, index),
       epochs,

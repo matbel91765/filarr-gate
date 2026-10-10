@@ -19,8 +19,10 @@ import { GateCore, type GateHost, type GateHostConfig } from '../../server/src/c
 import { Journal } from '../../server/src/journal';
 import { log } from '../../server/src/log';
 import { StateStore } from '../../server/src/state';
+import type { SyncHostOptions } from '../../server/src/sync/runner';
+import { envNameFor } from '../../server/src/sync/secrets';
 import { coerce, ENV_NAMES, loadConfig, type LoadedConfig, type SettingKey, type Settings } from './config';
-import { fileJournalSink, nodeListener, serveUiFile, StateDir, uiRoot } from './node';
+import { fileBlobs, fileJournalSink, nodeListener, serveUiFile, StateDir, uiRoot } from './node';
 import { GATE_VERSION } from './version';
 
 export interface GateOptions {
@@ -32,6 +34,8 @@ export interface GateOptions {
   replicaTiming?: { pollIntervalMs?: number; backoffMinMs?: number; backoffMaxMs?: number; pausedRetryMs?: number };
   /** Ne pas ouvrir les ports (essais qui appellent les gestionnaires directement). */
   listen?: boolean;
+  /** Pour les essais : l'exécutant des synchros externes (connecteurs simulés, sans minuterie). */
+  sync?: Partial<SyncHostOptions>;
 }
 
 /** L'hôte Node de la boîte : réglages, jeton, fichiers, adresses. */
@@ -111,6 +115,17 @@ export class Gate extends GateCore {
       ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
       ...(opts.webhooks ? { webhooks: opts.webhooks } : {}),
       ...(opts.replicaTiming ? { replicaTiming: opts.replicaTiming } : {}),
+      // Les synchros externes : ombres chiffrées en fichiers 0600, pilotes TCP chargés à la demande,
+      // clés par l'environnement (`FILARR_GATE_EXTDB_<ID>`), gate.toml, ou l'interface
+      sync: {
+        blobs: fileBlobs(files.syncDir),
+        tcp: true,
+        loadDriver: (name) => import(/* @vite-ignore */ name),
+        externalSecret: (defId) => env[envNameFor(defId)] || loaded.extdbSecrets[defId] || null,
+        timers: true,
+        ...(opts.fetchImpl ? { fetch: opts.fetchImpl } : {}),
+        ...opts.sync,
+      },
     });
     this.nodeHost = host;
     this.stateFiles = files;

@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import type { ConnInfo } from '../../server/src/http';
 import type { JournalSink } from '../../server/src/journal';
 import type { StateBackend } from '../../server/src/state';
+import type { BlobStore } from '../../server/src/sync/runner';
 
 /** Écriture atomique, droits 0600. */
 export function writeSecret(path: string, content: string | Uint8Array): void {
@@ -88,6 +89,30 @@ export class StateDir {
 }
 
 const DAY_FILE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/;
+
+/** Les ombres chiffrées des synchros externes, en fichiers 0600 (`sync/<nom>.bin`). */
+export function fileBlobs(dir: string): BlobStore {
+  const safe = (name: string): string => {
+    if (!/^[A-Za-z0-9_.-]{1,200}$/.test(name)) throw new Error('nom de fichier refusé');
+    return join(dir, `${name}.bin`);
+  };
+  return {
+    async get(name) {
+      try {
+        return new Uint8Array(await readFile(safe(name)));
+      } catch {
+        return null;
+      }
+    },
+    async put(name, data) {
+      await mkdir(dir, { recursive: true });
+      writeSecret(safe(name), data);
+    },
+    async delete(name) {
+      await rm(safe(name), { force: true });
+    },
+  };
+}
 
 /** Le journal en fichiers JSON Lines par jour, 0600. */
 export function fileJournalSink(dir: string): JournalSink {

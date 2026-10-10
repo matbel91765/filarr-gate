@@ -60,6 +60,38 @@ export class Writer {
   }
 
   /**
+   * Révision 3 (`source-externe-1` § 10.1, api-base-1 rév. 3 § 7) : une base
+   * alimentée par une source externe. Une colonne `in` (la source seule l'écrit)
+   * ne s'écrit pas ici (`409 field_managed`) ; une base en miroir n'y crée ni n'y
+   * supprime de ligne (`409 rows_managed`), une base à clé naturelle n'y crée pas
+   * de ligne. C'est une règle de la boîte noire, pas du chiffrement.
+   */
+  private managed(info: BaseInfo): { locked: Set<string>; noCreate: boolean; noDelete: boolean; source: string } | null {
+    const def = (info.base.mirror.head?.schema.extra as Record<string, unknown> | undefined)?.extSource as
+      | { name?: string; mode?: string; key?: { cols?: string[]; gen?: string }; map?: Array<{ col?: string; prop?: string; dir?: string }> }
+      | undefined;
+    if (!def || typeof def !== 'object' || !Array.isArray(def.map) || def.mode === 'once') return null;
+    const keyCols = def.key?.cols ?? [];
+    const locked = new Set<string>();
+    for (const m of def.map) {
+      if (typeof m.prop !== 'string') continue;
+      if (def.mode === 'mirror' || m.dir === 'in' || keyCols.includes(String(m.col))) locked.add(m.prop);
+    }
+    return { locked, noCreate: def.mode === 'mirror' || def.key?.gen === 'none', noDelete: def.mode === 'mirror', source: def.name ?? 'une source externe' };
+  }
+
+  private checkManaged(info: BaseInfo, input: unknown): void {
+    const m = this.managed(info);
+    if (!m || !input || typeof input !== 'object') return;
+    for (const name of Object.keys(input as Record<string, unknown>)) {
+      const field = info.fields.find((f) => f.name === name);
+      if (field && m.locked.has(field.prop.id)) {
+        throw new ApiError(409, 'field_managed', `« ${field.prop.name} » vient de ${m.source} : modifiez-le dans la source.`, { field: name });
+      }
+    }
+  }
+
+  /**
    * Les valeurs par défaut d'une ligne NEUVE, comme « Nouvelle ligne » dans
    * Filarr (`defaultCells` du cœur, celle de `makeRow`) : l'option par défaut
    * de chaque colonne select ou multiSelect qui en a une — un « Statut » à
@@ -118,6 +150,9 @@ export class Writer {
     const items = Array.isArray(body) ? body : [body];
     if (items.length === 0) throw new ApiError(400, 'bad_body', 'Aucune ligne');
     if (items.length > 500) throw new ApiError(413, 'too_many_rows', '500 lignes au plus par requête');
+    const managed = this.managed(info);
+    if (managed?.noCreate) throw new ApiError(409, 'rows_managed', `Les lignes de cette base viennent de ${managed.source}.`);
+    for (const item of items) this.checkManaged(info, item);
     const mirror = info.base.mirror;
     const tick = () => mirror.tick();
     const ops: StoreOp[] = [];
@@ -145,6 +180,7 @@ export class Writer {
     this.guard(info);
     const mirror = info.base.mirror;
     if (!mirror.rowById(rowId)) throw new ApiError(404, 'row_not_found', `Ligne introuvable : ${rowId}`);
+    this.checkManaged(info, body);
     let ops: StoreOp[];
     try {
       ops = this.cellOps(info, rowId, body, () => mirror.tick());
@@ -160,6 +196,8 @@ export class Writer {
     this.guard(info);
     const mirror = info.base.mirror;
     if (!mirror.rowById(rowId)) throw new ApiError(404, 'row_not_found', `Ligne introuvable : ${rowId}`);
+    const managed = this.managed(info);
+    if (managed?.noDelete) throw new ApiError(409, 'rows_managed', `Les lignes de cette base viennent de ${managed.source}.`);
     // La suppression gagne contre une modification concurrente ; restaurer reste possible dans Filarr (db-store-1 § 4)
     const version = await this.commit(info, [{ r: rowId, f: FIELD_DELETED, v: true, t: mirror.tick() }]);
     return { version, rows: [] };

@@ -33,6 +33,7 @@ import {
   toBase64Std,
 } from '../../packages/core/src/engine/store/apiAccess';
 import { computeCreatorTag, deriveAccessKeys3, notifyHeader } from '../../packages/core/src/engine/gate/access3';
+import { openJson, queueAad, resolveAad, sealJson, signDef, statusAad, statusKey, type ExtSourceDef, type QueueEntry, type SyncStatus } from '../../packages/core/src/engine/extsrc';
 import { boxSigMessage } from '../../packages/core/src/engine/gate/files';
 import { isCover } from '../../packages/core/src/engine/store/codec';
 import { fromBase64Url, personalStoreId, storeKeys, toBase64Url, utf8Encode, type StoreKeys } from '../../packages/core/src/engine/store/crypto';
@@ -189,7 +190,16 @@ export interface NewStore {
   views?: DbView[];
 }
 
-type MeterKind = 'self' | 'stream' | 'head' | 'changes' | 'slots' | 'stage' | 'commit' | 'files' | 'export' | 'import';
+type MeterKind = 'self' | 'stream' | 'head' | 'changes' | 'slots' | 'stage' | 'commit' | 'files' | 'export' | 'import' | 'ext';
+
+/** L'état des synchros externes d'un magasin, dans l'objet `DbStore` (`source-externe-1` § 12.1). */
+interface MockExt {
+  statuses: Map<string, { rev: number; e: number; g: number; sealed: string; updatedAt: string }>;
+  queues: Map<string, { rev: number; e: number; g: number; sealed: string; updatedAt: string }>;
+  leases: Map<string, { runnerId: string; until: number }>;
+  mailbox: Map<string, Array<{ seq: number; sealed: string; defId: string }>>;
+  seq: number;
+}
 
 const json = (res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void => {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
@@ -751,6 +761,151 @@ export class MockFilarr {
     return refuse(404, 'not_found', {}, headers);
   }
 
+  // ==================== Les synchros externes (`source-externe-1` § 12.1) ====================
+
+  readonly ext = new Map<string, MockExt>();
+
+  extOf(storeId: string): MockExt {
+    let e = this.ext.get(storeId);
+    if (!e) this.ext.set(storeId, (e = { statuses: new Map(), queues: new Map(), leases: new Map(), mailbox: new Map(), seq: 0 }));
+    return e;
+  }
+
+  private async handleExt(
+    req: IncomingMessage,
+    res: ServerResponse,
+    access: MockAccess,
+    path: string,
+    method: string,
+    headers: Record<string, string>,
+    log: (status: number, code?: string) => void,
+    refuse: (status: number, code: string, extra?: Record<string, unknown>, headers?: Record<string, string>) => void
+  ): Promise<void> {
+    const [, , storeId, action, rest] = path.split('/') as [string, string, string, string, string | undefined];
+    if (!access.grants.has(storeId)) return refuse(403, 'store_not_granted', {}, headers);
+    const ext = this.extOf(storeId);
+    const own = `a:${access.id}`;
+    const body = method === 'GET' || method === 'DELETE' ? {} : (JSON.parse((await readBody(req)).toString('utf8') || '{}') as Record<string, unknown>);
+    const ok = (data: unknown) => {
+      log(200);
+      json(res, 200, { success: true, data }, headers);
+    };
+    const runnerId = rest ? decodeURIComponent(rest) : undefined;
+    if (action === 'ext-status' && method === 'GET' && !runnerId) return ok({ statuses: [...ext.statuses].map(([r, s]) => ({ runnerId: r, ...s })) });
+    if ((action === 'ext-status' || action === 'ext-queue') && method === 'PUT' && runnerId) {
+      if (runnerId !== own) return refuse(403, 'runner_forbidden', {}, headers);
+      const map = action === 'ext-status' ? ext.statuses : ext.queues;
+      const cur = map.get(runnerId);
+      const rev = Number(body.rev);
+      if (rev !== (cur?.rev ?? 0) + 1) return refuse(409, action === 'ext-status' ? 'ext_status_conflict' : 'ext_queue_conflict', { rev: cur?.rev ?? 0 }, headers);
+      if (typeof body.sealed !== 'string' || body.sealed.length > (action === 'ext-status' ? 64 * 1024 * 1.4 : 1024 * 1024 * 1.4)) return refuse(413, 'too_large', {}, headers);
+      map.set(runnerId, { rev, e: Number(body.e), g: Number(body.g), sealed: body.sealed, updatedAt: new Date().toISOString() });
+      return ok({ rev });
+    }
+    if (action === 'ext-queue' && method === 'GET' && runnerId) {
+      const q = ext.queues.get(runnerId);
+      return q ? ok(q) : refuse(404, 'not_found', {}, headers);
+    }
+    if (action === 'ext-lease' && method === 'POST') {
+      const defId = String(body.defId);
+      if (body.runnerId !== own) return refuse(403, 'runner_forbidden', {}, headers);
+      const cur = ext.leases.get(defId);
+      if (cur && cur.runnerId !== own && cur.until > Date.now()) return refuse(409, 'extdb_lease_held', { runnerId: cur.runnerId, until: new Date(cur.until).toISOString(), remedy: ['wait'] }, headers);
+      const until = Date.now() + Math.min(3600, Math.max(120, Number(body.ttlS) || 120)) * 1000;
+      ext.leases.set(defId, { runnerId: own, until });
+      return ok({ until: new Date(until).toISOString() });
+    }
+    if (action === 'ext-lease' && method === 'DELETE' && runnerId) {
+      const cur = ext.leases.get(runnerId);
+      if (cur?.runnerId === own) ext.leases.delete(runnerId);
+      return ok({ ok: true });
+    }
+    if (action === 'ext-resolve' && runnerId && runnerId === own) {
+      const box = ext.mailbox.get(runnerId) ?? [];
+      const q = new URL(req.url ?? '/', 'http://x').searchParams;
+      if (method === 'GET') return ok({ items: box.filter((d) => d.seq > Number(q.get('after') ?? 0)).slice(0, 500).map(({ seq, sealed }) => ({ seq, sealed })) });
+      if (method === 'DELETE') {
+        const upTo = Number(q.get('upTo') ?? 0);
+        ext.mailbox.set(runnerId, box.filter((d) => d.seq > upTo));
+        return ok({ ok: true });
+      }
+    }
+    return refuse(404, 'not_found', {}, headers);
+  }
+
+  /** L'appli écrit une définition (signée par la clé du créateur, ou d'un autre compte) dans le schéma du magasin. */
+  async appSetExtSource(storeId: string, def: Record<string, unknown> | null, opts: { signer?: 'creator' | 'other'; managedBy?: boolean } = {}): Promise<Record<string, unknown> | null> {
+    const store = this.mustStore(storeId);
+    const replica = store.replica!;
+    await replica.refresh();
+    const schema = replica.schema()!;
+    let signed: Record<string, unknown> | null = null;
+    if (def) {
+      const key = opts.signer === 'other' ? new Uint8Array(randomBytes(32)) : this.creatorSigningKey;
+      signed = signDef(curves, { ...def, signer: (def.signer as string | undefined) ?? this.creatorUserId } as unknown as ExtSourceDef, key) as unknown as Record<string, unknown>;
+    }
+    const extra = { ...(schema.extra ?? {}) } as Record<string, unknown>;
+    if (signed) extra.extSource = signed;
+    else delete extra.extSource;
+    const map = (signed?.map ?? []) as Array<{ col: string; prop: string; dir: string }>;
+    const properties = schema.properties.map((p) => {
+      const m = map.find((x) => x.prop === p.id);
+      if (!opts.managedBy || !m) return p;
+      return { ...p, managedBy: { src: signed!.id, dir: m.dir, col: m.col } } as typeof p;
+    });
+    const { t: _t, ...rest } = schema;
+    void _t;
+    replica.setSchema({ ...rest, properties, extra });
+    await replica.flush();
+    return signed;
+  }
+
+  /** Les clés `K_xs` d'un magasin à sa génération courante (ce que dérive tout membre). */
+  private async kxs(storeId: string): Promise<{ key: Uint8Array; e: number; g: number }> {
+    const store = this.mustStore(storeId);
+    const k = await this.rootKeys(storeId, store.epoch, store.g);
+    return { key: await statusKey(c, k.kDb, storeId), e: store.epoch, g: store.g };
+  }
+
+  /** Un membre tranche des conflits : décisions scellées sous `K_xs`, déposées dans la boîte aux lettres de l'exécutant. */
+  async appDecide(storeId: string, runnerId: string, defId: string, decisions: Array<{ id: string; choice: string }>, by = { userId: 'u_membre', device: 'PC de Camille' }): Promise<number> {
+    const ext = this.extOf(storeId);
+    const { key } = await this.kxs(storeId);
+    const box = ext.mailbox.get(runnerId) ?? [];
+    for (const d of decisions) {
+      ext.seq += 1;
+      box.push({ seq: ext.seq, defId, sealed: await sealJson(c, key, { id: d.id, choice: d.choice, by, at: new Date().toISOString() }, resolveAad(storeId, runnerId)) });
+    }
+    ext.mailbox.set(runnerId, box);
+    // Le dépôt déclenche un passage (`ext-run`)
+    const accessId = runnerId.slice(2);
+    const access = this.accesses.get(accessId);
+    if (access) this.signal(access, { t: 'ext-run', storeId, defId });
+    return ext.seq;
+  }
+
+  /** `POST /dbstore/:id/ext-run` d'un membre (avec un accord pour CE passage, au besoin). */
+  appExtRun(storeId: string, runnerId: string, defId: string, ack?: Record<string, unknown>): void {
+    const access = this.accesses.get(runnerId.slice(2));
+    if (access) this.signal(access, { t: 'ext-run', storeId, defId, ...(ack ? { ack } : {}) });
+  }
+
+  /** Ce qu'un membre lit de l'état publié (et de la file) : ouverts sous `K_xs`. */
+  async appReadStatus(storeId: string, runnerId: string): Promise<{ status: SyncStatus | null; queue: { entries: QueueEntry[] } | null }> {
+    const ext = this.extOf(storeId);
+    const st = ext.statuses.get(runnerId);
+    const q = ext.queues.get(runnerId);
+    const open = async <T>(item: { e: number; g: number; sealed: string; rev: number } | undefined, aad: (rev: number) => string): Promise<T | null> => {
+      if (!item) return null;
+      const k = await this.rootKeys(storeId, item.e, item.g);
+      return openJson<T>(c, await statusKey(c, k.kDb, storeId), item.sealed, aad(item.rev));
+    };
+    return {
+      status: await open<SyncStatus>(st, (rev) => statusAad(storeId, runnerId, rev)),
+      queue: await open<{ entries: QueueEntry[] }>(q, (rev) => queueAad(storeId, runnerId, rev)),
+    };
+  }
+
   // ==================== La porte (`apiGate.ts`) ====================
 
   private quotaHeaders(access: MockAccess): Record<string, string> {
@@ -930,7 +1085,9 @@ export class MockFilarr {
           ? { kind: 'export' as MeterKind, storeId: undefined, action: 'export' }
           : this.rev3 && path === '/api-access/self/import' && method === 'GET'
             ? { kind: 'import' as MeterKind, storeId: undefined, action: 'import' }
-            : null;
+            : this.rev3 && /^\/dbstore\/[A-Za-z0-9_-]{22}\/ext-(status|lease|queue|resolve)(\/|$)/.test(path)
+              ? { kind: 'ext' as MeterKind, storeId: path.split('/')[2], action: 'ext' }
+              : null;
     const route =
       path === '/api-access/self' && method === 'GET'
         ? { kind: 'self' as MeterKind, storeId: undefined, action: 'self' }
@@ -969,6 +1126,7 @@ export class MockFilarr {
       });
     }
     if (route!.kind === 'files' && access) return this.handleFiles(req, res, access, path, method, headers, log, refuse);
+    if (route!.kind === 'ext' && access) return this.handleExt(req, res, access, path, method, headers, log, refuse);
     if (route!.kind === 'export' && access) {
       const body = JSON.parse((await readBody(req)).toString('utf8') || '{}') as { sealed?: unknown };
       if (!access.pending) return refuse(409, 'migration_not_pending', {}, headers);

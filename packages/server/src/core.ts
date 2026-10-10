@@ -27,6 +27,7 @@ import { McpServer } from './api/mcp';
 import { ApiServer } from './api/server';
 import { WebhookService, type WebhookOptions } from './api/webhooks';
 import { FileService } from './files';
+import { SyncRunner, type SyncHostOptions } from './sync/runner';
 import { json, readBody } from './http';
 import { Journal } from './journal';
 import { Metrics } from './metrics';
@@ -75,6 +76,8 @@ export interface GateCoreOptions {
   webhooks?: WebhookOptions;
   /** Pour les essais : intervalles de la réplique. */
   replicaTiming?: { pollIntervalMs?: number; backoffMinMs?: number; backoffMaxMs?: number; pausedRetryMs?: number };
+  /** L'exécutant des synchros externes (source-externe-1) : où ranger les ombres, quels connecteurs. */
+  sync?: SyncHostOptions;
 }
 
 const randomCode = (): string => String(100_000 + (globalThis.crypto.getRandomValues(new Uint32Array(1))[0]! % 900_000));
@@ -92,6 +95,8 @@ export class GateCore {
   readonly mcp: McpServer;
   readonly writer: Writer;
   readonly files: FileService;
+  /** L'exécutant des synchros externes, si l'hôte le fournit. */
+  readonly sync: SyncRunner | null;
   readonly api: ApiServer;
   readonly admin: AdminApi;
   readonly version: string;
@@ -131,6 +136,7 @@ export class GateCore {
     this.mcp = new McpServer(this.model, this.version);
     this.writer = new Writer(this.model, this.replicator, () => this.settings.write);
     this.files = new FileService(this);
+    this.sync = opts.sync ? new SyncRunner(this, opts.sync) : null;
     this.api = new ApiServer(this);
     this.admin = new AdminApi(this);
     this.wire();
@@ -282,6 +288,8 @@ export class GateCore {
       this.journal.add({ kind: 'error', who: 'migration', what: 'export refusé', code: 'créateur', note: 'clé du créateur non authentifiée : rien n’est exporté' });
       throw new Error('clé du créateur non authentifiée');
     }
+    // Les ombres des synchros (déjà chiffrées sous K_shadow) voyagent avec le paquet
+    await this.sync?.cacheShadows();
     let sealed: string;
     try {
       sealed = await sealSettingsFor(
@@ -320,6 +328,7 @@ export class GateCore {
   async start(token: string | null, source: 'env' | 'state' | null, live = true): Promise<void> {
     await this.journal.prune();
     this.pruneTimer = setInterval(() => void this.journal.prune(), 6 * 3_600_000);
+    this.sync?.start();
     (this.pruneTimer as { unref?: () => void }).unref?.();
     if (token) {
       try {
@@ -343,6 +352,7 @@ export class GateCore {
 
   async stop(): Promise<void> {
     if (this.pruneTimer) clearInterval(this.pruneTimer);
+    this.sync?.stop();
     this.webhooks.stop();
     await this.replicator.stop();
     this.state.saveNow();

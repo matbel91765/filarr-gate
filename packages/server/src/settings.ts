@@ -124,9 +124,10 @@ export function parseToml(text: string): Record<string, unknown> {
   for (const [i, raw] of text.split(/\r?\n/).entries()) {
     const line = raw.replace(/(^|\s)#.*$/, '').trim();
     if (line === '') continue;
-    const sec = /^\[([A-Za-z0-9_.-]+)\]$/.exec(line);
+    const sec = /^\[((?:[A-Za-z0-9_.-]|"[A-Za-z0-9_.-]+")+)\]$/.exec(line);
     if (sec) {
-      section = `${sec[1]}.`;
+      // `[extdb."xs_…"]` : une clé citée devient un segment comme un autre
+      section = `${sec[1]!.replace(/"/g, '')}.`;
       continue;
     }
     const kv = /^([A-Za-z0-9_-]+)\s*=\s*(.+)$/.exec(line);
