@@ -283,6 +283,10 @@ filarr-gate sources run xs_DemoClientsBoutique002 --json
 { "state": "question", "code": "extdb_guard", "question": { "kind": "guard", "pass": "p_3fa9c1d2e0", "gone": 2, "total": 3 } }
 ```
 
+The sync's journal records the stop itself (`{ "kind": "guard", "code": "extdb_guard", "n": 2 }`, `n` being what the pass
+would have done), never the rows it would have marked, and the counts of the state stay at zero: nothing was written.
+The gate's own **Log** names the cause, the planned number and the threshold, and says that nothing was written.
+
 Check D1 first (a truncated table, a wrong filter). If the disappearances are real, agree for this pass only:
 
 ```sh

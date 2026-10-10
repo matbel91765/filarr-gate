@@ -236,8 +236,24 @@ describe('miroir et deux sens contre D1', () => {
     expect(st).toMatchObject({ state: 'question', code: 'extdb_guard', question: { kind: 'guard', total: 3 } });
     expect(Object.keys(await rowsByNom())).toHaveLength(3);
     expect((await mock.appRows(storeId)).some((r) => (r as unknown as { extGone?: unknown }).extGone)).toBe(false);
+    // Rien n'a été écrit, et rien ne le fait croire (I3) : ni « gone » au journal de la synchro, ni compteur ;
+    // l'arrêt y est, avec le nombre prévu, et le journal local de la boîte le dit en clair
+    const guardEntry = st!.journal.find((j) => j.kind === 'guard');
+    expect(guardEntry).toMatchObject({ code: 'extdb_guard', n: 3 });
+    expect(st!.journal.some((j) => j.kind === 'gone')).toBe(false);
+    expect(st!.counts).toMatchObject({ in: { changed: 0, created: 0, gone: 0 }, out: { changed: 0, inserted: 0, deleted: 0 } });
+    const published = (await mock.appReadStatus(storeId, runner())).status!;
+    expect(published.journal.some((j) => j.kind === 'gone')).toBe(false);
+    expect(published.journal.find((j) => j.kind === 'guard')).toEqual(guardEntry);
+    expect(gate.journal.list().find((e) => e.code === 'extdb_guard')?.note).toMatch(/3 lignes sur 3 .*rien n’a été écrit/);
     mock.appExtRun(storeId, runner(), DEF_ID, { guard: st!.question!.pass });
     await until(async () => (await mock.appRows(storeId)).filter((r) => (r as unknown as { extGone?: unknown }).extGone).length === 3, 5000, 'lignes marquées après accord');
+    // Après le passage accordé, l'arrêt reste au journal de la synchro, suivi des lignes marquées, elles, pour de bon
+    await until(async () => ((await mock.appReadStatus(storeId, runner())).status?.journal ?? []).some((j) => j.kind === 'gone'), 5000, 'état publié après accord');
+    const after = (await mock.appReadStatus(storeId, runner())).status!;
+    expect(after.journal.find((j) => j.kind === 'guard')).toEqual(guardEntry);
+    expect(after.journal.filter((j) => j.kind === 'gone')).toHaveLength(3);
+    expect(after.counts.in.gone).toBe(3);
   });
 });
 

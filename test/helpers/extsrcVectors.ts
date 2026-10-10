@@ -7,7 +7,7 @@
  *     égalité de latest, registre jamais écrit, accord du premier passage) et la cellule déjà en file ;
  *  3 bis et 4. planPass : les scénarios de la file (pleine, décision en double ou rejouée, conflits de ligne,
  *     rafale et ack.initial) et des lignes (créées, convergence, idempotence, onGone, onFilarrDelete,
- *     garde-fou au seuil et un au-dessus, table vidée, clés en double, publish) ;
+ *     garde-fou au seuil et un au-dessus, table vidée, journal d'un passage arrêté, clés en double, publish) ;
  *  5. définitions (chaque code, signature Ed25519 avec une clé de test, autre clé refusée) ;
  *  6 et 7. scellés : K_xs (état, file, décision) et K_shadow, IV imposé ;
  *  8. schéma : managedBy, extra.extSource, #x.extGone relus et réécrits à l'octet près, options créées.
@@ -325,6 +325,16 @@ function planFamily() {
     add('garde-fou : un au-dessus, arrêt avant toute écriture', over);
     add('garde-fou : accord pour ce passage', { ...over, ack: { guard: String(run(over).stop!.question.pass) } });
     add('garde-fou : table vidée', planInput({ rows: [], fil: base.fil, shadow: base.shadow, def: g }));
+    // Un passage arrêté qui portait aussi une sortie vers la source, une ligne sans clé, une décision pour
+    // une entrée inconnue et une entrée de file d'une colonne retirée : son journal ne garde que la ligne
+    // laissée de côté et l'arrêt ; ses compteurs ne disent rien de fait (I3)
+    const fil = clone(base.fil);
+    fil.find((r) => r.regs.p_id?.v === 6)!.regs.p_nom = { v: 'C6 (Filarr)', t: hlc(20_000) };
+    const queue: QueueEntry[] = [{ id: 'q-ancienne', row: fil[19]!.id, key: '20', col: 'ancienne', prop: 'p_old', source: { v: 1, h: 'h', at: null }, filarr: { v: 2, h: 'h2', t: null }, kind: 'cell', since: '', truncated: false }];
+    const decisions: Decision[] = [{ id: 'q-inconnue', choice: 'source', by: { userId: 'u1' }, at: '2026-10-10T11:00:00Z', seq: 3 }];
+    const mixed = planInput({ rows: [...rows.slice(5), { id: null, nom: 'sans clé', statut: 'Actif' }], fil, shadow: base.shadow, def: g, queue, decisions });
+    add('garde-fou : arrêt, le journal ne garde que l’arrêt et ce qui a été lu', mixed);
+    add('garde-fou : le même passage accordé fait ces actions-là', { ...mixed, ack: { guard: String(run(mixed).stop!.question.pass) } });
   }
 
   {

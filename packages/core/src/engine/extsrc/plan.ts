@@ -598,7 +598,12 @@ export function planPass(input: PlanInput): PassPlan {
     stop = { code: 'extdb_conflict_burst', question: { kind: 'conflict_burst', pass: guardId, n: newConflicts, initial: !hadShadow } };
   }
   if (stop) {
-    log({ kind: 'guard', code: stop.code, n: Number(stop.question.gone ?? stop.question.n ?? 0) });
+    // Un passage arrêté n'écrit RIEN, d'aucun côté (§ 6.9) : son journal ne dit que ce qui a été LU (les
+    // lignes laissées de côté, `error`) et l'ARRÊT, avec le nombre prévu (disparitions ou conflits nouveaux).
+    // Aucune action planifiée (« gone », « out », mise en file, décision traitée…) n'y reste : le journal
+    // ferait croire à des lignes marquées qui ne l'ont pas été (I3). Le détail prévu se lit dans la
+    // question (`gone`/`total`, `n`), jamais comme un fait ; les compteurs disent ce qui a été fait : rien.
+    const read = journal.filter((j) => j.kind === 'error');
     return {
       stop,
       toFilarr: [],
@@ -608,8 +613,8 @@ export function planPass(input: PlanInput): PassPlan {
       shadow: input.shadow ? cloneShadow(input.shadow) : emptyShadow(def),
       queue: [...input.queue],
       overflow: 0,
-      journal,
-      counts: { ...counts, rows: src.size || known },
+      journal: [...read, { at: now, pass: input.passId, kind: 'guard', code: stop.code, n: Number(stop.question.gone ?? stop.question.n ?? 0) }],
+      counts: { rows: src.size || known, in: { changed: 0, created: 0, gone: 0 }, out: { changed: 0, inserted: 0, deleted: 0 }, conflicts: input.queue.length },
       handledDecisions: [],
       pendingClocks: {},
       sourceUndo: {},

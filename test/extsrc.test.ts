@@ -359,6 +359,46 @@ describe('planPass (§ 6.4, § 6.5, § 6.9)', () => {
     expect(plan({ rows: [], fil, shadow: first.shadow, def: g }).stop?.code).toBe('extdb_guard');
   });
 
+  it('passage arrêté : le journal dit l’arrêt et ce qui a été lu, jamais une action qui n’a pas eu lieu (I3)', () => {
+    let t = 10_000;
+    const tick = () => hlc((t += 1));
+    const rows = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, nom: `C${i + 1}`, statut: 'Actif' }));
+    const g = def({ guard: { pct: 20, min: 2 } }); // seuil : 4
+    const first = runPass({ rows, def: g }, tick);
+    const fil: FilarrRow[] = first.plan.created.map((id) => ({ id, deleted: false, regs: {} }));
+    first.plan.toFilarr.forEach((op, i) => (fil.find((r) => r.id === op.r)!.regs[op.f] = { v: op.v, t: first.ticks[i]! }));
+    // Le même passage porte aussi une valeur changée dans Filarr (elle sortirait vers la source), une ligne
+    // sans clé, une décision pour une entrée inconnue et une entrée de file d'une colonne retirée
+    fil.find((r) => r.regs.p_id?.v === 6)!.regs.p_nom = { v: 'C6 (Filarr)', t: tick() };
+    const queue: QueueEntry[] = [{ id: 'q-ancienne', row: fil[19]!.id, key: '20', col: 'ancienne', prop: 'p_old', source: { v: 1, h: 'h', at: null }, filarr: { v: 2, h: 'h2', t: null }, kind: 'cell', since: '', truncated: false }];
+    const same = {
+      rows: [...rows.slice(5), { id: null, nom: 'sans clé', statut: 'Actif' }],
+      fil,
+      shadow: first.shadow,
+      def: g,
+      queue,
+      decisions: [{ id: 'q-inconnue', choice: 'source' as const, by: { userId: 'u1' }, at: '2026-10-10T11:00:00.000Z', seq: 3 }],
+    };
+    const over = plan(same);
+    expect(over.stop).toMatchObject({ code: 'extdb_guard', question: { kind: 'guard', gone: 5, total: 20 } });
+    // Rien n'est écrit : le journal garde la ligne laissée de côté (lue) et l'ARRÊT, avec le nombre prévu ;
+    // ni « gone », ni « out », ni décision traitée, ni entrée de file sortie
+    expect(over.journal).toEqual([
+      { at: '2026-10-10T12:00:00.000Z', pass: 'pass1', kind: 'error', code: 'row_without_key' },
+      { at: '2026-10-10T12:00:00.000Z', pass: 'pass1', kind: 'guard', code: 'extdb_guard', n: 5 },
+    ]);
+    // Les compteurs disent ce qui a été fait (rien) ; le prévu se lit dans la question
+    expect(over.counts).toEqual({ rows: 15, in: { changed: 0, created: 0, gone: 0 }, out: { changed: 0, inserted: 0, deleted: 0 }, conflicts: 1 });
+    expect(over.handledDecisions).toEqual([]);
+    expect(over.queue).toEqual(queue);
+    // Le même passage, accordé, fait bien ces actions-là : c'est l'arrêt seul qui les retire du journal
+    const acked = plan({ ...same, ack: { guard: String(over.stop!.question.pass) } });
+    expect(acked.stop).toBeNull();
+    expect(acked.journal.filter((j) => j.kind === 'gone')).toHaveLength(5);
+    expect(acked.journal.map((j) => j.kind)).toEqual(expect.arrayContaining(['out', 'resolution_duplicate', 'resolved_by_policy', 'pass']));
+    expect(acked.journal.some((j) => j.kind === 'guard')).toBe(false);
+  });
+
   it('rafale de conflits au premier passage : arrêt, puis « trancher ce premier passage avec la source »', () => {
     const n = 60;
     const rows = Array.from({ length: n }, (_, i) => ({ id: i + 1, nom: `S${i}`, statut: 'Actif' }));
@@ -367,6 +407,9 @@ describe('planPass (§ 6.4, § 6.5, § 6.9)', () => {
     const d = def({ conflict: 'ask' });
     const burst = plan({ rows, fil, def: d });
     expect(burst.stop?.code).toBe('extdb_conflict_burst');
+    // Aucune entrée n'est mise en file par un passage arrêté : le journal ne dit que l'arrêt (I3)
+    expect(burst.journal).toEqual([{ at: '2026-10-10T12:00:00.000Z', pass: 'pass1', kind: 'guard', code: 'extdb_conflict_burst', n }]);
+    expect(burst.queue).toEqual([]);
     const initial = plan({ rows, fil, def: d, ack: { initial: 'source' } });
     expect(initial.stop).toBeNull();
     expect(initial.toFilarr.filter((o) => o.f === 'p_nom')).toHaveLength(n);

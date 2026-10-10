@@ -145,6 +145,19 @@ const PAID = new Set(['solo', 'pro', 'teams', 'enterprise']);
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/**
+ * La ligne du journal local pour un passage arrêté par un garde-fou (§ 6.9) : la cause, ce qui était
+ * PRÉVU (lu dans la question, jamais dans des écritures) et ce qui a été fait, rien.
+ */
+function stopNote(def: ExtSourceDef, stop: NonNullable<PassPlan['stop']>): string {
+  const q = stop.question;
+  if (stop.code === 'extdb_guard') {
+    const g = def.guard ?? { pct: 20, min: 10 };
+    return `garde-fou : ${Number(q.gone ?? 0)} lignes sur ${Number(q.total ?? 0)} seraient marquées ou supprimées d’un coup (seuil ${g.pct} %, au moins ${g.min}) ; arrêt avant toute écriture, rien n’a été écrit`;
+  }
+  return `trop de conflits d’un coup : ${Number(q.n ?? 0)} conflits nouveaux${q.initial === true ? ' au premier passage' : ''} ; arrêt avant toute écriture, rien n’a été écrit`;
+}
+
 /** La prochaine heure `HH:MM` dans un fuseau (planification `1d`). */
 export function nextDaily(at: string, tz: string, now = Date.now()): number {
   const m = /^(\d{2}):(\d{2})$/.exec(at);
@@ -583,8 +596,12 @@ export class SyncRunner {
         sha256,
       });
       if (plan.stop) {
+        // 5. Garde-fou : rien n'est écrit, l'ombre et la file restent celles d'avant. Le journal du plan ne
+        // porte que l'arrêt (et les lignes laissées de côté à la lecture) ; il est enregistré pour que
+        // l'arrêt reste au journal de la synchro après le passage suivant, accordé ou non
         persisted.journal = [...persisted.journal, ...plan.journal];
-        return await this.finish(s, base, persisted, { state: 'question', code: plan.stop.code, question: plan.stop.question, plan }, passId);
+        await this.savePersisted(s, base, persisted);
+        return await this.finish(s, base, persisted, { state: 'question', code: plan.stop.code, question: plan.stop.question, plan, detail: stopNote(s.def, plan.stop) }, passId);
       }
       // 6. La source : sous condition, relecture, écho
       if (plan.toSource.length > 0) {
@@ -767,7 +784,8 @@ export class SyncRunner {
       who: 'synchro',
       what: `passage ${passId} · ${label}`,
       code: out.code ?? out.state,
-      ...(plan ? { note: `Filarr ${plan.counts.in.changed + plan.counts.in.created} · source ${plan.counts.out.changed + plan.counts.out.inserted + plan.counts.out.deleted} · file ${plan.queue.length}` } : out.detail ? { note: out.detail } : {}),
+      // Un passage arrêté dit sa cause et ce qui était prévu, jamais des écritures qui n'ont pas eu lieu
+      ...(plan && !plan.stop ? { note: `Filarr ${plan.counts.in.changed + plan.counts.in.created} · source ${plan.counts.out.changed + plan.counts.out.inserted + plan.counts.out.deleted} · file ${plan.queue.length}` } : out.detail ? { note: out.detail } : {}),
     });
     this.core.webhooks.onSync(out.state === 'ok' ? 'sync.done' : 'sync.failed', { defId: s.def.id, name: s.def.name, base: s.base, state: status.state, code: status.code, counts: status.counts, queue: status.queue, at: now });
     return status;

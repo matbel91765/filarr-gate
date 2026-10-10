@@ -52,7 +52,8 @@ anything else is HTTPS or TLS.
    or `ask` — the cell is queued, written nowhere, and settled in Filarr; the rest of the row syncs.
 4. **Guards** stop a pass before any write: too many rows gone from the source (`guard.pct`, at least `guard.min`), or
    a burst of conflicts on a first pass. Agree in Filarr (or `filarr-gate sources run <id> --ack-guard <pass>`) to go
-   on for that pass only.
+   on for that pass only. A stopped pass journals the stop and the planned number, never the rows it would have
+   touched; its counts stay at zero.
 5. Writes to the source under the condition of the value read (a value changed meanwhile is not overwritten), then one
    commit to Filarr. The shadow and the published status (encrypted under a key of the database, readable by its
    members, never by Filarr) are saved; `sync.done` or `sync.failed` webhooks fire.
