@@ -6,8 +6,10 @@
  *   `Filarr-Gate-Signature: t=<secondes>,v1=<hex>` avec
  *   `v1 = HMAC-SHA256(secret, t + "." + corps)`. Le destinataire vérifie la
  *   signature sur le corps BRUT et refuse un horodatage de plus de 5 minutes.
- * - Reprises : 8 essais en 24 h au plus, délai doublé à chaque échec (5 min,
- *   10, 20…), `Retry-After` du destinataire honoré ; puis abandon noté au journal.
+ * - Reprises : 8 essais sur environ 10 h 30 (`RETRY_DELAYS_MIN` : tout de suite, puis
+ *   5 min, 10, 20… 320), `Retry-After` du destinataire honoré quand il est plus
+ *   long ; puis abandon noté au journal. La documentation et l'interface le disent
+ *   d'après ces délais (un essai le vérifie).
  * - Les livraisons en attente vivent en MÉMOIRE seulement : leurs corps portent
  *   des lignes en clair, qui ne s'écrivent jamais sur le disque. Un redémarrage
  *   les abandonne (et le journal le dit).
@@ -31,7 +33,9 @@ import { rowJson } from '../../../gate/src/data/fields';
 import type { BaseInfo, GateModel } from '../../../gate/src/data/model';
 
 export const SIGNATURE_TOLERANCE_S = 300;
-export const MAX_ATTEMPTS = 8;
+/** Les délais avant chaque essai d'une livraison, en minutes : un essai par délai. */
+export const RETRY_DELAYS_MIN: readonly number[] = [0, 5, 10, 20, 40, 80, 160, 320];
+export const MAX_ATTEMPTS = RETRY_DELAYS_MIN.length;
 
 /** Signe un corps : l'en-tête `Filarr-Gate-Signature`. */
 export function signPayload(secret: string, body: string, t = Math.floor(Date.now() / 1000)): string {
@@ -136,7 +140,7 @@ export class WebhookService {
     private readonly metrics: Metrics,
     private readonly opts: WebhookOptions = {}
   ) {
-    this.delays = opts.delaysMs ?? [0, 5, 10, 20, 40, 80, 160, 320].map((m) => m * 60_000);
+    this.delays = opts.delaysMs ?? RETRY_DELAYS_MIN.map((m) => m * 60_000);
   }
 
   list(): WebhookRecord[] {

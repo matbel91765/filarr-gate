@@ -81,8 +81,8 @@ const actifs = await gate.base('clients').view('clients-actifs').rows();
   autorisées et une échéance.
 - **L'écriture** (éteinte d'office) : `POST`, `PATCH`, `DELETE`, idempotents avec `Idempotency-Key`, validés par Filarr
   comme les écritures de n'importe quel appareil.
-- **Des webhooks signés** à chaque changement de ligne (HMAC-SHA256 sur le corps brut, 8 essais sur une dizaine
-  d'heures).
+- **Des webhooks signés** à chaque changement de ligne (HMAC-SHA256 sur le corps brut, 8 essais sur environ
+  10 h 30).
 - **Une fente à fichiers** (`POST /v1/files`) : les fichiers sont scellés pour la boîte de dépôt que le créateur a liée
   et signée dans Filarr ; exécutables et fichiers trop lourds sont refusés avant que rien ne parte. L'appli Filarr les
   range ; ni Filarr ni la boîte ne savent où.

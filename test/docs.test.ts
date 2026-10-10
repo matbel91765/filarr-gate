@@ -8,6 +8,8 @@
  *  - le texte d'accord de la boîte hébergée (`hebergement-v1`) est recopié MOT POUR MOT dans la page
  *    sécurité et confiance de chaque langue : son empreinte est celle que fixe le contrat
  *    `gate-heberge-1` (§ 3.2), recalculée ici sur la page elle-même ;
+ *  - les nouveaux essais des webhooks sont décrits d'après les délais du code, dans l'interface,
+ *    les pages et les README ;
  *  - l'OpenAPI générique est éprouvée route par route contre une boîte en marche : chaque
  *    opération décrite répond, avec un statut décrit.
  */
@@ -17,7 +19,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Gate } from '../packages/cli/src/gate';
+import { MAX_ATTEMPTS, RETRY_DELAYS_MIN } from '../packages/server/src/api/webhooks';
 import { setLogLevel } from '../packages/server/src/log';
+import { EN } from '../packages/cli/ui/src/en';
 import { buildDocs } from '../scripts/docs/build';
 import { CATALOGUE_DB, CLIENTS_DB, COMMANDES_DB, demoStores } from './support/demoData';
 import { MockFilarr } from './support/mockFilarr';
@@ -51,6 +55,38 @@ describe('le texte d’accord hebergement-v1, mot pour mot', () => {
     expect(block.split('\n')).toHaveLength(11);
     expect(block).toContain('{{box}}');
     expect(createHash('sha256').update(block.normalize('NFC'), 'utf8').digest('hex')).toBe(vectors.consent[lang].hash);
+  });
+});
+
+describe('les nouveaux essais des webhooks, décrits d’après le code', () => {
+  const n = RETRY_DELAYS_MIN.length;
+  const between = RETRY_DELAYS_MIN.slice(1, -1).join(', ');
+  const last = RETRY_DELAYS_MIN[n - 1];
+  // La durée totale, arrondie à la demi-heure : « 10 h 30 » et « 10.5 hours »
+  const halfHours = Math.round(RETRY_DELAYS_MIN.reduce((a, b) => a + b, 0) / 30);
+  const fr = `${Math.floor(halfHours / 2)} h ${halfHours % 2 ? '30' : '00'}`;
+  const en = `${halfHours / 2} hours`;
+  const read = (p: string) => readFileSync(join(__dirname, '..', p), 'utf8').replace(/\r\n/g, '\n').replace(/\n\s*/g, ' ');
+
+  it('un essai par délai', () => {
+    expect(MAX_ATTEMPTS).toBe(n);
+  });
+
+  it('l’interface de gestion', () => {
+    const key = `${n} essais sur environ ${fr}, délai doublé à chaque échec, puis abandon noté au journal`;
+    expect(read('packages/cli/ui/src/screens/Webhooks.tsx')).toContain(`t('${key}')`);
+    expect(EN[key]).toContain(`${n} attempts over about ${en}`);
+  });
+
+  it.each(['docs/tutorials/webhooks', 'docs/reference/webhooks', 'docs/troubleshooting'])('%s, dans les deux langues', (page) => {
+    expect(read(`${page}.md`)).toContain(`${between} and ${last} minutes`);
+    expect(read(`${page}.fr.md`)).toContain(`${between} et ${last} minutes`);
+  });
+
+  // packages/cli/README*.md sont des copies de ces deux-là, faites à l'empaquetage (scripts/prepack.mjs)
+  it('README, dans les deux langues', () => {
+    expect(read('README.md')).toContain(`${n} attempts over about ${en}`);
+    expect(read('README.fr.md')).toContain(`${n} essais sur environ ${fr}`);
   });
 });
 

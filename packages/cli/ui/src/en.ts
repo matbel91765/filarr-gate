@@ -14,7 +14,7 @@ export const EN: Record<string, string> = {
   "3 · Protéger cette interface": "3 · Protect this interface",
   "30 jours": "30 days",
   "7 jours": "7 days",
-  "8 essais en 24 h, délai doublé à chaque échec, puis abandon noté au journal": "8 attempts over 24 h, delay doubled after each failure, then given up and logged",
+  "8 essais sur environ 10 h 30, délai doublé à chaque échec, puis abandon noté au journal": "8 attempts over about 10.5 hours, delay doubled after each failure, then given up and logged",
   "90 jours": "90 days",
   "AAAA-MM-JJ": "YYYY-MM-DD",
   "API Filarr": "Filarr API",

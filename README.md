@@ -80,7 +80,7 @@ const active = await gate.base('clients').view('clients-actifs').rows();
   fingerprint), limited to databases, views, queries or the file slot, with a rate, allowed addresses and an expiry.
 - **Writes** (off by default): `POST`, `PATCH`, `DELETE`, idempotent with `Idempotency-Key`, committed to Filarr like any
   device's writes.
-- **Signed webhooks** on row changes (HMAC-SHA256 on the raw body, 8 attempts over about ten hours).
+- **Signed webhooks** on row changes (HMAC-SHA256 on the raw body, 8 attempts over about 10.5 hours).
 - **A file slot** (`POST /v1/files`): files sealed for the deposit box the creator linked and signed in Filarr;
   executables and oversized files refused before anything leaves. The Filarr app files them; neither Filarr nor the
   gate knows where.

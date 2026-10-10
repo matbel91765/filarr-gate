@@ -193,7 +193,7 @@ export function Webhooks(props: { onChange: () => void }) {
                   </a>
                 </dd>
                 <dt>{t('Reprises')}</dt>
-                <dd>{t('8 essais en 24 h, délai doublé à chaque échec, puis abandon noté au journal')}</dd>
+                <dd>{t('8 essais sur environ 10 h 30, délai doublé à chaque échec, puis abandon noté au journal')}</dd>
               </dl>
             </section>
 
